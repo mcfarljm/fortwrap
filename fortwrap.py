@@ -19,18 +19,10 @@ import os
 VERSION = 0.7
 
 
-# Determine Fortran compiler
-# TODO: make this an option
-# if len(sys.argv) == 1:
-#     compiler = 'g95'
-# elif sys.argv[1].find('g95') >= 0:
-#     compiler = 'g95'
-# else:
-#     compiler = 'gfortran' 
-compiler = 'g95'
-
-
 # SETTINGS ==========================================
+
+# Default Fortran compiler.  Can be overridden by command option
+compiler = 'g95'
 
 code_output_dir = '.'
 include_output_dir = '.'
@@ -1299,6 +1291,7 @@ class Options:
         print "-v, --version\tPrint version information and exit\n"
         print "-h, --help\tPrint this usage information\n"
         print "-n\t\tRun parser but do not generate any wrapper code (dry run)\n"
+        print "-c FC\t\tUse name mangling for Fortran compiler FC.  Only supports g95\n\t\tand gfortran\n"
         print "-g\t\tWrap source files found in current directory (glob)\n"
         print "-d dir\t\tOutput generated wrapper code to dir\n"
         print "--file-list=f\tRead list of Fortran source files to parse from file f\n"
@@ -1306,10 +1299,10 @@ class Options:
         sys.exit(exit_val)
 
     def parse_args(self):
-        global code_output_dir, include_output_dir, fort_output_dir
+        global code_output_dir, include_output_dir, fort_output_dir, compiler
         try:
             # -g is to glob working directory for files
-            opts, args = getopt.getopt(sys.argv[1:], 'hvgnd:', ['file-list=','clean','help','version'])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:', ['file-list=','clean','help','version'])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
@@ -1335,6 +1328,11 @@ class Options:
                 code_output_dir = a
                 include_output_dir = a
                 fort_output_dir = a
+            elif o=='-c':
+                if a!='g95' and a!='gfortran':
+                    print "Error, only g95 and gfortran name mangling supported"
+                    sys.exit(1)
+                    compiler = a
             elif o=='-n':
                 self.dry_run = True
             elif o=='--clean':
@@ -1350,8 +1348,6 @@ class Options:
 if __name__ == "__main__":
 
     opts = Options()
-
-    print "Fortran compiler is:", compiler
 
     if opts.clean_code:
         clean_directories()
