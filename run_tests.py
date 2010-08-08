@@ -8,6 +8,7 @@ cmd = '../../fortwrap.py'
 
 os.chdir('tests')
 tests = glob.glob('*')
+tests.remove( glob.glob('*.mk')[0] )
 
 num_err = 0
 
