@@ -16,29 +16,36 @@ num_err = 0
 if tests:
     os.chdir(tests[0])
 
+failed_tests = []
+
 for test in tests:
     os.chdir('..')
-    print "Running test:", test
+    print "Running test:", test,
     os.chdir(test)
     # Run wrapper generator
-    stat = os.system(cmd + ' ' + opts)
+    stat = os.system(cmd + ' ' + opts + ' > /dev/null')
     if stat!=0:
-        print "Error running fortwrap.py"
         num_err += 1
+        failed_tests.append((test,'wrapper'))
+        print "[FAIL: wrapper]"
         continue
     # Build test program
-    stat = os.system('make')
+    stat = os.system('make > /dev/null')
     if stat!=0:
-        print "Error building program"
         num_err += 1
+        failed_tests.append((test,'build'))
+        print "[FAIL: build]"
         continue
     # Run test program
     stat = os.system('./prog')
     if stat!=0:
-        print "Error running test program"
         num_err += 1
+        failed_tests.append((test,'run'))
+        print "[FAIL: run]"
+        continue
+    print "[PASS]"
 
 if num_err == 0:
     print "Tests successful"
 else:
-    print num_err, "error(s)"
+    print num_err, "error(s):", failed_tests

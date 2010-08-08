@@ -69,7 +69,7 @@ fort_type_def = re.compile(r'\s*TYPE\s+[a-zA-Z]')
 fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(')
 fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)')
 fort_comment = re.compile('\s*!')
-fort_data_string = r'\s*(TYPE\s*\((?P<dt_spec>\S*)\)|INTEGER|REAL\*8|REAL\(C_DOUBLE\)|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
+fort_data_string = r'\s*(TYPE\s*\((?P<dt_spec>\S*)\)|INTEGER|REAL(\*8|\s*\(C_DOUBLE\))?|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
 fort_data = re.compile(fort_data_string,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_string + '.*::',re.IGNORECASE)
 module_def = re.compile(r'\s*MODULE\s+\S')
@@ -98,7 +98,7 @@ proc_arg_exclusions = set()
 orphan_names = set()
 
 # 'INT' is for the hidden name length argument
-cpp_type_map = {'INTEGER':'int*', 'REAL*8':'double*', 'REAL(C_DOUBLE)':'double*','LOGICAL':'int*', 'CHARACTER':'char*', 'INT':'int'}
+cpp_type_map = {'INTEGER':'int*', 'REAL':'float*', 'REAL*8':'double*', 'REAL(C_DOUBLE)':'double*','LOGICAL':'int*', 'CHARACTER':'char*', 'INT':'int'}
 
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
 
