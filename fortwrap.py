@@ -29,13 +29,6 @@ VERSION = 0.7
 #     compiler = 'gfortran' 
 compiler = 'g95'
 
-# Define mangle_name here b/c it is used in the SETTINGS below
-def mangle_name(mod,func):
-    if compiler == 'g95':
-        return mod.lower() + "_MP_" + func.lower()
-    else: # gfortran
-        return '__' + mod.lower() + '_MOD_' + func.lower()
-
 
 # SETTINGS ==========================================
 
@@ -50,8 +43,7 @@ orphans_file = 'orphans.in'
 
 HEADER_STRING = '/* This source file automatically generated on ' + str(date.today()) + ' using \n   Fortran source code parser by John McFarland */\n'
 
-# TODO: auto-generate this Fortran code
-fpointer_conversion_func = mangle_name('cutils', 'convert_c_funcpointer')
+func_pointer_converter = 'convert_c_funcpointer'
 
 misc_defs_filename = 'InterfaceDefs.h'
 matrix_classname = 'FortranMatrix'
@@ -121,11 +113,15 @@ file_lines_list = []
 PRIVATE=1
 PUBLIC=0
 
+# Indicate whether or not we will need procedure pointer wrapper code
+have_proc_pointer = False
+
 # ===================================================
 
 
 class DataType:
     def __init__(self,type,array=False,matrix=False,str_len=-1,hidden=False,array_size_var=''):
+        global have_proc_pointer
         self.type = type
         self.array = array
         self.matrix = matrix
@@ -142,6 +138,7 @@ class DataType:
                 # Matching broken b/c of "::'
                 m = fort_data.match(type)
                 self.type = m.group('proc_spec')
+                have_proc_pointer = True
             else:
                 self.dt = True
                 m = fort_data.match(type)
@@ -343,6 +340,12 @@ class DerivedType:
                 ctors.append(proc)
         return ctors
 
+
+def mangle_name(mod,func):
+    if compiler == 'g95':
+        return mod.lower() + "_MP_" + func.lower()
+    else: # gfortran
+        return '__' + mod.lower() + '_MOD_' + func.lower()
 
 
 def read_substitutions():
@@ -942,7 +945,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
                     declared_c_pointer = True
                 s = s + prefix + 'c_pointer = (generic_fpointer) ' + arg.name + ';\n'
                 s = s + prefix + 'long FORT_' + arg.name + ';\n'
-                s = s + prefix + 'if (' + arg.name + ') ' + fpointer_conversion_func + '(c_pointer' + ', &FORT_' + arg.name + ');\n'
+                s = s + prefix + 'if (' + arg.name + ') ' + mangle_name(fort_wrap_file,func_pointer_converter) + '(c_pointer' + ', &FORT_' + arg.name + ');\n'
     # Add wrapper code for strings
     if call:
         for arg in proc.args.itervalues():
@@ -1163,7 +1166,7 @@ def write_misc_defs():
         f.write('     is used */\n')
         f.write('  void g95_runtime_start(int narg, char* args[]);\n')
         f.write('  void g95_runtime_stop(void);\n\n')
-    f.write('  void ' + fpointer_conversion_func + '(generic_fpointer c_pointer, void* fortran_pointer);\n')
+    f.write('  void ' + mangle_name(fort_wrap_file,func_pointer_converter) + '(generic_fpointer c_pointer, void* fortran_pointer);\n')
     f.write('}\n')
     f.write('\n#endif /* ' + misc_defs_filename.upper()[:-2] + '_H_ */\n')
     f.close()
@@ -1210,7 +1213,7 @@ def write_fortran_wrapper():
     for obj in objects.itervalues():
         if obj.name != orphan_classname:
             count += 1
-    if count == 0:
+    if count == 0 and not have_proc_pointer:
         return
     # Build list of modules we need to USE
     use_mods = set()
@@ -1223,6 +1226,13 @@ def write_fortran_wrapper():
     for mod in use_mods:
         f.write('USE ' + mod + '\n')
     f.write('USE ISO_C_BINDING\n\nCONTAINS\n\n')
+    if have_proc_pointer:
+        f.write('  SUBROUTINE '+func_pointer_converter+'(cpointer,fpointer)\n')
+        f.write('    USE ISO_C_BINDING\n')
+        f.write('    TYPE(C_FUNPTR), VALUE :: cpointer\n')
+        f.write('    PROCEDURE(), POINTER :: fpointer\n')
+        f.write('    CALL C_F_PROCPOINTER(cpointer,fpointer)\n')
+        f.write('  END SUBROUTINE '+func_pointer_converter+'\n\n')
     for obj in objects.itervalues():
         if obj.name == orphan_classname:
             continue
