@@ -1,4 +1,4 @@
-#include "CENTAUR.h"
+#include "FortWrap.h"
 
 int main(void) 
 {
