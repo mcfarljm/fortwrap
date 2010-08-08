@@ -11,7 +11,12 @@ tests = glob.glob('*')
 
 num_err = 0
 
+# Hack so can go up a directory at start of loop
+if tests:
+    os.chdir(tests[0])
+
 for test in tests:
+    os.chdir('..')
     print "Running test:", test
     os.chdir(test)
     # Run wrapper generator

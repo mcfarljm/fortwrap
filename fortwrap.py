@@ -1209,9 +1209,16 @@ def write_fortran_wrapper():
             count += 1
     if count == 0:
         return
+    # Build list of modules we need to USE
+    use_mods = set()
+    for obj in objects.itervalues():
+        use_mods.add(obj.mod)
     f = open(fort_output_dir+'/' + fort_wrap_file + '.f90', "w")
     #f.write(HEADER_STRING + '\n') # Wrong comment style
     f.write('MODULE ' + fort_wrap_file + '\n\n')
+    # USE the necessary modules:
+    for mod in use_mods:
+        f.write('USE ' + mod + '\n')
     f.write('USE ISO_C_BINDING\n\nCONTAINS\n\n')
     for obj in objects.itervalues():
         if obj.name == orphan_classname:
