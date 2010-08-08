@@ -76,7 +76,7 @@ result_name_def = re.compile(r'.*RESULT\s*\(\s*(\w+)\s*\)')
 intent_in_def = re.compile(r'.*INTENT\s?\(\s*IN\s*\)',re.IGNORECASE)
 intent_out_def = re.compile(r'.*INTENT\s?\(\s*OUT\s*\)',re.IGNORECASE)
 fort_abstract_def = re.compile(r'\s*ABSTRACT\s+INTERFACE',re.IGNORECASE)
-integer_param_def = re.compile(r'\s+INTEGER,\s+PARAMETER\s+::\s+(.*)\s+=\s+([0-9]+)\s+')
+integer_param_def = re.compile(r'\s+INTEGER,\s+PARAMETER\s+::\s+(.*)\s*=\s*([0-9]+)\s*')
 
 # ===================================================
 
@@ -1373,4 +1373,6 @@ if __name__ == "__main__":
     write_matrix_class()
     write_fortran_wrapper()
 
+    print "Ints:", fort_integer_params
+    
     sys.exit(0)
