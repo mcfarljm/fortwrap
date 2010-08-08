@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # This program will parse a selected set of Fortran source files
 # (specified in files.in) and write C++ code to wrap the Fortran
 # derived types in C++ classes
@@ -6,6 +8,7 @@
 
 # Author: John McFarland
 
+import getopt
 import re
 import glob
 from datetime import date
@@ -14,12 +17,14 @@ import os
 
 
 # Determine Fortran compiler
-if len(sys.argv) == 1:
-    compiler = 'g95'
-elif sys.argv[1].find('g95') >= 0:
-    compiler = 'g95'
-else:
-    compiler = 'gfortran'
+# TODO: make this an option
+# if len(sys.argv) == 1:
+#     compiler = 'g95'
+# elif sys.argv[1].find('g95') >= 0:
+#     compiler = 'g95'
+# else:
+#     compiler = 'gfortran' 
+compiler = 'g95'
 
 # Define mangle_name here b/c it is used in the SETTINGS below
 def mangle_name(mod,func):
@@ -31,26 +36,25 @@ def mangle_name(mod,func):
 
 # SETTINGS ==========================================
 
-code_output_dir = 'cpp_code/'
-include_output_dir = 'cpp_include/'
-fort_output_dir = 'fortran/'
+code_output_dir = '.'
+include_output_dir = '.'
+fort_output_dir = '.'
 
 substitution_file = 'substitutions.in'
 ignores_file = 'ignores.in'
 includes_file = 'includes.in'
 orphans_file = 'orphans.in'
 
-ERR_NAME = 'ierr'
-
 HEADER_STRING = '/* This source file automatically generated on ' + str(date.today()) + ' using \n   Fortran source code parser by John McFarland */\n'
 
+# TODO: auto-generate this Fortran code
 fpointer_conversion_func = mangle_name('cutils', 'convert_c_funcpointer')
 
 misc_defs_filename = 'InterfaceDefs.h'
 matrix_classname = 'FortranMatrix'
 
 orphan_classname = 'FortFuncs'
-orphan_class_comments = ['Special dummy class to wrap CENTAUR functions that do not operate on a Fortran derived type']
+orphan_class_comments = ['Wrapper class for Fortran routines that do not operate on a derived type']
 
 fort_wrap_file = 'CppWrappers'
 SWIG = True  # Whether or not to include preprocessor defs that will
@@ -263,7 +267,7 @@ class Procedure:
             if name.find('_ctor')>=0 or (name.find('init')>=0 and name.find('get')==-1 and name.find('set')==-1):
                 self.ctor = True
             elif (name.find('dtor')>=0 or name.find('delete')>=0):
-                if self.nargs==1 or (self.nargs==2 and ERR_NAME in args):
+                if self.nargs==1:
                     self.dtor = True
         # Check for exclusion:
         for arg in args.itervalues():
@@ -450,8 +454,8 @@ def is_public(name):
     """Check whether a name is public and not excluded"""
     if name.lower() in name_exclusions:
         return False
-    elif name.lower() in name_inclusions or name.lower() in orphan_names:
-        return True
+#    elif name.lower() in name_inclusions or name.lower() in orphan_names:
+#         return True
     elif default_protection == PUBLIC:
         return not name.lower() in private_names
     else:
@@ -741,7 +745,7 @@ def associate_procedures():
             elif typename.lower() not in name_exclusions:
                 print "Unknown object in associate_procedures:", proc.name, typename
         # Associate orphan functions with a dummy class
-        elif proc.name.lower() in orphan_names:
+        else:
             if not orphan_classname in objects:
                 objects[orphan_classname] = DerivedType(orphan_classname,orphan_class_comments)
             objects[orphan_classname].procs.append(proc)
@@ -1006,8 +1010,6 @@ def write_destructor(file,object):
     for proc in object.procs:
         if proc.dtor:
             file.write('  ' + 'if (initialized) ' + mangle_name(proc.mod,proc.name) + '(data_ptr')
-            if proc.nargs == 2:         # Only allowed ierr to be 2nd in a dtor
-                file.write(', NULL')
             file.write('); // CENTAUR Destructor\n')
     # Deallocate Fortran derived type
     file.write('  ' + mangle_name(fort_wrap_file,'deallocate_'+object.name) + '(data_ptr); // Deallocate Fortran derived type\n')
@@ -1020,7 +1022,7 @@ def write_class(object):
         return
 
     # First write header file:
-    file = open( include_output_dir + object.name + '.h', 'w')
+    file = open( include_output_dir+'/' + object.name + '.h', 'w')
     file.write(HEADER_STRING + '\n')
     file.write('#ifndef ' + object.name.upper() + '_H_\n')
     file.write('#define ' + object.name.upper() + '_H_\n\n')
@@ -1082,7 +1084,7 @@ def write_class(object):
 
 
     # Write method code to cpp file
-    file = open( code_output_dir + object.name + '.cpp', 'w')
+    file = open( code_output_dir+'/' + object.name + '.cpp', 'w')
     file.write(HEADER_STRING + '\n')
     file.write('#include "' + object.name + '.h"\n\n')
     # Constructor(s):
@@ -1132,7 +1134,7 @@ def get_native_includes(object):
     return includes
 
 def write_global_header_file():
-    f = open(include_output_dir + 'CENTAUR.h','w')
+    f = open(include_output_dir+'/' + 'CENTAUR.h','w')
     f.write(HEADER_STRING + '\n')
     for objname,obj in objects.iteritems():
         f.write('#include "' + objname + '.h"\n')
@@ -1142,7 +1144,7 @@ def write_global_header_file():
 
 
 def write_misc_defs():
-    f = open(include_output_dir + misc_defs_filename, 'w')
+    f = open(include_output_dir+'/' + misc_defs_filename, 'w')
     f.write(HEADER_STRING + '\n')
     f.write('#ifndef ' + misc_defs_filename.upper()[:-2] + '_H_\n')
     f.write('#define ' + misc_defs_filename.upper()[:-2] + '_H_\n\n')
@@ -1166,7 +1168,7 @@ def write_misc_defs():
 def write_matrix_class():
     comments = ['A templated class for working with Matrices that store data', 'internally in Fortran order.', '', 'From C++, the data are accessed in the natural order, using', '<tt>x(row,column)</tt> notation, starting with base index 0']
     
-    f = open(include_output_dir + matrix_classname + '.h', 'w')
+    f = open(include_output_dir+'/' + matrix_classname + '.h', 'w')
     f.write(HEADER_STRING + '\n')
     f.write('#ifndef ' + matrix_classname.upper() + '_H_\n')
     f.write('#define ' + matrix_classname.upper() + '_H_\n\n')
@@ -1199,10 +1201,18 @@ def write_fortran_wrapper():
     Write the Fortran code for allocating/deallocating Fortran derived
     types from C pointers
     """
-    f = open(fort_output_dir + fort_wrap_file + '.f90', "w")
+    # TODO: fix hack for testing whether we need to write this file
+    # Hack: check for real (non-orphan) methods
+    count = 0
+    for obj in objects.itervalues():
+        if obj.name != orphan_classname:
+            count += 1
+    if count == 0:
+        return
+    f = open(fort_output_dir+'/' + fort_wrap_file + '.f90', "w")
     #f.write(HEADER_STRING + '\n') # Wrong comment style
     f.write('MODULE ' + fort_wrap_file + '\n\n')
-    f.write('USE Centaur\nUSE ISO_C_BINDING\n\nCONTAINS\n\n')
+    f.write('USE ISO_C_BINDING\n\nCONTAINS\n\n')
     for obj in objects.itervalues():
         if obj.name == orphan_classname:
             continue
@@ -1226,49 +1236,72 @@ def write_fortran_wrapper():
                 
         
 
-        
-def clean_directories():
-    """
-    Remove old files from output directories before writing new ones
-    """
-    files = glob.glob(code_output_dir+'*') + glob.glob(include_output_dir+'*') + glob.glob(fort_output_dir+'*')
-    for f in files:
-        os.remove(f)
+class Options:
+    def __init__(self):
+        self.parse_args()
 
+    def parse_args(self):
+        global code_output_dir, include_output_dir, fort_output_dir
+        try:
+            # -g is to glob working directory for files
+            opts, args = getopt.getopt(sys.argv[1:], 'gd:', ['file-list='])
+        except getopt.GetoptError, err:
+            print str(err)
+            sys.exit(2)
+
+        self.inputs_file = ''
+        self.glob_files = False
+        if ('-g','') in opts:
+            self.glob_files = True
+        for o,a in opts:
+            if o=='--file-list':
+                self.inputs_file = a
+            elif o=='-d':
+                code_output_dir = a
+                include_output_dir = a
+                fort_output_dir = a
 
 
 # COMMANDS ==========================================
 
-print "Fortran compiler is:", compiler
+if __name__ == "__main__":
 
-clean_directories()
+    opts = Options()
 
-read_substitutions()
-read_ignores()
-read_includes()
-read_orphans()
+    print "Fortran compiler is:", compiler
 
-try:
-    f = open("files.in")
+    read_substitutions()
+    read_ignores()
+    read_includes()
+    read_orphans()
+
     file_list = []
-    for line in f:
-        if not line.strip().startswith('#') and re.search('\w', line):
-            file_list.append( line.strip() )
-    f.close()
-    print "LOADED", len(file_list), 'FILES FROM LIST'
-except:
-    file_list = glob.glob('*.f90')
 
+    if opts.inputs_file:
+        # TODO: Add error handler
+        f = open(opts.inputs_file)
+        for line in f:
+            if not line.strip().startswith('#') and re.search('\w', line):
+                file_list.append( line.strip() )
+        f.close()
+        print "LOADED", len(file_list), 'FILES FROM LIST'
+
+    if opts.glob_files:
+        file_list += glob.glob('*.f90')
     
-for f in file_list:
-    parse_file(f)
-associate_procedures()
+    if not file_list:
+        print "Error: no source files"
+        sys.exit(2)
+
+    for f in file_list:
+        parse_file(f)
+    associate_procedures()
 
 
-for obj in objects.itervalues():
-    write_class(obj)
+    for obj in objects.itervalues():
+        write_class(obj)
 
-write_global_header_file()
-write_misc_defs()
-write_matrix_class()
-write_fortran_wrapper()
+    write_global_header_file()
+    write_misc_defs()
+    write_matrix_class()
+    write_fortran_wrapper()
