@@ -1373,6 +1373,4 @@ if __name__ == "__main__":
     write_matrix_class()
     write_fortran_wrapper()
 
-    print "Ints:", fort_integer_params
-    
     sys.exit(0)
