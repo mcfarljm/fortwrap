@@ -16,6 +16,9 @@ import sys
 import os
 
 
+VERSION = 0.7
+
+
 # Determine Fortran compiler
 # TODO: make this an option
 # if len(sys.argv) == 1:
@@ -1260,19 +1263,39 @@ class Options:
     def __init__(self):
         self.parse_args()
 
+    def usage(self,exit_val=1):
+        print "Usage:", sys.argv[0], "[options]\n"
+        print "-v, --version\tPrint version information and exit\n"
+        print "-h, --help\tPrint this usage information\n"
+        print "-n\t\tRun parser but do not generate any wrapper code (dry run)\n"
+        print "-g\t\tWrap source files found in current directory (glob)\n"
+        print "-d dir\t\tOutput generated wrapper code to dir\n"
+        print "--file-list=f\tRead list of Fortran source files to parse from file f\n"
+        print "--clean\t\tRemove all wrapper-related files from wrapper code directory\n\t\tbefore generating new code.  Requires -d"
+        sys.exit(exit_val)
+
     def parse_args(self):
         global code_output_dir, include_output_dir, fort_output_dir
         try:
             # -g is to glob working directory for files
-            opts, args = getopt.getopt(sys.argv[1:], 'gd:', ['file-list=','clean'])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvgnd:', ['file-list=','clean','help','version'])
         except getopt.GetoptError, err:
             print str(err)
-            sys.exit(2)
+            self.usage()
+
+        if args:
+            self.usage()
 
         self.inputs_file = ''
         self.glob_files = False
         self.clean_code = False
-        if ('-g','') in opts:
+        self.dry_run = False
+        if ('-h','') in opts or ('--help','') in opts:
+            self.usage(0)
+        elif ('-v','') in opts or ('--version','') in opts:
+            print "FortWrap version", VERSION
+            sys.exit(0)
+        elif ('-g','') in opts:
             self.glob_files = True
         for o,a in opts:
             if o=='--file-list':
@@ -1281,6 +1304,8 @@ class Options:
                 code_output_dir = a
                 include_output_dir = a
                 fort_output_dir = a
+            elif o=='-n':
+                self.dry_run = True
             elif o=='--clean':
                 self.clean_code = True
 
@@ -1327,6 +1352,8 @@ if __name__ == "__main__":
         parse_file(f)
     associate_procedures()
 
+    if opts.dry_run:
+        sys.exit(0)
 
     for obj in objects.itervalues():
         write_class(obj)
