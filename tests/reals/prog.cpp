@@ -14,5 +14,5 @@ int main(void)
   if (FortFuncs::add_doubles(da,db) != da+db) 
     return 2;
 
-  return 3;
+  return 0;
 }
