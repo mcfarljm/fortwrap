@@ -114,17 +114,21 @@ PRIVATE=1
 PUBLIC=0
 
 # Indicate whether or not we will need procedure pointer wrapper code
-have_proc_pointer = False
+proc_pointer_used = False
+# Whether or not matrices are used
+matrix_used = False
 
 # ===================================================
 
 
 class DataType:
     def __init__(self,type,array=False,matrix=False,str_len=-1,hidden=False,array_size_var=''):
-        global have_proc_pointer
+        global proc_pointer_used, matrix_used
         self.type = type
         self.array = array
         self.matrix = matrix
+        if matrix:
+            matrix_used = True
         self.str_len = str_len
         self.proc_pointer = False
         self.dt = False
@@ -138,7 +142,7 @@ class DataType:
                 # Matching broken b/c of "::'
                 m = fort_data.match(type)
                 self.type = m.group('proc_spec')
-                have_proc_pointer = True
+                proc_pointer_used = True
             else:
                 self.dt = True
                 m = fort_data.match(type)
@@ -1144,7 +1148,8 @@ def write_global_header_file():
     f.write(HEADER_STRING + '\n')
     for objname,obj in objects.iteritems():
         f.write('#include "' + objname + '.h"\n')
-    f.write('#include "' + matrix_classname + '.h"\n')
+    if matrix_used:
+        f.write('#include "' + matrix_classname + '.h"\n')
     f.write('\n')
     f.close()
 
@@ -1166,12 +1171,15 @@ def write_misc_defs():
         f.write('     is used */\n')
         f.write('  void g95_runtime_start(int narg, char* args[]);\n')
         f.write('  void g95_runtime_stop(void);\n\n')
-    f.write('  void ' + mangle_name(fort_wrap_file,func_pointer_converter) + '(generic_fpointer c_pointer, void* fortran_pointer);\n')
+    if proc_pointer_used:
+        f.write('  void ' + mangle_name(fort_wrap_file,func_pointer_converter) + '(generic_fpointer c_pointer, void* fortran_pointer);\n')
     f.write('}\n')
     f.write('\n#endif /* ' + misc_defs_filename.upper()[:-2] + '_H_ */\n')
     f.close()
 
 def write_matrix_class():
+    if not matrix_used:
+        return
     comments = ['A templated class for working with Matrices that store data', 'internally in Fortran order.', '', 'From C++, the data are accessed in the natural order, using', '<tt>x(row,column)</tt> notation, starting with base index 0']
     
     f = open(include_output_dir+'/' + matrix_classname + '.h', 'w')
@@ -1213,7 +1221,7 @@ def write_fortran_wrapper():
     for obj in objects.itervalues():
         if obj.name != orphan_classname:
             count += 1
-    if count == 0 and not have_proc_pointer:
+    if count == 0 and not proc_pointer_used:
         return
     # Build list of modules we need to USE
     use_mods = set()
@@ -1226,7 +1234,7 @@ def write_fortran_wrapper():
     for mod in use_mods:
         f.write('USE ' + mod + '\n')
     f.write('USE ISO_C_BINDING\n\nCONTAINS\n\n')
-    if have_proc_pointer:
+    if proc_pointer_used:
         f.write('  SUBROUTINE '+func_pointer_converter+'(cpointer,fpointer)\n')
         f.write('    USE ISO_C_BINDING\n')
         f.write('    TYPE(C_FUNPTR), VALUE :: cpointer\n')
