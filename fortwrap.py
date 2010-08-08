@@ -64,7 +64,7 @@ fort_type_def = re.compile(r'\s*TYPE\s+[a-zA-Z]')
 fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(')
 fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)')
 fort_comment = re.compile('\s*!')
-fort_data_string = r'\s*(TYPE\s*\((?P<dt_spec>\S*)\)|INTEGER|REAL(\*8|\s*\(C_DOUBLE\))?|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
+fort_data_string = r'\s*(TYPE\s*\((?P<dt_spec>\S*)\)|INTEGER|REAL(\*8|\s*\(C_DOUBLE\)|\s*\(KIND=(?P<real_spec>[0-9]+)\s*\))?|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
 fort_data = re.compile(fort_data_string,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_string + '.*::',re.IGNORECASE)
 module_def = re.compile(r'\s*MODULE\s+\S')
@@ -136,6 +136,15 @@ class DataType:
         # For array, name of argument used to pass the array length:
         self.array_size_var = array_size_var 
         self.is_array_size = False # integer defining an array size
+        # Handle real kinds
+        if type.lower().startswith('real') and type.lower().find('kind')>=0:
+            kind = type.split('=')[1].split(')')[0].strip()
+            if kind=='4':
+                self.type = 'REAL'
+            elif kind=='8':
+                self.type = 'REAL*8'
+            else:
+                print type, "not supported"
         if not primitive_data.match(type):
             if type.upper().find('PROCEDURE') >= 0:
                 self.proc_pointer = True
@@ -214,6 +223,10 @@ class Argument:
                 return False
             else:
                 return True
+        elif self.type.type.lower().find('kind')>=0:
+            # Supported KIND= types are translated in the DataType
+            # constructor
+            return True
         return False
     
     def cpp_const(self):
