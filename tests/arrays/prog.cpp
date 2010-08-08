@@ -14,6 +14,15 @@ int main(void)
   FortFuncs::array_out(&v);
   if ((int) count(v.begin(), v.end(), 20) != v.size())
     return 2;
+
+  std::vector<int> a(3), b(3);
+  for (int i=0; i<a.size(); i++) 
+    {
+      a[i] = i;
+      b[i] = i+1;
+    }
+  if (FortFuncs::inner_prod(&a,&b) != 8)
+    return 3;
   
   return 0;
 }

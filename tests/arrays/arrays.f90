@@ -17,4 +17,10 @@ CONTAINS
     x = 20
   END SUBROUTINE  array_out
 
+  FUNCTION inner_prod(n,a,b) RESULT(y)
+    INTEGER, INTENT(in) :: n, a(n), b(n)
+    INTEGER :: y
+    y = DOT_PRODUCT(a,b)
+  END FUNCTION inner_prod
+
 END MODULE arrays
