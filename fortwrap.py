@@ -1234,6 +1234,19 @@ def write_fortran_wrapper():
         f.write('  END SUBROUTINE deallocate_' + obj.name + '\n\n')        
     f.write('END MODULE ' + fort_wrap_file + '\n')
                 
+
+def clean_directories():
+    """
+    Remove old files from output directories before writing new ones
+    """
+    files = []
+    files += glob.glob(code_output_dir+'/*.cpp')
+    files += glob.glob(code_output_dir+'/*.o')
+    files += glob.glob(include_output_dir+'/*.h')
+    files += glob.glob(fort_output_dir+'/*.f90')
+    files += glob.glob(fort_output_dir+'/*.o')
+    for f in files:
+        os.remove(f)
         
 
 class Options:
@@ -1244,13 +1257,14 @@ class Options:
         global code_output_dir, include_output_dir, fort_output_dir
         try:
             # -g is to glob working directory for files
-            opts, args = getopt.getopt(sys.argv[1:], 'gd:', ['file-list='])
+            opts, args = getopt.getopt(sys.argv[1:], 'gd:', ['file-list=','clear'])
         except getopt.GetoptError, err:
             print str(err)
             sys.exit(2)
 
         self.inputs_file = ''
         self.glob_files = False
+        self.clean_code = False
         if ('-g','') in opts:
             self.glob_files = True
         for o,a in opts:
@@ -1260,6 +1274,12 @@ class Options:
                 code_output_dir = a
                 include_output_dir = a
                 fort_output_dir = a
+            elif o=='--clear':
+                self.clean_code = True
+
+        if self.clean_code and code_output_dir=='.':
+            print "Error, clearing code output dir requires -d"
+            sys.exit(2)
 
 
 # COMMANDS ==========================================
@@ -1269,6 +1289,9 @@ if __name__ == "__main__":
     opts = Options()
 
     print "Fortran compiler is:", compiler
+
+    if opts.clean_code:
+        clean_directories()
 
     read_substitutions()
     read_ignores()
