@@ -6,7 +6,7 @@ import glob
 opts = '-g --clean -d wrap'
 cmd = '../../fortwrap.py'
 
-os.chdir('test')
+os.chdir('tests')
 tests = glob.glob('*')
 
 num_err = 0
