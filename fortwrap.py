@@ -1,18 +1,10 @@
-# Copyright 2009, Southwest Research Institute
-# All rights reserved.
-
 # This program will parse a selected set of Fortran source files
 # (specified in files.in) and write C++ code to wrap the Fortran
 # derived types in C++ classes
 
-# Usage: python parser.py [fortran_compiler_name=g95]
+# Usage: python fortwrap.py [fortran_compiler_name=g95]
 
-# Owner: John McFarland
-
-# Latest commit:
-# $Author: jmcfarland $
-# $Date: 2009-11-13 12:39:10 -0600 (Fri, 13 Nov 2009) $
-# $Rev: 14936 $
+# Author: John McFarland
 
 import re
 import glob
@@ -50,14 +42,14 @@ orphans_file = 'orphans.in'
 
 ERR_NAME = 'ierr'
 
-HEADER_STRING = '/* This source file automatically generated on ' + str(date.today()) + ' using \n   Fortran source code parser by John McFarland\n\n   Copyright 2009, Southwest Research Institute\n   All rights reserved */\n'
+HEADER_STRING = '/* This source file automatically generated on ' + str(date.today()) + ' using \n   Fortran source code parser by John McFarland */\n'
 
 fpointer_conversion_func = mangle_name('cutils', 'convert_c_funcpointer')
 
 misc_defs_filename = 'InterfaceDefs.h'
 matrix_classname = 'FortranMatrix'
 
-orphan_classname = 'CentaurUtils'
+orphan_classname = 'FortFuncs'
 orphan_class_comments = ['Special dummy class to wrap CENTAUR functions that do not operate on a Fortran derived type']
 
 fort_wrap_file = 'CppWrappers'
