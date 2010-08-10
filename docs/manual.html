@@ -1,0 +1,217 @@
+<html>
+  <head>
+    <title>FortWrap Manual</title>
+    <link rel=stylesheet href="style.css" type="text/css">
+  </head>
+    
+<body>
+  <h1>FortWrap Manual</h1>
+
+  <p>FortWrap is a script that parses Fortran 2003 source files and
+  generates wrapper code for interfacing with the original Fortran
+  code from C++.  FortWrap is intended to be used with Fortran code
+  that makes use of Fortran derived types.  The resulting wrapper code
+  provides a C++ interface that masks the Fortran derived types with
+  C++ classes.</p>
+
+  <p>For example, consider the following Fortran code:</p>
+
+  <div class="code"> <pre>
+MODULE m
+
+  TYPE Object
+    ... 
+  END TYPE Object
+
+CONTAINS
+    
+  SUBROUTINE object_ctor(o, n, x)
+    TYPE (Object) :: o
+    INTEGER, INTENT(in) :: n
+    REAL, INTENT(in) :: x(n)
+    ...
+  END SUBROUTINE object_ctor
+
+  SUBROUTINE process(o)
+    TYPE (Object) :: o
+    ...
+  END SUBROUTINE process
+  
+END MODULE m
+  </pre></div>      
+
+  <p>After wrapping with FortWrap, these routines can be utilized in a
+  natural way from C++:</p>
+
+  <div class="targetlang"> <pre>
+std::vector&lt;float&gt; x(10);
+... // Define values for x
+Object o(&x); // Automatically calls object_ctor
+o.process();
+  </pre></div>
+
+<h2>Primary Features</h2>
+
+<ul>
+  <li> <b>Derived Types</b>: Transparent translation of Fortran derived types into C++ classes.  This is the main objective of FortWrap.</li>
+  <ul>
+    <li> Translation of Fortran "ctor" functions into C++ constructors</li>
+    <li> Fortran "dtor" functions automatically called by C++ destructor</li>
+  </ul>
+
+  <li> <b>Optional arguments</b>: Fortran optional arguments are fully
+    supported, with automatic NULL default values in C++.</li>
+
+  <li> <b>Procedure pointers</b>: C++ function pointers may be passed
+    natively where Fortran expects a procedure pointer.  Right now this
+    requires that the Fortran procedure pointer have an
+    explict <tt>ABSTRACT INTERFACE</tt></li>
+  
+  <li> <b>Arrays</b>: One-dimensional arrays are translated into C++
+    vector containers.  Subroutine arguments used to define the Fortran
+    array size are automatically calculated baesd on the C++ vector.</li>
+  
+  <li> <b>Matrices</b>: A "FortranMatrix" C++ class is provided for
+    interfacing with two-dimensional Fortran arrays (matrices).  This
+    class takes care to store data internally in Fortran order.</li>
+
+  <li> Name mangling support for both gfortran and g95 compilers
+    
+  <li> Character arrays with <tt>INTENT(OUT)</tt> and explicit length
+    parameter are translated into C++ strings.</li>
+
+  <li> Where possible, pass by value is used in C++ (e.g. scalar
+    arguments that are not optional)</li>
+
+  <li> <b>Doxygen comments</b>: Doxygen-style comments used for
+    Fortran symbols (derived types, subroutines, arguments) are
+    transferred to C++ doxygen comments in the wrapper code.</li>
+
+  <li> Automatic handling of Fortran <tt>PUBLIC</tt>
+    and <tt>PRIVATE</tt> statements.  By default, only <tt>PUBLIC</tt>
+    routines are wrapped.</li>
+</ul>
+
+<h2>Unsupported Features</h2>
+
+<p>Many features of Fortran 90/95/2003 are not supported by FortWrap.  In
+some cases (e.g. assumed shape arrays) this is because the Fortran
+language standard does not provide an interoperability mechansim.  In
+other cases, this is because there was not a need for certain featuers
+  when the original version of FortWrap was being developed.</p>
+
+<p>Note that in most cases FortWrap will quietly leave out wrapper code
+for subroutines that contain unsupported argument types that are not
+optional.  In most situations, it is possible to get FortWrap to wrap
+these types of routines by providing a Fortran wrapper that is
+  interoperable and calls the target routine.</p>
+
+<p>The following data types are not permitted as arguments:</p>
+
+<ul>
+  <li> Assumed shape arrays (a declaration that looks like <tt>INTEGER
+      :: X(:)</tt>).  The Fortran standard does not provide an
+      interoperability mechansim for assumed shape arrays.</li>
+
+  <li> Assumed size arrays (<tt>INTEGER :: X(*)</tt>).  These could be
+    supported but are less useful than providing an explicit size
+    because the Fortran routine will not know the size of the
+    array.</li>
+
+  <li> Character arrays with intent other than <tt>INTENT(OUT)</tt></li>
+
+  <li> Arrays of dimensionality greater than 2 are not supported.</li>
+
+  <li> <tt>KIND</tt>: only limited support is provided for specifying
+    the <tt>KIND</tt> of primitive types.  For <tt>REAL</tt>
+    arguments, <tt>KIND</tt>s of 4 and 8 are supported,
+    otherwise <tt>KIND</tt> is not supported.</li>
+
+  <li> Arrays of a derived type.  These can be wrapped by creating a
+    new derived type to contain an array of the derived type of
+    interest.</li>
+
+  <li> Fortran functions with non-primitive return types are not
+    wrapped.</li>
+
+  <li> <b>CLASS</b> (polymorphic) variables.  This Fortran language
+    features is not supported by g95 and is currently making its way
+    online with gfortran.  Unfortunately, the Fortran 2003 standard
+    does not allow C_LOC to be used on <tt>CLASS</tt> pointers, so
+    there is not a standard-compliant way of working with these
+    variables.  However, experimental support for FortWrap to generate
+    polymorphic C++ wrappers around Fortran <tt>CLASS</tt> constructs
+    is already underway, although it relies on gfortran-specific
+    compiler implementation details and a patched version of the
+    compiler.</li>
+</ul>
+
+<h2>Getting Started</h2>
+
+<h2>Generated Files</h2>
+
+<h3><pre>FortWrap.h</pre></h3>
+
+<p>This is a catch-all include file for all of the C++ wrapper code.
+Your C++ program only needs to include this.</p>
+
+<h3><pre>CppWrappers.f90</pre></h3>
+
+<p>This source file is generated when either derived types or
+  procedure pointers are wrapped.  For each derived type that is being
+  wrapped, corresponding "allocate" and "deallocate" wrapper functions
+  are generated for craeting C "handles" to the Fortran derived type.
+  Where applicable, this source file will also define a small
+  procedure pointer conversion routine.</p>
+
+<h3>Class Wrappers</h3>
+
+<p>For each Fortran derived type being wrapped, a corresponding C++
+  class is crated.  Two C++ files are created: a header file defining
+  the class and a source code file defining the methods.  The header
+  file is the place to look to find out how to call the methods that
+  FortWrap has generated.</p>
+
+<h3>Global Wrappers</h3>
+
+<p>When you wrap global subroutines (i.e. ones that aren't inside a
+  Fortran module), FortWrap wraps them as static members of a dummy
+  C++ class called <tt>FortFuncs</tt>.  FortWrap will generate two
+  files to define this class: <tt>FortFuncs.h</tt>
+  and <tt>FortFuncs.cpp</tt>.</p>
+
+<h3><pre>FortranMatrix.h</pre></h3>
+
+<p> This is the definition of the <tt>FortranMatrix</tt> template
+  class that is provided for working with matrix arguments.  This file
+  is only generated when matrix arguments are wrapped.</p>
+
+<h3><pre>InterfaceDefs.h</pre></h3>
+
+<p>A small header file for FortWrap to declare a few things.</p>
+
+
+<h2>Details</h2>
+
+<h3>Derived Types</h3>
+
+<ul>
+  <li> first arg
+  <li> ctors, dtors, default ctors
+</ul>
+
+<h3>Optional Arguments</h3>
+
+<h3>Procedure Pointers</h3>
+
+<h3>Arrays</h3>
+
+<h3>Matrices</h3>
+
+<h3>Global (non-module) Procedures</h3>
+
+<h3>Strings</h3>
+
+</body>
+
+</html>
