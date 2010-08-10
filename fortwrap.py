@@ -69,6 +69,10 @@ intent_in_def = re.compile(r'.*INTENT\s?\(\s*IN\s*\)',re.IGNORECASE)
 intent_out_def = re.compile(r'.*INTENT\s?\(\s*OUT\s*\)',re.IGNORECASE)
 fort_abstract_def = re.compile(r'\s*ABSTRACT\s+INTERFACE',re.IGNORECASE)
 integer_param_def = re.compile(r'\s+INTEGER,\s+PARAMETER\s+::\s+(.*)\s*=\s*([0-9]+)\s*')
+# Regular expression to break up arguments.  This is needed to handle
+# matrices (e.g. A(m,n)).  It uses a negative lookahead assertion to
+# exclude the comma inside a matrix definition
+arg_splitter = re.compile(',(?!\s*\w+\s*\))')
 
 # ===================================================
 
@@ -114,7 +118,7 @@ matrix_used = False
 
 
 class DataType:
-    def __init__(self,type,array=False,matrix=False,str_len=-1,hidden=False,array_size_var=''):
+    def __init__(self,type,array=False,matrix=False,str_len=-1,hidden=False,array_size_var='',matrix_size_vars=()):
         global proc_pointer_used, matrix_used
         self.type = type
         self.array = array
@@ -128,6 +132,9 @@ class DataType:
         # For array, name of argument used to pass the array length:
         self.array_size_var = array_size_var 
         self.is_array_size = False # integer defining an array size
+        # Similar bookkeeping for matrices
+        self.matrix_size_vars = matrix_size_vars
+        self.is_matrix_size = False
         # Handle real kinds
         if type.lower().startswith('real') and type.lower().find('kind')>=0:
             kind = type.split('=')[1].split(')')[0].strip()
@@ -195,7 +202,7 @@ class Argument:
     def fort_only(self):
         if self.type.hidden:
             return True
-        elif self.type.is_array_size:
+        elif self.type.is_array_size or self.type.is_matrix_size:
             return True
         elif self.exclude or self.assumed_shape:
             return True
@@ -298,8 +305,11 @@ class Procedure:
         self.add_hidden_strlen_args()
         # Check for integer arguments that define array sizes:
         for arg in self.args.itervalues():
-            if arg.type.type=='INTEGER' and arg.intent=='in' and self.get_array_size_parent(arg.name):
-                arg.type.is_array_size = True
+            if arg.type.type=='INTEGER' and arg.intent=='in':
+                if self.get_array_size_parent(arg.name):
+                    arg.type.is_array_size = True
+                elif self.get_matrix_size_parent(arg.name):
+                    arg.type.is_matrix_size = True
             
     def has_args_past_pos(self,pos,bind):
         """Query whether or not the argument list continues past pos,
@@ -332,6 +342,18 @@ class Procedure:
         for arg in self.args_by_pos.itervalues():
             if arg.type.array and not arg.optional and arg.type.array_size_var==argname:
                 return arg.name
+        return None
+
+    def get_matrix_size_parent(self,argname):
+        """Similar to get_array_size_parent.  Returns (matname,0) if argname
+        is the number of rows and (matname,1) if argname is the number of
+        columns"""
+        for arg in self.args_by_pos.itervalues():
+            if arg.type.matrix and not arg.optional and argname in arg.type.matrix_size_vars:
+                if argname == arg.type.matrix_size_vars[0]:
+                    return arg.name,0
+                else:
+                    return arg.name,1
         return None
         
         
@@ -525,10 +547,12 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
             pass
 
     # Get name(s)
-    names = [name.strip() for name in line.split('::')[1].split('!')[0].split(',')]
+    arg_string = line.split('::')[1].split('!')[0]
+    names = [name.strip() for name in arg_splitter.split(arg_string)]
     for name in names:
         array = False
         array_size_var = ''
+        matrix_size_vars = ()
         if dimension:
             array = True
         matrix = False
@@ -536,14 +560,15 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
         if name.find(':') > 0:
             assumed_shape = True
         if name.find('(') > 0:
-            if name.find(')') > 0:
+            size_desc = name.split('(')[1].split(')')[0]
+            if name.find(',') < 0:
                 array = True
-                array_size_var = name.split('(')[1].split(')')[0].strip()
+                array_size_var = size_desc.strip()
             else:
-                # matrix b/c the comma split off the other part
                 matrix = True
+                matrix_size_vars = tuple([v.strip() for v in size_desc.split(',')])
             name = name.split('(')[0]
-        type = DataType(type_string,array,matrix,char_len,array_size_var=array_size_var)
+        type = DataType(type_string,array,matrix,char_len,array_size_var=array_size_var,matrix_size_vars=matrix_size_vars)
         if name in arg_list:
             count += 1
             args[name] = Argument(name,arg_list.index(name)+1,type,optional,intent,assumed_shape=assumed_shape,comment=comments)
@@ -850,7 +875,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             if bind and call:
                 if arg.type.hidden:
                     string = string + str(arg.type.str_len)
-                elif arg.type.is_array_size:
+                elif arg.type.is_array_size or arg.type.is_matrix_size:
                     string = string + '&' + arg.name
                 else:
                     string = string + 'NULL'
@@ -967,6 +992,10 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
         for arg in proc.args.itervalues():
             if arg.type.is_array_size:
                 s = s + prefix + 'int ' + arg.name + ' = ' + proc.get_array_size_parent(arg.name) + '->size();\n'
+            elif arg.type.is_matrix_size:
+                matrix_name, i = proc.get_matrix_size_parent(arg.name)
+                size_method = ('num_rows()','num_cols()')[i]
+                s = s + prefix + 'int ' + arg.name + ' = ' + matrix_name + '->' + size_method + ';\n'
     s = s + prefix
     # Make dummy class members static (so class doesn't need to be
     # instantiated)
@@ -1207,9 +1236,9 @@ def write_matrix_class():
     f.write('    // i--; j--; // Adjust base\n')
     f.write('    return data[j*nrows+i];\n  }\n\n')
     write_cpp_dox_comments(f, ['Get number of rows'])
-    f.write('  inline int num_rows(void) { return nrows; }\n\n')
+    f.write('  inline int num_rows(void) const { return nrows; }\n\n')
     write_cpp_dox_comments(f, ['Get number of columns'])
-    f.write('  inline int num_cols(void) { return ncols; }\n\n')
+    f.write('  inline int num_cols(void) const { return ncols; }\n\n')
     f.write('};\n\n')
     f.write('#endif /* ' + matrix_classname.upper() + '_H_ */\n')
     f.write('\n\n// Local Variables:\n// mode: c++\n// End:\n')

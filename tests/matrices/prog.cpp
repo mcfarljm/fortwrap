@@ -12,7 +12,7 @@ int main(void)
       X(i,0) = i;
       X(i,1) = i+1;
     }
-  if (FortFuncs::one_norm(3,2,&X) != 6)
+  if (FortFuncs::one_norm(&X) != 6)
     return 1;
 
 
