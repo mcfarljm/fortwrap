@@ -195,16 +195,130 @@ Your C++ program only needs to include this.</p>
 
 <h3>Derived Types</h3>
 
-<ul>
-  <li> first arg
-  <li> ctors, dtors, default ctors
-</ul>
+  <p>The main goal of FortWrap is to allow users to develop C++
+    interfaces to Fortran code that applies object oriented techniques
+    by making use of derived types.  In order to interface with
+    Fortran derived types, FortWrap uses an object handle approach,
+    where a pointer to the derived type is stored and passed to
+    arguments that operate on that derived type.  Thus the derived
+    type can not be directly inspected from C++, but the object handle
+    (pointer) can be passed to Fortran routines that operate on it</p>
+
+  <p>FortWrap scans the Fortran source code for definitions of derived
+    types and Fortran subroutines that operate on those derived types.
+    For each derived type it finds, it creates a corresponding C++
+    class.  After parsing the Fortran source code, C++ methods are
+    then created by associating Fortran subroutines with derived
+    types.  The rule for this association process is
+    simple: <span class="hl">each Fortran subroutine with a derived
+    type as its first argument is translated into a method of the
+    corresponding C++ class.</span></p>
+
+  <p>FortWrap also provides special mechanisms for wrapping certain
+    Fortran routines as C++ constructors and destructors.  If a
+    Fortran routine can be classified as a method and contains the
+    string "<tt>_ctor</tt>", it is translated into a C++ constructor
+    for the corresponding class.  Multiple constructors are supported,
+    provided the resulting C++ code will compile (i.e. the function
+    signatures are different).  Similarly, if a Fortran routine
+    contains the string "<tt>_dtor</tt>", it is treated as a
+    destructor and automatically called from the C++ destructor.
+    These types of methods are useful for derived types that make use
+    of dynamically allocated memory.</p>
+    
 
 <h3>Optional Arguments</h3>
 
+  <p>Fortran 90 provides for optional procedure arguments that may be
+    passed by position or keyword from Fortran.  Although
+    interoperating with optional arguments is not explicitly provided
+    for by the Fortran standard, FortWrap takes advantage of the fact
+    that both the g95 and gfortran compilers implement optional
+    arguments in a simple manner that is easy to mimic from C code.
+    Specifically, the compiler uses null pointers to indicate optional
+    arguments that are not present.</p>
+
+  <p>FortWrap exploits this by allowing the arguments to be optional
+    from C++.  The usage is not quite as friendly as it would be from
+    Fortran, though, since C++ does not support keyword arguments.
+    However, FortWrap tries to make the usage as simple as possible by
+    automatically giving all Fortran optional arguments default values
+    of <tt>NULL</tt>.  Note also that one consequence of using
+    optional arguments is that they may not be passed by value from
+    C++.  Normally FortWrap will wrap primitive scalar types
+    with <tt>INTENT(IN)</tt> as pass-by-value arguments from C++, but
+    FortWrap must resort to pass-by-reference for optional
+    arguments.</p>
+
+  <p>Consider the following Fortran subroutine:</p>
+
+<div class="code"><pre>
+SUBROUTINE foo(o,a,b,c,d)
+  TYPE(Object) :: o
+  INTEGER, INTENT(IN) :: a
+  INTEGER, INTENT(IN), OPTIONAL :: b, c
+  INTEGER, INTENT(OUT), OPTIONAL :: d
+  ...
+END SUBROUTINE foo
+</pre></div>  
+
+  <p>Given that an instance <tt>o</tt> as well
+    as <tt>int</tt>'s <tt>a</tt>, <tt>b</tt>, <tt>c</tt>,
+    and <tt>d</tt> have been declared, the following are examples of
+    valid C++ calls:</p>
+
+<div class="targetlang"><pre>
+o.foo(a);
+o.foo(a,&b);
+o.foo(a,NULL,&c);
+o.foo(a,&b,&c,&d);
+o.foo(a,NULL,NULL,&d);
+</pre></div>
+
+  <p>Note that <tt>a</tt> is passed by value, whereas the optional
+  arguments must be passed by reference.  Also note that it makes
+  sense to define the most used optional arguments at the start of the
+  argument list, because the optional arguments must be passed by
+  position, and intermediate optional arguments not being provided
+  must be passed <tt>NULL</tt>.
+
+
 <h3>Procedure Pointers</h3>
 
+  <p>The Fortran 2003 standard provides support for procedure pointers
+    as well as mechanisms for interoperating with procedure pointers
+    from C.  Procedure pointer arguments are wrapped by FortWrap with
+    the limitation that the interface must be explicit and defined via
+    an <tt>ABSTRACT INTERFACE</tt> block.
+    See <tt>tests/function_pointers</tt> for example usage.</p>
+
 <h3>Arrays</h3>
+
+  <p>FortWrap does not currently support assumed size
+    (e.g. <tt>X(*)</tt>) or assumed shape (e.g. <tt>X(:)</tt>) array
+    arguments.  However, both of these cases can be handled by
+    creating a Fortran wrapper that FortWrap can wrap.  For
+    example, in order to handle a subroutine like:</p>
+
+<div class="code"><pre>
+SUBROUTINE bad_sub(x)
+  INTEGER :: x(:)
+  ...
+END SUBROUTINE bad_sub
+</pre></div>
+
+  <p>write a Fortran wrapper that calls the original routine:</p>
+
+<div class="code"><pre>
+SUBROUTINE bad_sub_wrap(n,x)
+  INTEGER, INTENT(IN) :: n
+  INTEGER :: x(n)
+  CALL bad_sub(x)
+END SUBROUTINE bad_sub_wrap
+</pre></div>
+
+  <p>I am currently working on getting FortWrap to generate these
+    types of wrappers automatically...</p>
 
 <h3>Matrices</h3>
 
