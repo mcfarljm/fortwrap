@@ -280,9 +280,9 @@ class Procedure:
         self.dtor = False
         self.in_orphan_class = False # Set in associate_procedures
         if self.method:
-            if name.find('_ctor')>=0 or (name.find('init')>=0 and name.find('get')==-1 and name.find('set')==-1):
+            if name.find('_ctor')>=0:
                 self.ctor = True
-            elif (name.find('dtor')>=0 or name.find('delete')>=0):
+            elif name.find('_dtor')>=0:
                 if self.nargs==1:
                     self.dtor = True
         # Check for exclusion:
