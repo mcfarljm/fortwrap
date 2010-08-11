@@ -1317,14 +1317,14 @@ class Options:
 
     def usage(self,exit_val=1):
         print "Usage:", sys.argv[0], "[options]\n"
-        print "-v, --version\tPrint version information and exit\n"
-        print "-h, --help\tPrint this usage information\n"
-        print "-n\t\tRun parser but do not generate any wrapper code (dry run)\n"
-        print "-c FC\t\tUse name mangling for Fortran compiler FC.  Only supports g95\n\t\tand gfortran\n"
-        print "-g\t\tWrap source files found in current directory (glob)\n"
-        print "-d dir\t\tOutput generated wrapper code to dir\n"
-        print "--file-list=f\tRead list of Fortran source files to parse from file f\n"
-        print "--clean\t\tRemove all wrapper-related files from wrapper code directory\n\t\tbefore generating new code.  Requires -d"
+        print "-v, --version\t: Print version information and exit"
+        print "-h, --help\t: Print this usage information"
+        print "-n\t\t: Run parser but do not generate any wrapper code (dry run)"
+        print "-c FC\t\t: Use name mangling for Fortran compiler FC.  Only supports g95\n\t\t  and gfortran"
+        print "-g\t\t: Wrap source files found in current directory (glob)"
+        print "-d dir\t\t: Output generated wrapper code to dir"
+        print "--file-list=f\t: Read list of Fortran source files to parse from file f"
+        print "--clean\t\t: Remove all wrapper-related files from wrapper code directory\n\t\t  before generating new code.  Requires -d"
         sys.exit(exit_val)
 
     def parse_args(self):
