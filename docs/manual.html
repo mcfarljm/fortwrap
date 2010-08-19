@@ -7,12 +7,12 @@
 <body>
   <h1>FortWrap Manual</h1>
 
-  <p>FortWrap is a script that parses Fortran 90/95/200X source files
-  and generates wrapper code for interfacing with the original Fortran
-  code from C++.  FortWrap is intended to be used with Fortran code
-  that takes an object oriented approach and makes use of Fortran
+  <p>FortWrap is a python script that parses Fortran 90/95/200X source
+  files and generates wrapper code for interfacing with the original
+  Fortran code from C++.  FortWrap is intended to be used with Fortran
+  code that takes an object oriented approach and makes use of Fortran
   derived types.  The resulting wrapper code provides a C++ interface
-  that masks the Fortran derived types with C++ classes.</p>
+  that wraps the Fortran derived types with C++ proxy classes.</p>
 
   <p>For example, consider the following Fortran code:</p>
 
@@ -50,7 +50,7 @@ Object o(&x); // Automatically calls object_ctor
 o.process();
   </pre></div>
 
-<h2>Primary Features</h2>
+<h2>Main Features</h2>
 
 <ul>
   <li> <b>Derived Types</b>: Transparent translation of Fortran derived types into C++ classes.  This is the main objective of FortWrap.</li>
@@ -65,11 +65,11 @@ o.process();
   <li> <b>Procedure pointers</b>: C++ function pointers may be passed
     natively where Fortran expects a procedure pointer.  Right now this
     requires that the Fortran procedure pointer have an
-    explict <tt>ABSTRACT INTERFACE</tt></li>
+    explicit <tt>ABSTRACT INTERFACE</tt></li>
   
   <li> <b>Arrays</b>: One-dimensional arrays are translated into C++
     vector containers.  Subroutine arguments used to define the Fortran
-    array size are automatically calculated baesd on the C++ vector.</li>
+    array size are automatically calculated based on the C++ vector.</li>
   
   <li> <b>Matrices</b>: A "FortranMatrix" C++ class is provided for
     interfacing with two-dimensional Fortran arrays (matrices).  This
@@ -96,8 +96,8 @@ o.process();
 
 <p>Many features of Fortran 90/95/2003 are not supported by FortWrap.  In
 some cases (e.g. assumed shape arrays) this is because the Fortran
-language standard does not provide an interoperability mechansim.  In
-other cases, this is because there was not a need for certain featuers
+language standard does not provide an interoperability mechanism.  In
+other cases, this is because there was not a need for certain features
   when the original version of FortWrap was being developed.</p>
 
 <p>Note that in most cases FortWrap will quietly leave out wrapper code
@@ -111,7 +111,7 @@ these types of routines by providing a Fortran wrapper that is
 <ul>
   <li> Assumed shape arrays (a declaration that looks like <tt>INTEGER
       :: X(:)</tt>).  The Fortran standard does not provide an
-      interoperability mechansim for assumed shape arrays.</li>
+      interoperability mechanism for assumed shape arrays.</li>
 
   <li> Assumed size arrays (<tt>INTEGER :: X(*)</tt>).  These could be
     supported but are less useful than providing an explicit size
@@ -160,7 +160,7 @@ Your C++ program only needs to include this.</p>
 <p>This source file is generated when either derived types or
   procedure pointers are wrapped.  For each derived type that is being
   wrapped, corresponding "allocate" and "deallocate" wrapper functions
-  are generated for craeting C "handles" to the Fortran derived type.
+  are generated for creating C "handles" to the Fortran derived type.
   Where applicable, this source file will also define a small
   procedure pointer conversion routine.</p>
 
