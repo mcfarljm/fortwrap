@@ -106,7 +106,8 @@ optional.  In most situations, it is possible to get FortWrap to wrap
 these types of routines by providing a Fortran wrapper that is
   interoperable and calls the target routine.</p>
 
-<p>The following data types are not permitted as arguments:</p>
+<p>The following argument types/constructs/features are not
+supported:</p>
 
 <ul>
   <li> Assumed shape arrays (a declaration that looks like <tt>INTEGER
@@ -133,6 +134,10 @@ these types of routines by providing a Fortran wrapper that is
 
   <li> Fortran functions with non-primitive return types are not
     wrapped.</li>
+
+  <li> Wrapping Fortran code outside of a <tt>MODULE</tt> is not
+    currently supported.  Note that the main purpose of FortWrap is to
+    wrap derived types, which requires the use of <tt>MODULE</tt></li>
 
   <li> <b>CLASS</b> (polymorphic) variables.  This Fortran language
     features is not supported by g95 and is currently making its way
@@ -202,7 +207,8 @@ Your C++ program only needs to include this.</p>
     where a pointer to the derived type is stored and passed to
     arguments that operate on that derived type.  Thus the derived
     type can not be directly inspected from C++, but the object handle
-    (pointer) can be passed to Fortran routines that operate on it</p>
+    (pointer) can be passed to Fortran routines that operate on
+    it.</p>
 
   <p>FortWrap scans the Fortran source code for definitions of derived
     types and Fortran subroutines that operate on those derived types.

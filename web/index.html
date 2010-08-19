@@ -55,6 +55,8 @@ Object o(&x); // C++ constructor: automatically calls object_ctor
 o.process();
   </pre></div>
 
+  <p>Additional examples can be found <a href="examples.html">here</a>
+
   <h2>Wrapping for other languages</h2>
 
  <p>FortWrap can also be used as an intermediary step for wrapping
@@ -127,7 +129,8 @@ optional.  In most situations, it is possible to get FortWrap to wrap
 these types of routines by providing a Fortran wrapper that is
   interoperable and calls the target routine.</p>
 
-<p>The following data types are not permitted as arguments:</p>
+<p>The following argument types/constructs/features are not
+supported:</p>
 
 <ul>
   <li> Assumed shape arrays (a declaration that looks like <tt>INTEGER
@@ -154,6 +157,10 @@ these types of routines by providing a Fortran wrapper that is
 
   <li> Fortran functions with non-primitive return types are not
     wrapped.</li>
+
+  <li> Wrapping Fortran code outside of a <tt>MODULE</tt> is not
+    currently supported.  Note that the main purpose of FortWrap is to
+    wrap derived types, which requires the use of <tt>MODULE</tt></li>
 
   <li> <b>CLASS</b> (polymorphic) variables.  This Fortran language
     features is not supported by g95 and is currently making its way

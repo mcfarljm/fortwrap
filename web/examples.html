@@ -1,0 +1,64 @@
+<html>
+  <head>
+    <title>FortWrap Examples</title>
+    <link rel=stylesheet href="style.css" type="text/css">
+  </head>
+  
+  <body>
+    <h1>Examples</h1>
+
+    <p>Note that for simplicity, most of the examples below are not
+    shown with derived types.  When the first argument is not a
+    derived type, FortWrap wraps the routine as a static method of the
+    special "utility class" <tt>FortFuncs</tt>.</p>
+
+    <h2>Arrays</h2>
+
+  <div class="code"> <pre>
+FUNCTION inner_prod(n,a,b) RESULT(y)
+  INTEGER, INTENT(in) :: n, a(n), b(n)
+  INTEGER :: y
+  y = DOT_PRODUCT(a,b)
+END FUNCTION inner_prod
+  </pre></div>
+
+    <p>generates a method of the "utility class" <tt>FortFuncs</tt>
+    (the utility class is used to wrap functions that do not operate
+    on a derived type):</p>
+
+    <div class="targetlang"> <pre>
+static int inner_prod(const std::vector<int>* a, const std::vector<int>* b);
+    </pre></div>
+
+    <h2>Optional Arguments</h2>
+
+    <div class="code"> <pre>
+FUNCTION add_mixed(a,b,c,d) RESULT(y)
+  INTEGER, INTENT(in) :: a,b
+  INTEGER, INTENT(in), OPTIONAL :: c,d
+  INTEGER :: y
+  y = a+b
+  IF (PRESENT(c)) y = y + c
+  IF (PRESENT(d)) y = y + d
+END FUNCTION add_mixed
+    </pre></div>
+
+    <p>generates the following method:</p>
+
+    <div class="targetlang"> <pre>
+static int add_mixed(int a, int b, const int* c=NULL, const int* d=NULL);
+    </pre></div>
+
+    <p>Note that <tt>a</tt> and <tt>b</tt> use pass-by-value since
+      they are not optional.  The optinonal arguments <tt>c</tt>
+      and <tt>d</tt> use pass-by-reference.  Passing <tt>NULL</tt>
+      (which is the default) indicates that the argument is not
+      provided.</p>
+    
+    <p>These wrappers are particularly powerful when using swig
+    with <tt>-c++ -keyword</tt>, since the optional parameters can
+    then be passed by keyword in the target language</p>
+
+
+  </body>
+</html>
