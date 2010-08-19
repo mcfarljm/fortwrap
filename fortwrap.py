@@ -2,13 +2,12 @@
 
 # This program is licensed under the MIT license.  See LICENSE.txt
 
-# This program will parse a selected set of Fortran source files
-# (specified in files.in) and write C++ code to wrap the Fortran
-# derived types in C++ classes
-
-# Usage: python fortwrap.py [fortran_compiler_name=g95]
-
 # Author: John McFarland
+
+# This program will parse a selected set of Fortran source files and
+# write C++ code to wrap the Fortran derived types in C++ classes
+
+# Run fortwrap.py -h for usage information
 
 import getopt
 import re
