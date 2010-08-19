@@ -26,3 +26,6 @@ cd ..
 mkdir $dir
 cp -r docs fortwrap.py LICENSE.txt README.txt run_tests.py tests $dir
 tar --exclude .svn -cvzf $dir.tar.gz $dir
+
+echo "Make sure to update Version number in python source"
+echo "Make sure to update version number on web site"

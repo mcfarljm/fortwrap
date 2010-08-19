@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# This program is licensed under the MIT license.  See LICENSE.txt
+
 # This program will parse a selected set of Fortran source files
 # (specified in files.in) and write C++ code to wrap the Fortran
 # derived types in C++ classes
@@ -16,7 +18,7 @@ import sys
 import os
 
 
-VERSION = 0.7
+VERSION = 0.9
 
 
 # SETTINGS ==========================================
@@ -33,7 +35,7 @@ ignores_file = 'ignores.in'
 includes_file = 'includes.in'
 orphans_file = 'orphans.in'
 
-HEADER_STRING = '/* This source file automatically generated on ' + str(date.today()) + ' using \n   Fortran source code parser by John McFarland */\n'
+HEADER_STRING = '/* This source file automatically generated on ' + str(date.today()) + ' using \n   FortWrap wrapper generator */\n'
 
 func_pointer_converter = 'convert_c_funcpointer'
 
