@@ -18,3 +18,7 @@ prog: prog.o $(OBJ)
 
 clean:
 	rm -f *.o *.mod $(WRAP)/*.o
+
+realclean:
+	make clean
+	rm -f prog wrap/*
