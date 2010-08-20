@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# Copyright (c) 2010 John McFarland
+
 # This program is licensed under the MIT license.  See LICENSE.txt
 
 # Author: John McFarland
@@ -17,7 +19,7 @@ import sys
 import os
 
 
-VERSION = 0.9
+VERSION = 0.91
 
 
 # SETTINGS ==========================================
@@ -53,23 +55,23 @@ SWIG = True  # Whether or not to include preprocessor defs that will
 
 # REGULAR EXPRESSIONS ===============================
 
-fort_type_def = re.compile(r'\s*TYPE\s+[a-zA-Z]')
-fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(')
-fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)')
+fort_type_def = re.compile(r'\s*TYPE\s+[a-z]',re.IGNORECASE)
+fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(',re.IGNORECASE)
+fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)',re.IGNORECASE)
 fort_comment = re.compile('\s*!')
 fort_data_string = r'\s*(TYPE\s*\((?P<dt_spec>\S*)\)|INTEGER|REAL(\*8|\s*\(C_DOUBLE\)|\s*\(KIND=(?P<real_spec>[0-9]+)\s*\))?|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
 fort_data = re.compile(fort_data_string,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_string + '.*::',re.IGNORECASE)
-module_def = re.compile(r'\s*MODULE\s+\S')
+module_def = re.compile(r'\s*MODULE\s+\S',re.IGNORECASE)
 # INT below is used to represent the hidden length arguments, passed by value
-primitive_data = re.compile('(INTEGER|REAL|LOGICAL|CHARACTER|INT)')
+primitive_data = re.compile('(INTEGER|REAL|LOGICAL|CHARACTER|INT)',re.IGNORECASE)
 fort_dox_comments = re.compile(r'\s*!\>')
 fort_dox_inline = re.compile(r'\s*\w+.*!\<')
-result_name_def = re.compile(r'.*RESULT\s*\(\s*(\w+)\s*\)')
+result_name_def = re.compile(r'.*RESULT\s*\(\s*(\w+)\s*\)',re.IGNORECASE)
 intent_in_def = re.compile(r'.*INTENT\s?\(\s*IN\s*\)',re.IGNORECASE)
 intent_out_def = re.compile(r'.*INTENT\s?\(\s*OUT\s*\)',re.IGNORECASE)
 fort_abstract_def = re.compile(r'\s*ABSTRACT\s+INTERFACE',re.IGNORECASE)
-integer_param_def = re.compile(r'\s+INTEGER,\s+PARAMETER\s+::\s+(.*)\s*=\s*([0-9]+)\s*')
+integer_param_def = re.compile(r'\s+INTEGER,\s+PARAMETER\s+::\s+(.*)\s*=\s*([0-9]+)\s*',re.IGNORECASE)
 # Regular expression to break up arguments.  This is needed to handle
 # matrices (e.g. A(m,n)).  It uses a negative lookahead assertion to
 # exclude the comma inside a matrix definition
@@ -137,7 +139,7 @@ class DataType:
         self.matrix_size_vars = matrix_size_vars
         self.is_matrix_size = False
         # Handle real kinds
-        if type.lower().startswith('real') and type.lower().find('kind')>=0:
+        if type.upper().startswith('REAL') and type.upper().find('KIND')>=0:
             kind = type.split('=')[1].split(')')[0].strip()
             if kind=='4':
                 self.type = 'REAL'
@@ -223,7 +225,7 @@ class Argument:
                 return False
             else:
                 return True
-        elif self.type.type.lower().find('kind')>=0:
+        elif self.type.type.upper().find('KIND')>=0:
             # Supported KIND= types are translated in the DataType
             # constructor
             return True
@@ -243,17 +245,17 @@ class Argument:
         """
         if self.type.dt:
             return 'ADDRESS'
-        elif self.type.type in cpp_type_map:
+        elif self.type.type.upper() in cpp_type_map:
             if self.cpp_const():
                 prefix = 'const '
             else:
                 prefix = ''
-            return prefix + cpp_type_map[self.type.type]
+            return prefix + cpp_type_map[self.type.type.upper()]
         elif self.type.proc_pointer and self.type.type in abstract_interfaces:
             #print "Proc pointer not implemented yet:", self.type.type
             proc = abstract_interfaces[self.type.type]
             if proc.retval:
-                string = cpp_type_map[proc.retval.type.type][:-1] + ' '
+                string = cpp_type_map[proc.retval.type.type.upper()][:-1] + ' '
             else:
                 string = 'void '
             string = string + '(*' + self.name + ')'
@@ -306,7 +308,7 @@ class Procedure:
         self.add_hidden_strlen_args()
         # Check for integer arguments that define array sizes:
         for arg in self.args.itervalues():
-            if arg.type.type=='INTEGER' and arg.intent=='in':
+            if arg.type.type.upper()=='INTEGER' and arg.intent=='in':
                 if self.get_array_size_parent(arg.name):
                     arg.type.is_array_size = True
                 elif self.get_matrix_size_parent(arg.name):
@@ -365,7 +367,7 @@ class DerivedType:
         self.mod = current_module
         self.comment = comment
     def ctor_list(self):
-        """Return list of associated CENTAUR ctors"""
+        """Return list of associated ctors"""
         ctors = []
         for proc in self.procs:
             if proc.ctor:
@@ -523,9 +525,9 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
     type_string = m.group(1)
 
     # Attributes
-    optional = line.lower().find('optional')>=0
+    optional = line.upper().find('OPTIONAL')>=0
     # Check for DIMENSION statement (assume it means 1D array...)
-    dimension = line.split('::')[0].lower().find('dimension')>=0
+    dimension = line.split('::')[0].upper().find('DIMENSION')>=0
     intent = 'inout'
     if intent_in_def.match(line):
         intent = 'in'
@@ -534,7 +536,7 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
 
     # Process character length
     char_len=-1
-    if type_string.startswith('CHARACTER'):
+    if type_string.upper().startswith('CHARACTER'):
         type_string = 'CHARACTER'
         try:
             len_spec = m.group('char_spec').split('=')[1].split(')')[0].strip()
@@ -597,7 +599,7 @@ def parse_proc(file,line,abstract=False):
     args = dict()
     #print arg_list
     retval = None
-    if line.find('FUNCTION') >= 0:
+    if line.upper().find('FUNCTION') >= 0:
         m = result_name_def.match(line)
         if m:
             retval = Argument(m.group(1),0)
@@ -650,7 +652,9 @@ def parse_proc(file,line,abstract=False):
         else:
             print "******* Untyped retval:", retval.name, proc_name
             invalid = True
-    if not invalid:
+    if invalid:
+        print "Warning, not wrapping procedure:", proc_name
+    else:
         proc = Procedure(proc_name,args,method,retval,proc_comments)
         # dtors automatically get added.  This way we can hide them
         # with the ignores list, but they still get used in the Class
@@ -671,7 +675,7 @@ def parse_type(file,line):
         if line == '':
             print "Unexpected end of file in TYPE", typename
             return
-        if line.strip().startswith('END TYPE'):
+        if line.upper().strip().startswith('END TYPE'):
             return
 
 def parse_comments(file,line):
@@ -722,9 +726,9 @@ def parse_file(fname):
             continue
         elif fort_comment.match(line):
             continue
-        elif module_def.match(line) and line.find("PROCEDURE")==-1:
+        elif module_def.match(line) and line.upper().find("PROCEDURE")==-1:
             current_module = line.split()[1]
-            print 'MOD:', current_module
+            #print 'MOD:', current_module
             dox_comments = []
             default_protection = PUBLIC
             module_proc_num = 1
@@ -747,14 +751,14 @@ def parse_file(fname):
                 line = readline(f)
             parse_proc(f,line,abstract=True)
             dox_comments = []
-        elif line.strip().startswith('PRIVATE'):
+        elif line.strip().upper().startswith('PRIVATE'):
             if line.find('::')==-1:
                 default_protection = PRIVATE
             else:
                 line = join_lines(line,file)
                 for name in line.split('::')[1].split(','):
                     private_names.add(name.strip().lower())
-        elif line.strip().startswith('PUBLIC'):
+        elif line.strip().upper().startswith('PUBLIC'):
             if line.find('::')>=0:
                 line = join_lines(line,file)
                 for name in line.split('::')[1].split(','):
@@ -1020,26 +1024,26 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
     s = s + '(' + c_arg_list(proc,bind,call,obj!=None) + ')'
     return s
 
-def write_constructor(file,object,centaur_ctor=None):
+def write_constructor(file,object,fort_ctor=None):
     """Write the c++ code for the constructor, possibly including a
-    call to a CENTAUR ctor"""
+    call to a Fortran ctor"""
     # Not used for dummy class with orphan functions
     if object.name==orphan_classname:
         return
     file.write('// Constructor:\n')
     file.write(object.name + '::' + object.name)# + '() {\n')
-    if centaur_ctor:
-        file.write('(' + c_arg_list(centaur_ctor,definition=True) + ')' )
+    if fort_ctor:
+        file.write('(' + c_arg_list(fort_ctor,definition=True) + ')' )
     else:
         file.write('()')
     file.write(' {\n')
     file.write('  data_ptr = NULL;\n')
     # Allocate storage for Fortran derived type
     file.write('  ' + mangle_name(fort_wrap_file, 'allocate_' + object.name) + '(&data_ptr); // Allocate Fortran derived type\n')
-    # If present, call CENTAUR ctor
-    if centaur_ctor:
-        file.write(function_def_str(centaur_ctor,bind=True,call=True) )
-        file.write('; // CENTAUR Constructor\n')
+    # If present, call Fortran ctor
+    if fort_ctor:
+        file.write(function_def_str(fort_ctor,bind=True,call=True) )
+        file.write('; // Fortran Constructor\n')
         file.write('  initialized = true;\n')
     else:
         file.write('  initialized = false;\n')
@@ -1051,11 +1055,11 @@ def write_destructor(file,object):
         return
     file.write('// Destructor:\n')
     file.write(object.name + '::~' + object.name + '() {\n')
-    # Check for CENTAUR destructor
+    # Check for Fortran destructor
     for proc in object.procs:
         if proc.dtor:
             file.write('  ' + 'if (initialized) ' + mangle_name(proc.mod,proc.name) + '(data_ptr')
-            file.write('); // CENTAUR Destructor\n')
+            file.write('); // Fortran Destructor\n')
     # Deallocate Fortran derived type
     file.write('  ' + mangle_name(fort_wrap_file,'deallocate_'+object.name) + '(data_ptr); // Deallocate Fortran derived type\n')
     file.write('}\n\n')    
@@ -1100,11 +1104,11 @@ def write_class(object):
     file.write('class ' + object.name + ' {\n\n')
     file.write('public:\n')
     # Constructor:
-    centaur_ctors = object.ctor_list()
-    if centaur_ctors:
-        for centaur_ctor in centaur_ctors:
-            write_cpp_dox_comments(file,centaur_ctor.comment,centaur_ctor.args_by_pos)
-            file.write('  ' + object.name + '(' + c_arg_list(centaur_ctor,bind=False,call=False,definition=False) + ');\n')
+    fort_ctors = object.ctor_list()
+    if fort_ctors:
+        for fort_ctor in fort_ctors:
+            write_cpp_dox_comments(file,fort_ctor.comment,fort_ctor.args_by_pos)
+            file.write('  ' + object.name + '(' + c_arg_list(fort_ctor,bind=False,call=False,definition=False) + ');\n')
     elif not object.name==orphan_classname:
         # Don't declare default constructor (or destructor, below) for
         # the dummy class
@@ -1133,9 +1137,9 @@ def write_class(object):
     file.write(HEADER_STRING + '\n')
     file.write('#include "' + object.name + '.h"\n\n')
     # Constructor(s):
-    if centaur_ctors:
-        for centaur_ctor in centaur_ctors:
-            write_constructor(file,object,centaur_ctor)
+    if fort_ctors:
+        for fort_ctor in fort_ctors:
+            write_constructor(file,object,fort_ctor)
     else:
         write_constructor(file,object)
     # Destructor
