@@ -68,7 +68,7 @@ they should work as described by "fortwrap.py -h".
 
 RELEASE NOTES
 
-Version 0.91 (8/19/10): Added support for lowercase Fortran keywords
+Version 0.9.1 (8/19/10): Added support for lowercase Fortran keywords
 
 Version 0.9 (8/18/10): Initial release
 
