@@ -48,7 +48,7 @@ to generate the C++ wrapper code.  Then execute "make" to build the
 simple test program in that directory, prog.cpp.
 
 
-STATUS OF THIS RELEASE
+STATUS
 
 8/18/2010
 
@@ -66,9 +66,16 @@ extensively and may be subject to change in the future, but I believe
 they should work as described by "fortwrap.py -h".
 
 
+RELEASE NOTES
+
+Version 0.9.1 (8/19/10): Added support for lowercase Fortran keywords
+
+Version 0.9 (8/18/10): Initial release
+
+
 CONTACT
 
-Feel free to contact me at mcfarljm@gmail.com with questions, issues,
+Feel free to contact me at mcfarljm@gmail.com with questions, problems,
 suggestions, etc.
 
 -- John
