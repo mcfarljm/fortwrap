@@ -19,7 +19,7 @@ import sys
 import os
 
 
-VERSION = 0.91
+VERSION = '0.9.1'
 
 
 # SETTINGS ==========================================
