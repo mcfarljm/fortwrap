@@ -1,3 +1,6 @@
+FortWrap 0.9.5 summary:
+- Fixed bug for processing compiler specification with -c
+
 FortWrap 0.9.4 summary:
 - Added capability to list files to wrap on the command line
 - Added option --global to wrap non-method procedures as global
