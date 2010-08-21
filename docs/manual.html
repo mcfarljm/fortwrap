@@ -84,10 +84,10 @@ o.process();
     procedure pointer have an explicit <tt>ABSTRACT
     INTERFACE</tt></li>
   
-  <li> <a href="#details-arrays"><b>Arrays</b></a>: One-dimensional
-    arrays are translated into C++ vector containers.  Subroutine
-    arguments used to define the Fortran array size are automatically
-    calculated based on the C++ vector.</li>
+  <li> <a href="#details-arrays"><b>Arrays</b></a>: By default,
+    one-dimensional arrays are translated into C++ vector containers.
+    Subroutine arguments used to define the Fortran array size are
+    automatically calculated based on the C++ vector.</li>
   
   <li> <a href="#details-matrices"><b>Matrices</b></a>: A
     "FortranMatrix" C++ class is provided for interfacing with
@@ -374,10 +374,16 @@ o.foo(a,NULL,NULL,&d);
 
   <h3><a name="details-arrays">Arrays</a></h3>
 
-  <p>Arrays are wrapped to <tt>std::vector&lt;&gt;*</tt>, with
-    a <tt>const</tt> qualifier for <tt>INTENT(IN)</tt> arguments.
-    If there is interest, I can add an option to wrap arrays arrays as
-    C-style arrays (i.e. pointers).</p>
+  <p>By default, arrays are wrapped to <tt>std::vector&lt;&gt;*</tt>,
+    with a <tt>const</tt> qualifier for <tt>INTENT(IN)</tt> arguments.
+    FortWrap will detect arguments that are used to define the Fortran
+    array size; these are hidden from the generated interface and are
+    calculated automatically based on the size of the vector container
+    that is passed in.</p>
+  
+  <p>The option <tt>--c-arrays</tt> can be used to create C-style
+    arrays, although with this option FortWrap can not hide the array
+    size arguments from the generated interface.</p>
 
   <p>FortWrap does not currently support assumed size
     (e.g. <tt>X(*)</tt>) or assumed shape (e.g. <tt>X(:)</tt>) array
@@ -402,8 +408,8 @@ SUBROUTINE bad_sub_wrap(n,x)
 END SUBROUTINE bad_sub_wrap
 </pre></div>
 
-  <p>I am currently working on getting FortWrap to generate these
-    types of wrappers automatically...</p>
+  <p>There is the possibility of a future version of FortWrap creating
+    these types of wrappers automatically.</p>
 
   <h3><a name="details-matrices">Matrices</a></h3>
 

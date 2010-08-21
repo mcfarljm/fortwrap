@@ -102,9 +102,10 @@ o.process();
     requires that the Fortran procedure pointer have an
     explicit <tt>ABSTRACT INTERFACE</tt></li>
   
-  <li> <b>Arrays</b>: One-dimensional arrays are translated into C++
-    vector containers.  Subroutine arguments used to define the Fortran
-    array size are automatically calculated based on the C++ vector.</li>
+  <li> <b>Arrays</b>: By default, one-dimensional arrays are
+    translated into C++ vector containers.  Subroutine arguments used
+    to define the Fortran array size are automatically calculated
+    based on the C++ vector.</li>
   
   <li> <b>Matrices</b>: A "FortranMatrix" C++ class is provided for
     interfacing with two-dimensional Fortran arrays (matrices).  This

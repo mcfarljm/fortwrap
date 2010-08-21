@@ -303,17 +303,18 @@ class Procedure:
                 arg.cpp_optional = True
             else:
                 break
-        # Push new_* methods to the top (for class Distribution)
-        if not name.lower().startswith('new'):
-            self.num += 100
         self.add_hidden_strlen_args()
         # Check for integer arguments that define array sizes:
-        for arg in self.args.itervalues():
-            if arg.type.type.upper()=='INTEGER' and arg.intent=='in':
-                if self.get_array_size_parent(arg.name):
-                    arg.type.is_array_size = True
-                elif self.get_matrix_size_parent(arg.name):
-                    arg.type.is_matrix_size = True
+        if not opts.c_arrays:
+            for arg in self.args.itervalues():
+                if arg.type.type.upper()=='INTEGER' and arg.intent=='in':
+                    if not opts.c_arrays and self.get_array_size_parent(arg.name):
+                        # The check on opts.c_arrays prevents writing
+                        # wrapper code that tries to extract the array
+                        # size from a C array
+                        arg.type.is_array_size = True
+                    elif self.get_matrix_size_parent(arg.name):
+                        arg.type.is_matrix_size = True
             
     def has_args_past_pos(self,pos,bind):
         """Query whether or not the argument list continues past pos,
@@ -915,7 +916,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                 elif not bind and arg.pass_by_val():
                     string = string + arg.cpp_type()[:-1] + ' '
                 elif not arg.type.dt and arg.type.array:
-                    if not bind:
+                    if not bind and not opts.c_arrays:
                         if arg.intent=='in':
                             # const is manually removed inside <>, so
                             # add it before the type declaration
@@ -941,9 +942,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         elif call and arg.type.proc_pointer:
             # Pass converted Fortran function pointer
             string = string + arg.name + ' ? &FORT_' + arg.name + ' : NULL'
-        elif bind and not call and not arg.type.dt and arg.type.array:
+        elif (bind or opts.c_arrays) and not call and not arg.type.dt and arg.type.array:
             string = string + arg.name + '[]'
-        elif call and not arg.type.dt and arg.type.array:
+        elif (not opts.c_arrays) and call and not arg.type.dt and arg.type.array:
             if arg.optional:
                 string = string + arg.name + ' ? &(*' + arg.name + ')[0] : NULL'
             else:
@@ -1086,7 +1087,8 @@ def write_class(object):
     file.write('#define ' + object.name.upper() + '_H_\n\n')
     file.write('#include <stdlib.h>\n') # Needed for NULL
     file.write('#include <string>\n') # Needed for special string handling
-    file.write('#include <vector>\n')
+    if not opts.c_arrays:
+        file.write('#include <vector>\n')
     file.write('#include "' + misc_defs_filename + '"\n')
     includes = get_native_includes(object)
     if object.name in includes:
@@ -1339,6 +1341,7 @@ class Options:
         print "-g\t\t: Wrap source files found in current directory (glob)"
         print "-d dir\t\t: Output generated wrapper code to dir"
         print "--file-list=f\t: Read list of Fortran source files to parse from file f"
+        print "--c-arays\t: Wrap arrays arguments as C-sytle arrays instead of\n\t\t  C++ std:vector containers"
         # Not documenting, as this option could be dangerous
         # (especially with something like "-d .", and only has limited
         # usefulness:
@@ -1349,7 +1352,7 @@ class Options:
         global code_output_dir, include_output_dir, fort_output_dir, compiler
         try:
             # -g is to glob working directory for files
-            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:', ['file-list=','clean','help','version'])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:', ['file-list=','clean','help','version','c-arrays'])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
@@ -1361,6 +1364,7 @@ class Options:
         self.glob_files = False
         self.clean_code = False
         self.dry_run = False
+        self.c_arrays = False
         if ('-h','') in opts or ('--help','') in opts:
             self.usage(0)
         elif ('-v','') in opts or ('--version','') in opts:
@@ -1384,6 +1388,8 @@ class Options:
                 self.dry_run = True
             elif o=='--clean':
                 self.clean_code = True
+            elif o=='--c-arrays':
+                self.c_arrays = True
 
         if self.clean_code and code_output_dir=='.':
             print "Error, cleaning wrapper code output dir requires -d"
