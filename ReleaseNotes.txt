@@ -1,0 +1,14 @@
+FortWrap 0.9.3 summary:
+- Added option --c-arrays to generate C-style array wrappers instead
+  of C++ vector containers
+
+FortWrap 0.9.2 summary: 
+- Added proper handling for top-level procedures (print warning) and
+  multi-module files
+- Expanded documentation
+
+FortWrap 0.9.1 summary: 
+- Added support for lowercase Fortran keywords
+
+FortWrap 0.9 summary: 
+- Initial release

@@ -24,9 +24,10 @@ latter requires that the execute permission be set.  Use "fortwrap.py
 
 DOCUMENTATION
 
-Refer to docs/manual.html for help getting started.  The tests/
-directory provides working examples of most of the main FortWrap
-features.
+Refer to the html documentation at docs/manual.html.  The
+documentation is continuuing to be expanded, so check the latest
+release for the most complete documentation.  The tests/ directory
+provides working examples of most of the main FortWrap features.
 
 
 USING THE TESTS
@@ -43,9 +44,11 @@ program, and finally run the test program.
 
 To manually run a test, first make sure the compiler specified in
 tests/Tests.mk is valid.  Then change to a test directory, for
-example, tests/arrays.  Execute "../../fortwrap.py -g --clean -d wrap"
-to generate the C++ wrapper code.  Then execute "make" to build the
-simple test program in that directory, prog.cpp.
+example, tests/arrays.  Execute "../../fortwrap.py -g -d wrap" to
+generate the C++ wrapper code (some tests, for example c_arrays,
+require different FortWrap options, which are defined in
+run_tests.py).  Then execute "make" to build the simple test program
+in that directory, prog.cpp.
 
 
 STATUS
@@ -65,17 +68,6 @@ directory.
 The command line options are fairly new, so haven't been tested
 extensively and may be subject to change in the future, but I believe
 they should work as described by "fortwrap.py -h".
-
-
-RELEASE NOTES
-
-Version 0.9.2 (8/20/10): Added proper handling for top-level
-procedures (print warning) and multi-module files.  Expanded
-documentation.
-
-Version 0.9.1 (8/19/10): Added support for lowercase Fortran keywords
-
-Version 0.9 (8/18/10): Initial release
 
 
 CONTACT
