@@ -1339,7 +1339,10 @@ class Options:
         print "-g\t\t: Wrap source files found in current directory (glob)"
         print "-d dir\t\t: Output generated wrapper code to dir"
         print "--file-list=f\t: Read list of Fortran source files to parse from file f"
-        print "--clean\t\t: Remove all wrapper-related files from wrapper code directory\n\t\t  before generating new code.  Requires -d"
+        # Not documenting, as this option could be dangerous
+        # (especially with something like "-d .", and only has limited
+        # usefulness:
+        #print "--clean\t\t: Remove all wrapper-related files from wrapper code directory\n\t\t  before generating new code.  Requires -d.  Warning: this\n\t\t  deletes files.  Use with caution and assume it will delete\n\t\t  everything in the wrapper directory"
         sys.exit(exit_val)
 
     def parse_args(self):
