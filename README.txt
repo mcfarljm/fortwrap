@@ -56,10 +56,11 @@ The internals of FortWrap are in a stable state and have been used
 successfully to wrap very large Fortran projects (~40,000 lines of
 code).  However, FortWrap is not intended to wrap all Fortran
 constructs.  In particular, FortWrap is geared towards wrapping
-derived types and procedures that operate on them.  In particular,
-FortWrap should not be used with Fortran 77 code.  For more details
-regarding the Fortran constructs that FortWrap is set up to wrap,
-refer to the html documentation and the tests directory.
+derived types and procedures that operate on them.  FortWrap is not
+intended to wrap legacy code and should not be used with Fortran 77
+code.  For more details regarding the Fortran constructs that FortWrap
+is set up to wrap, refer to the html documentation and the tests
+directory.
 
 The command line options are fairly new, so haven't been tested
 extensively and may be subject to change in the future, but I believe
@@ -67,6 +68,10 @@ they should work as described by "fortwrap.py -h".
 
 
 RELEASE NOTES
+
+Version 0.9.2 (8/20/10): Added proper handling for top-level
+procedures (print warning) and multi-module files.  Expanded
+documentation.
 
 Version 0.9.1 (8/19/10): Added support for lowercase Fortran keywords
 

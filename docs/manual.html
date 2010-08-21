@@ -7,6 +7,19 @@
 <body>
   <h1>FortWrap Manual</h1>
 
+<ul>
+  <li><a href="#Introduction">Introduction</a></li>
+  <li><a href="#Features">Main Features</a></li>
+  <li><a href="#Unsupported">Unsupported Features</a></li>
+  <li><a href="#GetStarted">Getting Started</a></li>
+  <li><a href="#Swig">Swig Tips (or "How to use with other languages")</a></li>
+  <li><a href="#Details">Wrapper Details</a></li>
+  <li><a href="#Files">Generated Files</a></li>
+  <li><a href="#Support">Support</a></li>
+</ul>
+
+  <h2><a name="Introduction">Introduction</a></h2>
+
   <p>FortWrap is a python script that parses Fortran 90/95/200X source
   files and generates wrapper code for interfacing with the original
   Fortran code from C++.  FortWrap is intended to be used with Fortran
@@ -50,7 +63,7 @@ Object o(&x); // Automatically calls object_ctor
 o.process();
   </pre></div>
 
-<h2>Main Features</h2>
+  <h2><a name="Features">Main Features</a></h2>
 
 <ul>
   <li> <b>Derived Types</b>: Transparent translation of Fortran derived types into C++ classes.  This is the main objective of FortWrap.</li>
@@ -92,7 +105,7 @@ o.process();
     routines are wrapped.</li>
 </ul>
 
-<h2>Unsupported Features</h2>
+<h2><a name="Unsupported">Unsupported Features</a></h2>
 
 <p>Many features of Fortran 90/95/2003 are not supported by FortWrap.  In
 some cases (e.g. assumed shape arrays) this is because the Fortran
@@ -100,16 +113,18 @@ language standard does not provide an interoperability mechanism.  In
 other cases, this is because there was not a need for certain features
   when the original version of FortWrap was being developed.</p>
 
-<p>Note that in most cases FortWrap will quietly leave out wrapper code
-for subroutines that contain unsupported argument types that are not
-optional.  In most situations, it is possible to get FortWrap to wrap
-these types of routines by providing a Fortran wrapper that is
-  interoperable and calls the target routine.</p>
+<p>In most situations, it is possible to get FortWrap to wrap these
+types of routines by providing a Fortran wrapper that is interoperable
+and calls the target routine.</p>
 
 <p>The following argument types/constructs/features are not
 supported:</p>
 
 <ul>
+  <li>"Top-level" (a.k.a. global or non-module) procedures.  Note that
+    FortWrap is geared towards wrapping modern Fortran code, not
+    legacy code.</li>
+
   <li> Assumed shape arrays (a declaration that looks like <tt>INTEGER
       :: X(:)</tt>).  The Fortran standard does not provide an
       interoperability mechanism for assumed shape arrays.</li>
@@ -151,56 +166,80 @@ supported:</p>
     compiler.</li>
 </ul>
 
-<h2>Getting Started</h2>
+<h2><a name="GetStarted">Getting Started</a></h2>
 
-  <p>See <tt>README.txt</tt></p>
-
-<h2>Generated Files</h2>
-
-<h3><pre>FortWrap.h</pre></h3>
-
-<p>This is a catch-all include file for all of the C++ wrapper code.
-Your C++ program only needs to include this.</p>
-
-<h3><pre>CppWrappers.f90</pre></h3>
-
-<p>This source file is generated when either derived types or
-  procedure pointers are wrapped.  For each derived type that is being
-  wrapped, corresponding "allocate" and "deallocate" wrapper functions
-  are generated for creating C "handles" to the Fortran derived type.
-  Where applicable, this source file will also define a small
-  procedure pointer conversion routine.</p>
-
-<h3>Class Wrappers</h3>
-
-<p>For each Fortran derived type being wrapped, a corresponding C++
-  class is crated.  Two C++ files are created: a header file defining
-  the class and a source code file defining the methods.  The header
-  file is the place to look to find out how to call the methods that
-  FortWrap has generated.</p>
-
-<h3>Global Wrappers</h3>
-
-<p>When you wrap global subroutines (i.e. ones that aren't inside a
-  Fortran module), FortWrap wraps them as static members of a dummy
-  C++ class called <tt>FortFuncs</tt>.  FortWrap will generate two
-  files to define this class: <tt>FortFuncs.h</tt>
-  and <tt>FortFuncs.cpp</tt>.</p>
-
-<h3><pre>FortranMatrix.h</pre></h3>
-
-<p> This is the definition of the <tt>FortranMatrix</tt> template
-  class that is provided for working with matrix arguments.  This file
-  is only generated when matrix arguments are wrapped.</p>
-
-<h3><pre>InterfaceDefs.h</pre></h3>
-
-<p>A small header file for FortWrap to declare a few things.</p>
+<ul>
+  <li>See <tt>README.txt</tt></li>
+  <li>Run "<tt>fortwrap.py -h</tt>" for usage information</li>
+  <li>Look in the tests directory at examples</li>
+</ul>
 
 
-<h2>Details</h2>
 
-<h3>Derived Types</h3>
+<h2><a name="Swig">Swig tips (or how to use with other languages)</a></h2>
+
+  <p>One of the principal advantages of wrapping code with FortWrap is
+    that the generated wrappers work well as input for Swig.  This
+    makes FortWrap useful even if you don't want to work with C++.
+    Just tell Swig to wrap the FortWrap-generated header files for the
+    target language of your choice.</p>
+
+  <p>Here are some tips:</p>
+
+  <ul>
+    <li>Make sure to use the <tt>-c++</tt> option with Swig</li>
+    <li>If your target language supports it, use <tt>-keyword</tt>
+      (python supports this).  This way, even though your optional
+      arguments must be passed by location in C++, they can be passed by
+      keyword in the target language.</li>
+    <li>Use "<tt>%apply int *INPUT { const int* };</tt>" to create an
+      input typemap (repeat for <tt>double</tt>).  This will only
+      catch scalars because FortWrap uses classes
+      (<tt>std::vector</tt> and <tt>FortranMatrix</tt> for arrays).
+      This is compatible with the way optional arguments are
+      treated.</li>
+<!--     <li>Use "<tt>%apply int *OUTPUT { int* };</tt>" to create an -->
+<!--       output typemap.  Note, however, that <tt>INTENT(OUT)</tt> -->
+<!--       and <tt>INTENT(INOUT)</tt> arguments are not distinguishable -->
+<!--       based on the C header file, so this typemap will not work when -->
+<!--       the input value really is used (it is not too common that a -->
+<!--       primitive scalar argument really is used as both input and -->
+<!--       output).  This is why FortWrap writes warnings for arguments -->
+<!--       that are not explicitly declared either <tt>INTENT(IN)</tt> -->
+<!--       or <tt>INTENT(OUT)</tt>.</li> -->
+    <li>Be careful with using
+      Swig's <a href="http://www.swig.org/Doc1.3/Library.html#Library_nn15"><tt>std_vector.i</tt></a>
+      library.  This drastically increases the size of the wrapper
+      code and is not compatible with keyword arguments.  I am also
+      not aware of a way to use this library with <tt>vector<>*</tt>
+      arguments that are meant to store outputs (which typically play
+      a big role in the wrapper code that FortWrap generates, since
+      input arguments are qualified by <tt>const</tt>).  You are
+      probably better off writing your own typemaps to handle
+      the <tt>const</tt> and non-<tt>const</tt> <tt>vector</tt>
+      arguments.</li>
+    <li>To wrap string outputs, you may <tt>%include
+	"<a href="http://www.swig.org/Doc1.3/Library.html#Library_nn14">std_string.i</a>"</tt>,
+	but you will need to write an <tt>argout</tt> typemap to
+	handle the string pointer as an output.
+      
+  </ul>
+  
+
+  <h2><a name="Details">Wrapper Details</a></h2>
+
+  <ul>
+    <li><a href="#details-dt">Derived Types</a></li>
+    <li><a href="#details-opt">Optional Arguments</a></li>
+    <li><a href="#details-orphans">Non-method procedures</a></li>
+    <li><a href="#details-arrays">Arrays</a></li>
+    <li><a href="#details-matrices">Matrices</a></li>
+    <li><a href="#details-procpointers">Procedure Pointers</a></li>
+    <li><a href="#details-strings">Strings</a></li>
+    <li><a href="#details-global">Top-level procedures</a></li>
+  </ul>
+
+  <h3><a name="details-dt">Derived Types</a></h3>
 
   <p>The main goal of FortWrap is to allow users to develop C++
     interfaces to Fortran code that applies object oriented techniques
@@ -235,7 +274,7 @@ Your C++ program only needs to include this.</p>
     of dynamically allocated memory.</p>
     
 
-<h3>Optional Arguments</h3>
+  <h3><a name="details-opt">Optional Arguments</a></h3>
 
   <p>Fortran 90 provides for optional procedure arguments that may be
     passed by position or keyword from Fortran.  Although
@@ -284,23 +323,28 @@ o.foo(a,NULL,NULL,&d);
 </pre></div>
 
   <p>Note that <tt>a</tt> is passed by value, whereas the optional
-  arguments must be passed by reference.  Also note that it makes
-  sense to define the most used optional arguments at the start of the
-  argument list, because the optional arguments must be passed by
-  position, and intermediate optional arguments not being provided
-  must be passed <tt>NULL</tt>.
+    arguments must be passed by reference.  Also note that it makes
+    sense to define the most used optional arguments at the start of the
+    argument list, because the optional arguments must be passed by
+    position, and intermediate optional arguments not being provided
+    must be passed <tt>NULL</tt>.</p>
+    
+  <h3><a name="details-orphans">Non-method procedures</a></h3>
 
+  <p>FortWrap can wrap procedures that do not operate on a derived
+    type.  In keeping with the object-oriented slant (and also to
+    reduce namespace pollution), such procedures are by default
+    wrapped as static methods of a dummy class
+    named <tt>FortFuncs</tt>.  Future versions may add an option to
+    wrap these as global functions.</p>
+    
 
-<h3>Procedure Pointers</h3>
+  <h3><a name="details-arrays">Arrays</a></h3>
 
-  <p>The Fortran 2003 standard provides support for procedure pointers
-    as well as mechanisms for interoperating with procedure pointers
-    from C.  Procedure pointer arguments are wrapped by FortWrap with
-    the limitation that the interface must be explicit and defined via
-    an <tt>ABSTRACT INTERFACE</tt> block.
-    See <tt>tests/function_pointers</tt> for example usage.</p>
-
-<h3>Arrays</h3>
+  <p>Arrays are wrapped to <tt>std::vector<>*</tt>, with
+    a <tt>const</tt> qualifier for <tt>INTENT(IN)</tt> arguments.
+    If there is interest, I can add an option to wrap arrays arrays as
+    C-style arrays (i.e. pointers).</p>
 
   <p>FortWrap does not currently support assumed size
     (e.g. <tt>X(*)</tt>) or assumed shape (e.g. <tt>X(:)</tt>) array
@@ -328,11 +372,92 @@ END SUBROUTINE bad_sub_wrap
   <p>I am currently working on getting FortWrap to generate these
     types of wrappers automatically...</p>
 
-<h3>Matrices</h3>
+  <h3><a name="details-matrices">Matrices</a></h3>
 
-<h3>Global (non-module) Procedures</h3>
 
-<h3>Strings</h3>
+
+  <h3><a name="details-procpointers">Procedure Pointers</a></h3>
+
+  <p>The Fortran 2003 standard provides support for procedure pointers
+    as well as mechanisms for interoperating with procedure pointers
+    from C.  Procedure pointer arguments are wrapped by FortWrap with
+    the limitation that the interface must be explicit and defined via
+    an <tt>ABSTRACT INTERFACE</tt> block.
+    See <tt>tests/function_pointers</tt> for example usage.</p>
+
+
+  <h3><a name="details-strings">Strings</a></h3>
+
+  <p>Currently only limited support for processing strings is provided.
+    In fact, this is a difficult language feature to handle well, and the
+    Fortran standard for interoperating with strings is no help.</p>
+
+  <p>FortWrap can only wrap scalar string arguments that
+    are <tt>INTENT(OUT)</tt> and have an explicitly declared length
+    with <tt>len=</tt>.  Integer literals or named integer parameters
+    can be used, provided that the declaration of the parameter name
+    is somewhere in a file that FortWrap parsed.</p>
+
+  <h3><a name="details-global">Top-level (non-module) procedures</a></h3>
+
+  <p>FortWrap does not currently wrap so-called "top-level" or
+    "global" procedures (i.e. procedures that are not contained within
+    a module).  Note that FortWrap is geared towards wrapping modern
+    Fortran code, not legacy code.</p>
+
+
+  <h2><a name="Files">Generated Files</a></h2>
+
+<h3><pre>FortWrap.h</pre></h3>
+
+<p>This is a catch-all include file for all of the C++ wrapper code.
+Your C++ program only needs to include this.</p>
+
+<h3><pre>CppWrappers.f90</pre></h3>
+
+<p>This source file is generated when either derived types or
+  procedure pointers are wrapped.  For each derived type that is being
+  wrapped, corresponding "allocate" and "deallocate" wrapper functions
+  are generated for creating C "handles" to the Fortran derived type.
+  When applicable, this source file will also define a small
+  procedure pointer conversion routine.</p>
+
+<h3>Class Wrappers</h3>
+
+<p>For each Fortran derived type being wrapped, a corresponding C++
+  class is created.  Two C++ files are created: a header file defining
+  the class and a source code file defining the methods.  The header
+  file is the place to look to find out how to call the methods that
+  FortWrap has generated.</p>
+
+<h3>Dummy Class Wrappers</h3>
+
+  <p>When you wrap procedures that do not operate on a derived type,
+    FortWrap wraps them as static members of a dummy C++ class
+    called <tt>FortFuncs</tt>.  FortWrap will generate two files to
+    define this class: <tt>FortFuncs.h</tt>
+    and <tt>FortFuncs.cpp</tt>.</p>
+
+<h3><pre>FortranMatrix.h</pre></h3>
+
+<p> This is the definition of the <tt>FortranMatrix</tt> template
+  class that is provided for working with matrix arguments.  This file
+  is only generated when matrix arguments are wrapped.</p>
+
+<h3><pre>InterfaceDefs.h</pre></h3>
+
+<p>A small header file for FortWrap to declare a few things.</p>
+
+
+<h2><a name="Support">Support</a></h2>
+
+  <p>FortWrap is actively maintained.  Please don't hesitate to
+    contact me if you have any questions, suggestions, complaints,
+    feature requests...</p>
+
+  <p>Email John
+  at <a href="mailto:mcfarljm@gmail.com">mcfarljm@gmail.com</a></p>
+
 
 </body>
 
