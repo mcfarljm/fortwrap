@@ -1393,10 +1393,10 @@ class Options:
                 include_output_dir = a
                 fort_output_dir = a
             elif o=='-c':
+                compiler = a
                 if a!='g95' and a!='gfortran':
                     print "Error, only g95 and gfortran name mangling supported"
                     sys.exit(1)
-                    compiler = a
             elif o=='-n':
                 self.dry_run = True
             elif o=='--clean':
