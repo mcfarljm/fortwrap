@@ -368,8 +368,12 @@ o.foo(a,NULL,NULL,&d);
     type.  In keeping with the object-oriented slant (and also to
     reduce namespace pollution), such procedures are by default
     wrapped as static methods of a dummy class
-    named <tt>FortFuncs</tt>.  Future versions may add an option to
-    wrap these as global functions.</p>
+    named <tt>FortFuncs</tt>.  The name of this class can be changed
+    using the <tt>--dummy-class</tt> option.</p>
+
+  <p>As an alternative, the <tt>--global</tt> option can be used to
+    wrap non-method procedures as global functions defined in
+    the <tt>FortFuncs.h</tt> header file.</p>
     
 
   <h3><a name="details-arrays">Arrays</a></h3>

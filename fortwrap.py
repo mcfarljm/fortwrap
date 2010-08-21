@@ -19,7 +19,7 @@ import sys
 import os
 
 
-VERSION = '0.9.3'
+VERSION = '0.9.4'
 
 
 # SETTINGS ==========================================
@@ -1014,7 +1014,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
     s = s + prefix
     # Make dummy class members static (so class doesn't need to be
     # instantiated)
-    if proc.in_orphan_class and not bind and not call and not obj:
+    if proc.in_orphan_class and not bind and not call and not obj and not opts.global_orphans:
         s = s + 'static '        
     # Now write return type:
     if proc.retval:
@@ -1027,7 +1027,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
     # Definition/declaration:
     if bind:
         s = s + mangle_name(proc.mod,proc.name)
-    elif obj:
+    elif obj and not opts.global_orphans:
         s = s + obj.name + '::' + translate_name(proc.name)
     else:
         s = s + translate_name(proc.name)
@@ -1112,8 +1112,9 @@ def write_class(object):
     file.write('\n')
     
     write_cpp_dox_comments(file,object.comment)
-    file.write('class ' + object.name + ' {\n\n')
-    file.write('public:\n')
+    if not opts.global_orphans:
+        file.write('class ' + object.name + ' {\n\n')
+        file.write('public:\n')
     # Constructor:
     fort_ctors = object.ctor_list()
     if fort_ctors:
@@ -1138,7 +1139,8 @@ def write_class(object):
         file.write('  ADDRESS data_ptr;\n')
         file.write('\nprivate:\n')
         file.write('  bool initialized;\n')
-    file.write('};\n\n')
+    if not opts.global_orphans:
+        file.write('};\n\n')
     file.write('#endif /* ' + object.name.upper() + '_H_ */\n')
     file.close()
 
@@ -1337,11 +1339,13 @@ class Options:
         print "-v, --version\t: Print version information and exit"
         print "-h, --help\t: Print this usage information"
         print "-n\t\t: Run parser but do not generate any wrapper code (dry run)"
-        print "-c FC\t\t: Use name mangling for Fortran compiler FC.  Only supports g95\n\t\t  and gfortran"
+        print "-c <FC>\t\t: Use name mangling for Fortran compiler <FC>.  Only supports\n\t\t  g95 and gfortran"
         print "-g\t\t: Wrap source files found in current directory (glob)"
-        print "-d dir\t\t: Output generated wrapper code to dir"
-        print "--file-list=f\t: Read list of Fortran source files to parse from file f"
+        print "-d <dir>\t: Output generated wrapper code to <dir>"
+        print "--file-list=<f>\t: Read list of Fortran source files to parse from file <f>"
         print "--c-arays\t: Wrap arrays arguments as C-sytle arrays instead of\n\t\t  C++ std:vector containers"
+        print "--dummy-class=<n>: Use <n> as the name of the dummy class used to wrap\n\t\t  non-method procedures"
+        print "--global\t: Wrap non-method procedures as global functions instead of\n\t\t  static methods of a dummy class"
         # Not documenting, as this option could be dangerous
         # (especially with something like "-d .", and only has limited
         # usefulness:
@@ -1349,10 +1353,10 @@ class Options:
         sys.exit(exit_val)
 
     def parse_args(self):
-        global code_output_dir, include_output_dir, fort_output_dir, compiler
+        global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname
         try:
             # -g is to glob working directory for files
-            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:', ['file-list=','clean','help','version','c-arrays'])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:', ['file-list=','clean','help','version','c-arrays','dummy-class=','global'])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
@@ -1365,6 +1369,7 @@ class Options:
         self.clean_code = False
         self.dry_run = False
         self.c_arrays = False
+        self.global_orphans = False
         if ('-h','') in opts or ('--help','') in opts:
             self.usage(0)
         elif ('-v','') in opts or ('--version','') in opts:
@@ -1390,6 +1395,10 @@ class Options:
                 self.clean_code = True
             elif o=='--c-arrays':
                 self.c_arrays = True
+            elif o=='--dummy-class':
+                orphan_classname = a
+            elif o=='--global':
+                self.global_orphans = True
 
         if self.clean_code and code_output_dir=='.':
             print "Error, cleaning wrapper code output dir requires -d"
