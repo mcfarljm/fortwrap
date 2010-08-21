@@ -66,32 +66,39 @@ o.process();
   <h2><a name="Features">Main Features</a></h2>
 
 <ul>
-  <li> <b>Derived Types</b>: Transparent translation of Fortran derived types into C++ classes.  This is the main objective of FortWrap.</li>
+  <li> <a href="#details-dt"><b>Derived Types</b></a>: Transparent
+  translation of Fortran derived types into C++ classes.  This is the
+  main objective of FortWrap.</li>
   <ul>
     <li> Translation of Fortran "ctor" functions into C++ constructors</li>
     <li> Fortran "dtor" functions automatically called by C++ destructor</li>
   </ul>
 
-  <li> <b>Optional arguments</b>: Fortran optional arguments are fully
-    supported, with automatic NULL default values in C++.</li>
+  <li> <a href="#details-opt"><b>Optional arguments</b></a>: Fortran
+    optional arguments are fully supported, with automatic NULL
+    default values in C++.</li>
 
-  <li> <b>Procedure pointers</b>: C++ function pointers may be passed
-    natively where Fortran expects a procedure pointer.  Right now this
-    requires that the Fortran procedure pointer have an
-    explicit <tt>ABSTRACT INTERFACE</tt></li>
+  <li> <a href="#details-procpointers"><b>Procedure pointers</b></a>:
+    C++ function pointers may be passed natively where Fortran expects
+    a procedure pointer.  Right now this requires that the Fortran
+    procedure pointer have an explicit <tt>ABSTRACT
+    INTERFACE</tt></li>
   
-  <li> <b>Arrays</b>: One-dimensional arrays are translated into C++
-    vector containers.  Subroutine arguments used to define the Fortran
-    array size are automatically calculated based on the C++ vector.</li>
+  <li> <a href="#details-arrays"><b>Arrays</b></a>: One-dimensional
+    arrays are translated into C++ vector containers.  Subroutine
+    arguments used to define the Fortran array size are automatically
+    calculated based on the C++ vector.</li>
   
-  <li> <b>Matrices</b>: A "FortranMatrix" C++ class is provided for
-    interfacing with two-dimensional Fortran arrays (matrices).  This
-    class takes care to store data internally in Fortran order.</li>
+  <li> <a href="#details-matrices"><b>Matrices</b></a>: A
+    "FortranMatrix" C++ class is provided for interfacing with
+    two-dimensional Fortran arrays (matrices).  This class takes care
+    to store data internally in Fortran order.</li>
 
   <li> Name mangling support for both gfortran and g95 compilers
     
-  <li> Character arrays with <tt>INTENT(OUT)</tt> and explicit length
-    parameter are translated into C++ strings.</li>
+  <li> <a href="#details-strings">Character arrays</a>
+    with <tt>INTENT(OUT)</tt> and explicit length parameter are
+    translated into C++ strings.</li>
 
   <li> Where possible, pass by value is used in C++ (e.g. scalar
     arguments that are not optional)</li>
@@ -121,9 +128,11 @@ and calls the target routine.</p>
 supported:</p>
 
 <ul>
-  <li>"Top-level" (a.k.a. global or non-module) procedures.  Note that
-    FortWrap is geared towards wrapping modern Fortran code, not
-    legacy code.</li>
+  <li>"Top-level" (a.k.a. global or non-module) procedures are not
+    currently wrapped.  Note that FortWrap is geared towards wrapping
+    modern Fortran code, not legacy code.</li>
+
+  <li><tt>ALLOCATABLE</tt> or <tt>POINTER</tt> arguments</li>
 
   <li> Assumed shape arrays (a declaration that looks like <tt>INTEGER
       :: X(:)</tt>).  The Fortran standard does not provide an
@@ -140,19 +149,18 @@ supported:</p>
 
   <li> <tt>KIND</tt>: only limited support is provided for specifying
     the <tt>KIND</tt> of primitive types.  For <tt>REAL</tt>
-    arguments, <tt>KIND</tt>s of 4 and 8 are supported,
-    otherwise <tt>KIND</tt> is not supported.</li>
+    arguments, <tt>KIND</tt>s of 4 and 8 are supported
+    (<tt>REAL*8</tt> is also recognized), otherwise <tt>KIND</tt> is
+    not supported.</li>
 
   <li> Arrays of a derived type.  These can be wrapped by creating a
     new derived type to contain an array of the derived type of
-    interest.</li>
+    interest.  Create an "append" function in Fortran that accepts
+    only scalars but allows you to add items to the array container
+    one at a time.</li>
 
   <li> Fortran functions with non-primitive return types are not
     wrapped.</li>
-
-  <li> Wrapping Fortran code outside of a <tt>MODULE</tt> is not
-    currently supported.  Note that the main purpose of FortWrap is to
-    wrap derived types, which requires the use of <tt>MODULE</tt></li>
 
   <li> <b>CLASS</b> (polymorphic) variables.  This Fortran language
     features is not supported by g95 and is currently making its way
@@ -164,7 +172,19 @@ supported:</p>
     is already underway, although it relies on gfortran-specific
     compiler implementation details and a patched version of the
     compiler.</li>
+
+  <li>Type bound procedures.  Those that were not declared
+    as <tt>NOPASS</tt> require that the firrst argument be declared
+    using <tt>CLASS</tt> instead of <tt>TYPE</tt>.  FortWrap does not
+    currently handle <tt>CLASS</tt>: see above.</li>
 </ul>
+
+  <p>Note that FortWrap can still wrap procedures that use unsupported
+    arguments if those arguments are optional.  In these cases, the
+    offending arguments are hidden from the generated interface
+    code.</p>
+
+
 
 <h2><a name="GetStarted">Getting Started</a></h2>
 
@@ -192,37 +212,49 @@ supported:</p>
       (python supports this).  This way, even though your optional
       arguments must be passed by location in C++, they can be passed by
       keyword in the target language.</li>
-    <li>Use "<tt>%apply int *INPUT { const int* };</tt>" to create an
-      input typemap (repeat for <tt>double</tt>).  This will only
+    <li>Use <tt>%apply int *INPUT { const int* };</tt> to create an
+      input typemap (repeat for <tt>double*</tt>).  This will only
       catch scalars because FortWrap uses classes
-      (<tt>std::vector</tt> and <tt>FortranMatrix</tt> for arrays).
+      (<tt>std::vector</tt> and <tt>FortranMatrix</tt>) for arrays.
       This is compatible with the way optional arguments are
       treated.</li>
-<!--     <li>Use "<tt>%apply int *OUTPUT { int* };</tt>" to create an -->
-<!--       output typemap.  Note, however, that <tt>INTENT(OUT)</tt> -->
-<!--       and <tt>INTENT(INOUT)</tt> arguments are not distinguishable -->
-<!--       based on the C header file, so this typemap will not work when -->
-<!--       the input value really is used (it is not too common that a -->
-<!--       primitive scalar argument really is used as both input and -->
-<!--       output).  This is why FortWrap writes warnings for arguments -->
-<!--       that are not explicitly declared either <tt>INTENT(IN)</tt> -->
-<!--       or <tt>INTENT(OUT)</tt>.</li> -->
+    <li>Use <tt>%apply int *OUTPUT { int* };</tt> to create an
+      output typemap.  Note, however, that <tt>INTENT(OUT)</tt>
+      and <tt>INTENT(INOUT)</tt> arguments are not distinguishable
+      based on the C header file, so this typemap will not work when
+      the input value really is used.  This is why FortWrap writes
+      warnings for arguments that are not explicitly declared
+      either <tt>INTENT(IN)</tt> or <tt>INTENT(OUT)</tt>.  Caution is
+      also needed if using this typemap in conjunction with optional
+      arguments: because of the way the typemap works, there will be
+      no way to "not pass" the optional argument from the target
+      language.  This limitatino can be worked around by creating a
+      custom typemap.</li>
     <li>Be careful with using
       Swig's <a href="http://www.swig.org/Doc1.3/Library.html#Library_nn15"><tt>std_vector.i</tt></a>
       library.  This drastically increases the size of the wrapper
       code and is not compatible with keyword arguments.  I am also
-      not aware of a way to use this library with <tt>vector<>*</tt>
-      arguments that are meant to store outputs (which typically play
-      a big role in the wrapper code that FortWrap generates, since
-      input arguments are qualified by <tt>const</tt>).  You are
-      probably better off writing your own typemaps to handle
-      the <tt>const</tt> and non-<tt>const</tt> <tt>vector</tt>
-      arguments.</li>
+      not aware of a way to use this library
+      with <tt>vector&lt;&gt;*</tt> arguments that are meant to store
+      outputs (which typically play a big role in the wrapper code
+      that FortWrap generates, since input arguments are qualified
+      by <tt>const</tt>).  You are probably better off writing your
+      own typemaps to handle the <tt>const</tt> and
+      non-<tt>const</tt> <tt>vector</tt> arguments.</li>
     <li>To wrap string outputs, you may <tt>%include
 	"<a href="http://www.swig.org/Doc1.3/Library.html#Library_nn14">std_string.i</a>"</tt>,
 	but you will need to write an <tt>argout</tt> typemap to
-	handle the string pointer as an output.
-      
+      handle the string pointer as an output.</li>
+    <li>There are a couple different ways to work with function
+      pointers in the target language (in python, at least).  See
+      the <a href="http://www.swig.org/Doc1.3/SWIG.html#SWIG_nn30">Swig
+      documentation</a>.  The simplest is to use Swig directives to
+      wrap an existing C/C++ function as a <tt>%constant</tt> that can
+      be passed as an argument in the target language.  With python,
+      it is also possible to define the callback function in the
+      target language, but this will involve the use of a custom
+      typemap.  <a href="#Support">Contact me</a> if you want help
+      with this.</li>
   </ul>
   
 
@@ -282,20 +314,21 @@ supported:</p>
     for by the Fortran standard, FortWrap takes advantage of the fact
     that both the g95 and gfortran compilers implement optional
     arguments in a simple manner that is easy to mimic from C code.
-    Specifically, the compiler uses null pointers to indicate optional
-    arguments that are not present.</p>
+    Specifically, these compilers use null pointers to indicate
+    optional arguments that are not present.</p>
 
   <p>FortWrap exploits this by allowing the arguments to be optional
     from C++.  The usage is not quite as friendly as it would be from
     Fortran, though, since C++ does not support keyword arguments.
     However, FortWrap tries to make the usage as simple as possible by
-    automatically giving all Fortran optional arguments default values
+    automatically giving all optional arguments default values
     of <tt>NULL</tt>.  Note also that one consequence of using
     optional arguments is that they may not be passed by value from
     C++.  Normally FortWrap will wrap primitive scalar types
     with <tt>INTENT(IN)</tt> as pass-by-value arguments from C++, but
-    FortWrap must resort to pass-by-reference for optional
-    arguments.</p>
+    FortWrap must resort to pass-by-reference for optional arguments
+    (however, see the<a href="#Swig">Swig notes</a>; if re-wrapping
+    with Swig, this is not an issue).</p>
 
   <p>Consider the following Fortran subroutine:</p>
 
@@ -341,7 +374,7 @@ o.foo(a,NULL,NULL,&d);
 
   <h3><a name="details-arrays">Arrays</a></h3>
 
-  <p>Arrays are wrapped to <tt>std::vector<>*</tt>, with
+  <p>Arrays are wrapped to <tt>std::vector&lt;&gt;*</tt>, with
     a <tt>const</tt> qualifier for <tt>INTENT(IN)</tt> arguments.
     If there is interest, I can add an option to wrap arrays arrays as
     C-style arrays (i.e. pointers).</p>
@@ -374,6 +407,25 @@ END SUBROUTINE bad_sub_wrap
 
   <h3><a name="details-matrices">Matrices</a></h3>
 
+  <p>Matrices are wrapped using a special template
+    class <tt>FortranMatrix</tt>.  The header
+    file <tt>FortranMatrix.h</tt> is created when needed.  Part of its
+    purpose is to hide the fact that C and Fortran store
+    multi-dimensional array data in different orders.  Element access
+    is provided via the overloaded parentheses operator.  Note that
+    although the base Fortran index is 1 (by default), the base index
+    used by the <tt>FortranMatrix</tt> class is 0.  Bounds checking is
+    done via a C assertion, but this can be tweaked or commented-out
+    as needed.</p>
+
+  <p>As an example usage, consider declaring an integer matrix with 4
+  rows and 2 columns, and setting the value of the 1st row and 2nd
+  column:</p>
+
+<div class="targetlang"><pre>
+FortranMatrix&lt;int&gt; X(4,2);
+X(0,1) = 10;
+</pre></div>
 
 
   <h3><a name="details-procpointers">Procedure Pointers</a></h3>
