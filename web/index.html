@@ -9,6 +9,16 @@
 
   <p><b>FortWrap version 0.9 released 8/18/2010</b></p>
 
+  <ul>
+    <li><a href="#Introduction">Introduction</a></li>
+    <li><a href="#Swig">Wrapping for other languages</a></li>
+    <li><a href="#Obtaining">Obtaining FortWrap</a></li>
+    <li><a href="#Features">Main Features</a></li>
+    <li><a href="#Unsupported">Unsupported Features</a></li>
+  </ul>
+
+  <h2><a name="Introduction">Introduction</a></h2>
+
   <p>FortWrap is a python script that parses Fortran 90/95/200X source
   files and generates wrapper code for interfacing with the original
   Fortran code from C++.  FortWrap is compatible with
@@ -57,7 +67,7 @@ o.process();
 
   <p>Additional examples can be found <a href="examples.html">here</a>
 
-  <h2>Wrapping for other languages</h2>
+    <h2><a name="Swig">Wrapping for other languages</a></h2>
 
  <p>FortWrap can also be used as an intermediary step for wrapping
    Fortran code with <a href="http://www.swig.org">Swig</a>.  The C++
@@ -70,12 +80,12 @@ o.process();
    arguments.
 
 
-  <h2>Obtaining FortWrap</h2>
+   <h2><a name="Obtaining">Obtaining FortWrap</a></h2>
 
   FortWrap may be downloaded
   from <a href="https://sourceforge.net/projects/fortwrap/">https://sourceforge.net/projects/fortwrap/</a>.
 
-<h2>Main Features</h2>
+   <h2><a name="Features">Main Features</a></h2>
 
 <ul>
   <li> <b>Derived Types</b>: Transparent translation of Fortran derived types into C++ classes.  This is the main objective of FortWrap.</li>
@@ -92,9 +102,10 @@ o.process();
     requires that the Fortran procedure pointer have an
     explicit <tt>ABSTRACT INTERFACE</tt></li>
   
-  <li> <b>Arrays</b>: One-dimensional arrays are translated into C++
-    vector containers.  Subroutine arguments used to define the Fortran
-    array size are automatically calculated based on the C++ vector.</li>
+  <li> <b>Arrays</b>: By default, one-dimensional arrays are
+    translated into C++ vector containers.  Subroutine arguments used
+    to define the Fortran array size are automatically calculated
+    based on the C++ vector.</li>
   
   <li> <b>Matrices</b>: A "FortranMatrix" C++ class is provided for
     interfacing with two-dimensional Fortran arrays (matrices).  This
@@ -117,22 +128,26 @@ o.process();
     routines are wrapped.</li>
 </ul>
 
-<h2>Unsupported Features</h2>
+<h2><a name="Unsupported">Unsupported Features</a></h2>
 
 <p>Many features of Fortran 90/95/2003 are not supported by FortWrap.
 In some cases (e.g. assumed shape arrays) this is because the Fortran
 language standard does not provide an interoperability mechanism.</p>
 
-<p>Note that in most cases FortWrap will quietly leave out wrapper code
-for subroutines that contain unsupported argument types that are not
-optional.  In most situations, it is possible to get FortWrap to wrap
-these types of routines by providing a Fortran wrapper that is
-  interoperable and calls the target routine.</p>
+<p>In most situations, it is possible to get FortWrap to wrap these
+types of routines by providing a Fortran wrapper that is interoperable
+and calls the target routine.</p>
 
 <p>The following argument types/constructs/features are not
 supported:</p>
 
 <ul>
+  <li>"Top-level" (a.k.a. global or non-module) procedures are not
+    currently wrapped.  Note that FortWrap is geared towards wrapping
+    modern Fortran code, not legacy code.</li>
+
+  <li><tt>ALLOCATABLE</tt> or <tt>POINTER</tt> arguments</li>
+
   <li> Assumed shape arrays (a declaration that looks like <tt>INTEGER
       :: X(:)</tt>).  The Fortran standard does not provide an
       interoperability mechanism for assumed shape arrays.</li>
@@ -148,19 +163,18 @@ supported:</p>
 
   <li> <tt>KIND</tt>: only limited support is provided for specifying
     the <tt>KIND</tt> of primitive types.  For <tt>REAL</tt>
-    arguments, <tt>KIND</tt>s of 4 and 8 are supported,
-    otherwise <tt>KIND</tt> is not supported.</li>
+    arguments, <tt>KIND</tt>s of 4 and 8 are supported
+    (<tt>REAL*8</tt> is also recognized), otherwise <tt>KIND</tt> is
+    not supported.</li>
 
   <li> Arrays of a derived type.  These can be wrapped by creating a
     new derived type to contain an array of the derived type of
-    interest.</li>
+    interest.  Create an "append" function in Fortran that accepts
+    only scalars but allows you to add items to the array container
+    one at a time.</li>
 
   <li> Fortran functions with non-primitive return types are not
     wrapped.</li>
-
-  <li> Wrapping Fortran code outside of a <tt>MODULE</tt> is not
-    currently supported.  Note that the main purpose of FortWrap is to
-    wrap derived types, which requires the use of <tt>MODULE</tt></li>
 
   <li> <b>CLASS</b> (polymorphic) variables.  This Fortran language
     features is not supported by g95 and is currently making its way
@@ -171,8 +185,17 @@ supported:</p>
     polymorphic C++ wrappers around Fortran <tt>CLASS</tt> constructs
     is already underway, although it relies on gfortran-specific
     compiler implementation details.</li>
+
+  <li>Type bound procedures.  Those that were not declared
+    as <tt>NOPASS</tt> require that the firrst argument be declared
+    using <tt>CLASS</tt> instead of <tt>TYPE</tt>.  FortWrap does not
+    currently handle <tt>CLASS</tt>: see above.</li>
 </ul>
 
+  <p>Note that FortWrap can still wrap procedures that use unsupported
+    arguments if those arguments are optional.  In these cases, the
+    offending arguments are hidden from the generated interface
+    code.</p>
 
 </body>
 

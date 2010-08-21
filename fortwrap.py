@@ -19,7 +19,7 @@ import sys
 import os
 
 
-VERSION = '0.9.1'
+VERSION = '0.9.3'
 
 
 # SETTINGS ==========================================
@@ -63,6 +63,7 @@ fort_data_string = r'\s*(TYPE\s*\((?P<dt_spec>\S*)\)|INTEGER|REAL(\*8|\s*\(C_DOU
 fort_data = re.compile(fort_data_string,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_string + '.*::',re.IGNORECASE)
 module_def = re.compile(r'\s*MODULE\s+\S',re.IGNORECASE)
+end_module_def = re.compile(r'\s*END\s+MODULE',re.IGNORECASE)
 # INT below is used to represent the hidden length arguments, passed by value
 primitive_data = re.compile('(INTEGER|REAL|LOGICAL|CHARACTER|INT)',re.IGNORECASE)
 fort_dox_comments = re.compile(r'\s*!\>')
@@ -302,17 +303,18 @@ class Procedure:
                 arg.cpp_optional = True
             else:
                 break
-        # Push new_* methods to the top (for class Distribution)
-        if not name.lower().startswith('new'):
-            self.num += 100
         self.add_hidden_strlen_args()
         # Check for integer arguments that define array sizes:
-        for arg in self.args.itervalues():
-            if arg.type.type.upper()=='INTEGER' and arg.intent=='in':
-                if self.get_array_size_parent(arg.name):
-                    arg.type.is_array_size = True
-                elif self.get_matrix_size_parent(arg.name):
-                    arg.type.is_matrix_size = True
+        if not opts.c_arrays:
+            for arg in self.args.itervalues():
+                if arg.type.type.upper()=='INTEGER' and arg.intent=='in':
+                    if not opts.c_arrays and self.get_array_size_parent(arg.name):
+                        # The check on opts.c_arrays prevents writing
+                        # wrapper code that tries to extract the array
+                        # size from a C array
+                        arg.type.is_array_size = True
+                    elif self.get_matrix_size_parent(arg.name):
+                        arg.type.is_matrix_size = True
             
     def has_args_past_pos(self,pos,bind):
         """Query whether or not the argument list continues past pos,
@@ -590,6 +592,12 @@ def parse_proc(file,line,abstract=False):
     # First check for line continuation:
     line = join_lines(line,file)
     proc_name = line.split('(')[0].split()[-1]
+
+    # If not in a module, print warning and return
+    if not current_module:
+        print "Warning, wrapping top-level (non-module) procedures not supported:", proc_name
+        return
+
     arg_string = line.split('(')[1].split(')')[0]
     if re.search(r'\S',arg_string):
         arg_list = arg_string.split(',')
@@ -734,6 +742,8 @@ def parse_file(fname):
             module_proc_num = 1
             private_names = set()
             public_names = set()
+        elif end_module_def.match(line):
+            current_module = ''
         elif fort_type_def.match(line):
             #print line.split()[1]
             parse_type(f,line)
@@ -850,12 +860,12 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     opposed to declared (prototype)
     """
     # dt check is necessary to handle orphan functions in the dummy class
-    if (not call) and (proc.nargs == 0 or (not bind and proc.nargs==1)) and proc.args_by_pos[1].type.dt:
+    if (not call) and (proc.nargs == 0 or (not bind and proc.nargs==1 and proc.args_by_pos[1].type.dt)):
         return 'void'
     string = ''
     # Pass "data_ptr" as first arg, if necessary. dt check is necessary to
     # handle orphan functions in the dummy class correctly
-    if bind and call and proc.args_by_pos[1].type.dt:
+    if bind and call and proc.nargs>0 and proc.args_by_pos[1].type.dt:
         if proc.nargs==1:
             return 'data_ptr'
         else:
@@ -906,7 +916,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                 elif not bind and arg.pass_by_val():
                     string = string + arg.cpp_type()[:-1] + ' '
                 elif not arg.type.dt and arg.type.array:
-                    if not bind:
+                    if not bind and not opts.c_arrays:
                         if arg.intent=='in':
                             # const is manually removed inside <>, so
                             # add it before the type declaration
@@ -932,9 +942,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         elif call and arg.type.proc_pointer:
             # Pass converted Fortran function pointer
             string = string + arg.name + ' ? &FORT_' + arg.name + ' : NULL'
-        elif bind and not call and not arg.type.dt and arg.type.array:
+        elif (bind or opts.c_arrays) and not call and not arg.type.dt and arg.type.array:
             string = string + arg.name + '[]'
-        elif call and not arg.type.dt and arg.type.array:
+        elif (not opts.c_arrays) and call and not arg.type.dt and arg.type.array:
             if arg.optional:
                 string = string + arg.name + ' ? &(*' + arg.name + ')[0] : NULL'
             else:
@@ -1077,7 +1087,8 @@ def write_class(object):
     file.write('#define ' + object.name.upper() + '_H_\n\n')
     file.write('#include <stdlib.h>\n') # Needed for NULL
     file.write('#include <string>\n') # Needed for special string handling
-    file.write('#include <vector>\n')
+    if not opts.c_arrays:
+        file.write('#include <vector>\n')
     file.write('#include "' + misc_defs_filename + '"\n')
     includes = get_native_includes(object)
     if object.name in includes:
@@ -1265,7 +1276,8 @@ def write_fortran_wrapper():
     # Build list of modules we need to USE
     use_mods = set()
     for obj in objects.itervalues():
-        use_mods.add(obj.mod)
+        if obj.name != orphan_classname:
+            use_mods.add(obj.mod)
     f = open(fort_output_dir+'/' + fort_wrap_file + '.f90', "w")
     #f.write(HEADER_STRING + '\n') # Wrong comment style
     f.write('MODULE ' + fort_wrap_file + '\n\n')
@@ -1329,14 +1341,18 @@ class Options:
         print "-g\t\t: Wrap source files found in current directory (glob)"
         print "-d dir\t\t: Output generated wrapper code to dir"
         print "--file-list=f\t: Read list of Fortran source files to parse from file f"
-        print "--clean\t\t: Remove all wrapper-related files from wrapper code directory\n\t\t  before generating new code.  Requires -d"
+        print "--c-arays\t: Wrap arrays arguments as C-sytle arrays instead of\n\t\t  C++ std:vector containers"
+        # Not documenting, as this option could be dangerous
+        # (especially with something like "-d .", and only has limited
+        # usefulness:
+        #print "--clean\t\t: Remove all wrapper-related files from wrapper code directory\n\t\t  before generating new code.  Requires -d.  Warning: this\n\t\t  deletes files.  Use with caution and assume it will delete\n\t\t  everything in the wrapper directory"
         sys.exit(exit_val)
 
     def parse_args(self):
         global code_output_dir, include_output_dir, fort_output_dir, compiler
         try:
             # -g is to glob working directory for files
-            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:', ['file-list=','clean','help','version'])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:', ['file-list=','clean','help','version','c-arrays'])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
@@ -1348,6 +1364,7 @@ class Options:
         self.glob_files = False
         self.clean_code = False
         self.dry_run = False
+        self.c_arrays = False
         if ('-h','') in opts or ('--help','') in opts:
             self.usage(0)
         elif ('-v','') in opts or ('--version','') in opts:
@@ -1371,6 +1388,8 @@ class Options:
                 self.dry_run = True
             elif o=='--clean':
                 self.clean_code = True
+            elif o=='--c-arrays':
+                self.c_arrays = True
 
         if self.clean_code and code_output_dir=='.':
             print "Error, cleaning wrapper code output dir requires -d"

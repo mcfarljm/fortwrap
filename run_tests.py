@@ -3,8 +3,10 @@
 import os
 import glob
 
-opts = '-g --clean -d wrap'
+OPTS = '-g --clean -d wrap'
 cmd = '../../fortwrap.py'
+
+custom_opts = { 'c_arrays':OPTS+' --c-arrays' }
 
 os.chdir('tests')
 tests = glob.glob('*')
@@ -23,6 +25,10 @@ for test in tests:
     print "Running test:", test,
     os.chdir(test)
     # Run wrapper generator
+    if test in custom_opts:
+        opts = custom_opts[test]
+    else:
+        opts = OPTS
     stat = os.system(cmd + ' ' + opts + ' > /dev/null')
     if stat!=0:
         num_err += 1
