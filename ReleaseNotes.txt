@@ -1,10 +1,14 @@
 FortWrap 0.9.4 summary:
 
+- Added capability to list files to wrap on the command line
+
 - Added option --dummy-class for specifying the name of the class used
   to wrap non-method procedures
 
 - Added option --global to wrap non-method procedures as global
   functions instead of static members of dummy class
+
+- Improved error checking for invalid source files
 
 FortWrap 0.9.3 summary:
 - Added option --c-arrays to generate C-style array wrappers instead

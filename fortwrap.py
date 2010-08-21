@@ -62,6 +62,8 @@ fort_comment = re.compile('\s*!')
 fort_data_string = r'\s*(TYPE\s*\((?P<dt_spec>\S*)\)|INTEGER|REAL(\*8|\s*\(C_DOUBLE\)|\s*\(KIND=(?P<real_spec>[0-9]+)\s*\))?|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
 fort_data = re.compile(fort_data_string,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_string + '.*::',re.IGNORECASE)
+# CLASS: not yet supported, but print warnings
+fort_class_data_def = re.compile(r'\s*CLASS\s*\(\S*\).*::',re.IGNORECASE)
 module_def = re.compile(r'\s*MODULE\s+\S',re.IGNORECASE)
 end_module_def = re.compile(r'\s*END\s+MODULE',re.IGNORECASE)
 # INT below is used to represent the hidden length arguments, passed by value
@@ -637,6 +639,8 @@ def parse_proc(file,line,abstract=False):
             # variables (assuming definitions are ordered in code)
             parse_argument_defs(line,file,arg_list,args,retval,arg_comments)
             arg_comments = []
+        elif fort_class_data_def.match(line):
+            print "Warning, CLASS arguments not currently supported:", proc_name
     # Check args:
     if len(args) != len(arg_list):
         print "****** Missing argument definitions:", proc_name
@@ -1441,12 +1445,17 @@ if __name__ == "__main__":
         print "Error: no source files"
         sys.exit(2)
 
-    fcount = 0
+    fcount = 0  # Counts valid files
     for f in file_list:
         fcount += parse_file(f)
     if fcount==0:
         print "Error: no source files"
         sys.exit(2)
+
+    # Prevent writing any files if there is nothing to wrap
+    if len(procedures)==0:
+        print "No procedures to wrap"
+        sys.exit(5)
 
     associate_procedures()
 
