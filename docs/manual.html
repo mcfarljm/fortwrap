@@ -194,6 +194,19 @@ supported:</p>
   <li>Look in the tests directory at examples</li>
 </ul>
 
+  <p>Any one or more of three mechanisms can be used to specify the
+    Fortran source file(s) to be wrapped:</p>
+  
+  <ol>
+    <li>Name the files on the command line using full or relative paths</li>
+    <li>The <tt>-g</tt> option will wrap all <tt>.f90</tt>
+      or <tt>.F90</tt> source files found in the current working
+      directory.</li>
+    <li>Use the <tt>--file-list</tt> option to name a file that
+      contains a list of source files to be wrapped.  The format of this
+      file is a newline-separated list of files to be wrapped.</li>
+  </ol>
+
 
 
 <h2><a name="Swig">Swig tips (or how to use with other languages)</a></h2>
@@ -492,13 +505,20 @@ Your C++ program only needs to include this.</p>
   file is the place to look to find out how to call the methods that
   FortWrap has generated.</p>
 
-<h3>Dummy Class Wrappers</h3>
+<h3>Dummy Class or Global Wrappers</h3>
 
   <p>When you wrap procedures that do not operate on a derived type,
     FortWrap wraps them as static members of a dummy C++ class
     called <tt>FortFuncs</tt>.  FortWrap will generate two files to
     define this class: <tt>FortFuncs.h</tt>
-    and <tt>FortFuncs.cpp</tt>.</p>
+    and <tt>FortFuncs.cpp</tt>.  Note that the name of this class and
+    its associated files can be changed with
+    the <tt>--dummy-class</tt> option.</p>
+
+  <p>When using the <tt>--global</tt> option, the same files are
+    created, but the non-method procedures are wrapped as global
+    functions.  The <tt>--dummy-class</tt> option also functions to
+    change the associated filenames in this case.</p>
 
 <h3><pre>FortranMatrix.h</pre></h3>
 
@@ -520,6 +540,9 @@ Your C++ program only needs to include this.</p>
   <p>Email John
   at <a href="mailto:mcfarljm@gmail.com">mcfarljm@gmail.com</a></p>
 
+  <p>Get the latest version
+    at <a href="https://sourceforge.net/projects/fortwrap/">https://sourceforge.net/projects/fortwrap/</a>.
+    
 
 </body>
 

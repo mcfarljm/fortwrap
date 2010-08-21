@@ -722,7 +722,11 @@ def parse_comments(file,line):
 
 def parse_file(fname):
     global current_module, file_pointer, file_lines_list, dox_comments, default_protection, private_names, public_names
-    f = open(fname)
+    try:
+        f = open(fname)
+    except:
+        print "Error opening file", fname
+        return 0
     file_lines_list = f.readlines()
     file_pointer = 0
     while True:
@@ -777,6 +781,7 @@ def parse_file(fname):
             m = integer_param_def.match(line)
             fort_integer_params[m.group(1)] = int(m.group(2))
     f.close()
+    return 1
 
 def associate_procedures():
     """
@@ -1335,34 +1340,33 @@ class Options:
         self.parse_args()
 
     def usage(self,exit_val=1):
-        print "Usage:", sys.argv[0], "[options]\n"
+        print "Usage:", sys.argv[0], "[options] [filenames]\n"
+        print "Source files to be wrapped can be specified on the command line ([filenames]),\nby globbing the current directory (-g), or listed in a file (--file-list)\n"
         print "-v, --version\t: Print version information and exit"
         print "-h, --help\t: Print this usage information"
         print "-n\t\t: Run parser but do not generate any wrapper code (dry run)"
         print "-c <FC>\t\t: Use name mangling for Fortran compiler <FC>.  Only supports\n\t\t  g95 and gfortran"
         print "-g\t\t: Wrap source files found in current directory (glob)"
         print "-d <dir>\t: Output generated wrapper code to <dir>"
-        print "--file-list=<f>\t: Read list of Fortran source files to parse from file <f>"
+        print "--file-list=<f>\t: Read list of Fortran source files to parse from file <f>.\n\t\t  The format is a newline-separated list of filenames with full\n\t\t  or relative paths"
         print "--c-arays\t: Wrap arrays arguments as C-sytle arrays instead of\n\t\t  C++ std:vector containers"
         print "--dummy-class=<n>: Use <n> as the name of the dummy class used to wrap\n\t\t  non-method procedures"
         print "--global\t: Wrap non-method procedures as global functions instead of\n\t\t  static methods of a dummy class"
-        # Not documenting, as this option could be dangerous
-        # (especially with something like "-d .", and only has limited
-        # usefulness:
+        # Not documenting, as this option could be dangerous, although
+        # it is protected from "-d .":
         #print "--clean\t\t: Remove all wrapper-related files from wrapper code directory\n\t\t  before generating new code.  Requires -d.  Warning: this\n\t\t  deletes files.  Use with caution and assume it will delete\n\t\t  everything in the wrapper directory"
         sys.exit(exit_val)
 
     def parse_args(self):
-        global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname
+        global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname, file_list
         try:
-            # -g is to glob working directory for files
             opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:', ['file-list=','clean','help','version','c-arrays','dummy-class=','global'])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
 
-        if args:
-            self.usage()
+        for f in args:
+            file_list.append(f)
 
         self.inputs_file = ''
         self.glob_files = False
@@ -1409,6 +1413,8 @@ class Options:
 
 if __name__ == "__main__":
 
+    file_list = []
+
     opts = Options()
 
     if opts.clean_code:
@@ -1418,8 +1424,6 @@ if __name__ == "__main__":
     read_ignores()
     read_includes()
     read_orphans()
-
-    file_list = []
 
     if opts.inputs_file:
         # TODO: Add error handler
@@ -1431,14 +1435,19 @@ if __name__ == "__main__":
         print "LOADED", len(file_list), 'FILES FROM LIST'
 
     if opts.glob_files:
-        file_list += glob.glob('*.f90')
+        file_list += glob.glob('*.[fF]90')
     
     if not file_list:
         print "Error: no source files"
         sys.exit(2)
 
+    fcount = 0
     for f in file_list:
-        parse_file(f)
+        fcount += parse_file(f)
+    if fcount==0:
+        print "Error: no source files"
+        sys.exit(2)
+
     associate_procedures()
 
     if opts.dry_run:
