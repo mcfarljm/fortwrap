@@ -63,6 +63,7 @@ fort_data_string = r'\s*(TYPE\s*\((?P<dt_spec>\S*)\)|INTEGER|REAL(\*8|\s*\(C_DOU
 fort_data = re.compile(fort_data_string,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_string + '.*::',re.IGNORECASE)
 module_def = re.compile(r'\s*MODULE\s+\S',re.IGNORECASE)
+end_module_def = re.compile(r'\s*END\s+MODULE',re.IGNORECASE)
 # INT below is used to represent the hidden length arguments, passed by value
 primitive_data = re.compile('(INTEGER|REAL|LOGICAL|CHARACTER|INT)',re.IGNORECASE)
 fort_dox_comments = re.compile(r'\s*!\>')
@@ -590,6 +591,12 @@ def parse_proc(file,line,abstract=False):
     # First check for line continuation:
     line = join_lines(line,file)
     proc_name = line.split('(')[0].split()[-1]
+
+    # If not in a module, print warning and return
+    if not current_module:
+        print "Warning, wrapping top-level (non-module) procedures not supported:", proc_name
+        return
+
     arg_string = line.split('(')[1].split(')')[0]
     if re.search(r'\S',arg_string):
         arg_list = arg_string.split(',')
@@ -734,6 +741,8 @@ def parse_file(fname):
             module_proc_num = 1
             private_names = set()
             public_names = set()
+        elif end_module_def.match(line):
+            current_module = ''
         elif fort_type_def.match(line):
             #print line.split()[1]
             parse_type(f,line)
@@ -850,12 +859,12 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     opposed to declared (prototype)
     """
     # dt check is necessary to handle orphan functions in the dummy class
-    if (not call) and (proc.nargs == 0 or (not bind and proc.nargs==1)) and proc.args_by_pos[1].type.dt:
+    if (not call) and (proc.nargs == 0 or (not bind and proc.nargs==1 and proc.args_by_pos[1].type.dt)):
         return 'void'
     string = ''
     # Pass "data_ptr" as first arg, if necessary. dt check is necessary to
     # handle orphan functions in the dummy class correctly
-    if bind and call and proc.args_by_pos[1].type.dt:
+    if bind and call and proc.nargs>0 and proc.args_by_pos[1].type.dt:
         if proc.nargs==1:
             return 'data_ptr'
         else:
@@ -1265,7 +1274,8 @@ def write_fortran_wrapper():
     # Build list of modules we need to USE
     use_mods = set()
     for obj in objects.itervalues():
-        use_mods.add(obj.mod)
+        if obj.name != orphan_classname:
+            use_mods.add(obj.mod)
     f = open(fort_output_dir+'/' + fort_wrap_file + '.f90', "w")
     #f.write(HEADER_STRING + '\n') # Wrong comment style
     f.write('MODULE ' + fort_wrap_file + '\n\n')
