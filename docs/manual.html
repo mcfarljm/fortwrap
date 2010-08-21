@@ -174,7 +174,7 @@ supported:</p>
     compiler.</li>
 
   <li>Type bound procedures.  Those that were not declared
-    as <tt>NOPASS</tt> require that the firrst argument be declared
+    as <tt>NOPASS</tt> require that the first argument be declared
     using <tt>CLASS</tt> instead of <tt>TYPE</tt>.  FortWrap does not
     currently handle <tt>CLASS</tt>: see above.</li>
 </ul>
@@ -194,6 +194,19 @@ supported:</p>
   <li>Look in the tests directory at examples</li>
 </ul>
 
+  <p>Any one or more of three mechanisms can be used to specify the
+    Fortran source file(s) to be wrapped:</p>
+  
+  <ol>
+    <li>Name the files on the command line using full or relative paths</li>
+    <li>The <tt>-g</tt> option will wrap all <tt>.f90</tt>
+      and <tt>.F90</tt> source files found in the current working
+      directory.</li>
+    <li>Use the <tt>--file-list</tt> option to name a file that
+      contains a list of source files to be wrapped.  The format of this
+      file is a newline-separated list of files to be wrapped.</li>
+  </ol>
+
 
 
 <h2><a name="Swig">Swig tips (or how to use with other languages)</a></h2>
@@ -208,16 +221,19 @@ supported:</p>
 
   <ul>
     <li>Make sure to use the <tt>-c++</tt> option with Swig</li>
+
     <li>If your target language supports it, use <tt>-keyword</tt>
       (python supports this).  This way, even though your optional
       arguments must be passed by location in C++, they can be passed by
       keyword in the target language.</li>
+
     <li>Use <tt>%apply int *INPUT { const int* };</tt> to create an
       input typemap (repeat for <tt>double*</tt>).  This will only
       catch scalars because FortWrap uses classes
-      (<tt>std::vector</tt> and <tt>FortranMatrix</tt>) for arrays.
-      This is compatible with the way optional arguments are
-      treated.</li>
+      (<tt>std::vector</tt> and <tt>FortranMatrix</tt>) for arrays (or
+      "<tt>[]</tt>" in the case of <tt>--c-arrays</tt>).  This is
+      compatible with the way optional arguments are treated.</li>
+
     <li>Use <tt>%apply int *OUTPUT { int* };</tt> to create an
       output typemap.  Note, however, that <tt>INTENT(OUT)</tt>
       and <tt>INTENT(INOUT)</tt> arguments are not distinguishable
@@ -228,8 +244,9 @@ supported:</p>
       also needed if using this typemap in conjunction with optional
       arguments: because of the way the typemap works, there will be
       no way to "not pass" the optional argument from the target
-      language.  This limitatino can be worked around by creating a
+      language.  This limitation can be worked around by creating a
       custom typemap.</li>
+
     <li>Be careful with using
       Swig's <a href="http://www.swig.org/Doc1.3/Library.html#Library_nn15"><tt>std_vector.i</tt></a>
       library.  This drastically increases the size of the wrapper
@@ -240,11 +257,15 @@ supported:</p>
       that FortWrap generates, since input arguments are qualified
       by <tt>const</tt>).  You are probably better off writing your
       own typemaps to handle the <tt>const</tt> and
-      non-<tt>const</tt> <tt>vector</tt> arguments.</li>
+      non-<tt>const</tt> <tt>vector</tt> arguments.  If you would
+      rather have Swig handle C-style arrays, use FortWrap
+      with <tt>--c-arrays</tt></li>
+
     <li>To wrap string outputs, you may <tt>%include
 	"<a href="http://www.swig.org/Doc1.3/Library.html#Library_nn14">std_string.i</a>"</tt>,
 	but you will need to write an <tt>argout</tt> typemap to
       handle the string pointer as an output.</li>
+
     <li>There are a couple different ways to work with function
       pointers in the target language (in python, at least).  See
       the <a href="http://www.swig.org/Doc1.3/SWIG.html#SWIG_nn30">Swig
@@ -368,8 +389,12 @@ o.foo(a,NULL,NULL,&d);
     type.  In keeping with the object-oriented slant (and also to
     reduce namespace pollution), such procedures are by default
     wrapped as static methods of a dummy class
-    named <tt>FortFuncs</tt>.  Future versions may add an option to
-    wrap these as global functions.</p>
+    named <tt>FortFuncs</tt>.  The name of this class can be changed
+    using the <tt>--dummy-class</tt> option.</p>
+
+  <p>As an alternative, the <tt>--global</tt> option can be used to
+    wrap non-method procedures as global functions defined in
+    the <tt>FortFuncs.h</tt> header file.</p>
     
 
   <h3><a name="details-arrays">Arrays</a></h3>
@@ -443,6 +468,10 @@ X(0,1) = 10;
     an <tt>ABSTRACT INTERFACE</tt> block.
     See <tt>tests/function_pointers</tt> for example usage.</p>
 
+  <p>FortWrap will parse the abstract interface definition to generate
+    the corresponding C function pointer prototype.  Make sure that the
+    callback target conforms to this prototype.</p>
+
 
   <h3><a name="details-strings">Strings</a></h3>
 
@@ -488,13 +517,20 @@ Your C++ program only needs to include this.</p>
   file is the place to look to find out how to call the methods that
   FortWrap has generated.</p>
 
-<h3>Dummy Class Wrappers</h3>
+<h3>Dummy Class or Global Wrappers</h3>
 
   <p>When you wrap procedures that do not operate on a derived type,
     FortWrap wraps them as static members of a dummy C++ class
     called <tt>FortFuncs</tt>.  FortWrap will generate two files to
     define this class: <tt>FortFuncs.h</tt>
-    and <tt>FortFuncs.cpp</tt>.</p>
+    and <tt>FortFuncs.cpp</tt>.  Note that the name of this class and
+    its associated files can be changed with
+    the <tt>--dummy-class</tt> option.</p>
+
+  <p>When using the <tt>--global</tt> option, the same files are
+    created, but the non-method procedures are wrapped as global
+    functions.  The <tt>--dummy-class</tt> option also functions to
+    change the associated filenames in this case.</p>
 
 <h3><pre>FortranMatrix.h</pre></h3>
 
@@ -516,6 +552,9 @@ Your C++ program only needs to include this.</p>
   <p>Email John
   at <a href="mailto:mcfarljm@gmail.com">mcfarljm@gmail.com</a></p>
 
+  <p>Get the latest version
+    at <a href="https://sourceforge.net/projects/fortwrap/">https://sourceforge.net/projects/fortwrap/</a>.
+    
 
 </body>
 
