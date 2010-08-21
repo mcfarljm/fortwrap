@@ -9,6 +9,16 @@
 
   <p><b>FortWrap version 0.9 released 8/18/2010</b></p>
 
+  <ul>
+    <li><a href="#Introduction">Introduction</a></li>
+    <li><a href="#Swig">Wrapping for other languages</a></li>
+    <li><a href="#Obtaining">Obtaining</a></li>
+    <li><a href="#Features">Main Features</a></li>
+    <li><a href="#Unsupported">Unsupported Features</a></li>
+  </ul>
+
+  <h2><a name="Introduction">Introduction</a></h2>
+
   <p>FortWrap is a python script that parses Fortran 90/95/200X source
   files and generates wrapper code for interfacing with the original
   Fortran code from C++.  FortWrap is compatible with
@@ -57,7 +67,7 @@ o.process();
 
   <p>Additional examples can be found <a href="examples.html">here</a>
 
-  <h2>Wrapping for other languages</h2>
+    <h2><a name="Swig">Wrapping for other languages</a></h2>
 
  <p>FortWrap can also be used as an intermediary step for wrapping
    Fortran code with <a href="http://www.swig.org">Swig</a>.  The C++
@@ -70,12 +80,12 @@ o.process();
    arguments.
 
 
-  <h2>Obtaining FortWrap</h2>
+   <h2><a name="Obtaining">Obtaining FortWrap</a></h2>
 
   FortWrap may be downloaded
   from <a href="https://sourceforge.net/projects/fortwrap/">https://sourceforge.net/projects/fortwrap/</a>.
 
-<h2>Main Features</h2>
+   <h2><a name="Features">Main Features</a></h2>
 
 <ul>
   <li> <b>Derived Types</b>: Transparent translation of Fortran derived types into C++ classes.  This is the main objective of FortWrap.</li>
@@ -117,22 +127,24 @@ o.process();
     routines are wrapped.</li>
 </ul>
 
-<h2>Unsupported Features</h2>
+<h2><a name="Unsupported">Unsupported Features</a></h2>
 
 <p>Many features of Fortran 90/95/2003 are not supported by FortWrap.
 In some cases (e.g. assumed shape arrays) this is because the Fortran
 language standard does not provide an interoperability mechanism.</p>
 
-<p>Note that in most cases FortWrap will quietly leave out wrapper code
-for subroutines that contain unsupported argument types that are not
-optional.  In most situations, it is possible to get FortWrap to wrap
-these types of routines by providing a Fortran wrapper that is
-  interoperable and calls the target routine.</p>
+<p>In most situations, it is possible to get FortWrap to wrap these
+types of routines by providing a Fortran wrapper that is interoperable
+and calls the target routine.</p>
 
 <p>The following argument types/constructs/features are not
 supported:</p>
 
 <ul>
+  <li>"Top-level" (a.k.a. global or non-module) procedures.  Note that
+    FortWrap is geared towards wrapping modern Fortran code, not
+    legacy code.</li>
+
   <li> Assumed shape arrays (a declaration that looks like <tt>INTEGER
       :: X(:)</tt>).  The Fortran standard does not provide an
       interoperability mechanism for assumed shape arrays.</li>
