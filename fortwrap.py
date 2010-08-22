@@ -31,11 +31,6 @@ code_output_dir = '.'
 include_output_dir = '.'
 fort_output_dir = '.'
 
-substitution_file = 'substitutions.in'
-ignores_file = 'ignores.in'
-includes_file = 'includes.in'
-orphans_file = 'orphans.in'
-
 HEADER_STRING = '/* This source file automatically generated on ' + str(date.today()) + ' using \n   FortWrap wrapper generator */\n'
 
 func_pointer_converter = 'convert_c_funcpointer'
@@ -92,7 +87,6 @@ name_substitutions = dict()
 name_exclusions = set()
 name_inclusions = set()
 proc_arg_exclusions = set()
-orphan_names = set()
 
 # 'INT' is for the hidden name length argument
 cpp_type_map = {'INTEGER':'int*', 'REAL':'float*', 'REAL*8':'double*', 'REAL(C_DOUBLE)':'double*','LOGICAL':'int*', 'CHARACTER':'char*', 'INT':'int'}
@@ -293,8 +287,11 @@ class Procedure:
                     self.dtor = True
         # Check for exclusion:
         for arg in args.itervalues():
-            if arg.optional and (name.lower(),arg.name.lower()) in proc_arg_exclusions:
-                arg.exclude = True
+            if (name.lower(),arg.name.lower()) in proc_arg_exclusions:
+                if arg.optional:
+                    arg.exclude = True
+                else:
+                    print "Argument exclusions only valid for optional arguments:", name, arg.name
         # Make position map
         for arg in self.args.itervalues():
             self.args_by_pos[arg.pos] = arg
@@ -366,7 +363,7 @@ class Procedure:
         
 class DerivedType:
     def __init__(self,name,comment=None):
-        self.name = name
+        self.name = translate_name(name)
         self.procs = []
         self.mod = current_module
         self.comment = comment
@@ -384,70 +381,6 @@ def mangle_name(mod,func):
         return mod.lower() + "_MP_" + func.lower()
     else: # gfortran
         return '__' + mod.lower() + '_MOD_' + func.lower()
-
-
-def read_substitutions():
-    """Read name substitutions from a file"""
-    global name_substitutions
-    try:
-        f = open(substitution_file)
-        for line in f:
-            # Allow comments
-            if not line.strip().startswith('#') and re.search('\w', line):
-                old,new = line.split()
-                name_substitutions[old.lower()] = new
-        f.close()
-        print "LOADED", len(name_substitutions), "NAME SUBSTITUTIONS"
-    except:
-        pass
-
-def read_ignores():
-    """Read names to ignore from a file"""
-    global name_exclusions, proc_arg_exclusions
-    try:
-        f = open(ignores_file)
-        for line in f:
-            # Allow comments
-            if not line.strip().startswith('#') and re.search('\w', line):
-                if line.strip().count(' ') == 1:
-                    # Add a (proc,arg) exclusion
-                    proc_arg_exclusions.add( tuple(line.strip().lower().split()) )
-                else:
-                    name_exclusions.add( line.strip().lower() )
-        f.close()
-        print "LOADED", len(name_exclusions), "NAMES TO IGNORE"
-        print "LOADED", len(proc_arg_exclusions), "ARGUMENTS TO IGNORE"
-    except:
-        pass
-
-def read_includes():
-    """Read names to include (even if theya re private) from a file"""
-    global name_inclusions
-    try:
-        f = open(includes_file)
-        for line in f:
-            # Allow comments
-            if not line.strip().startswith('#') and re.search('\w', line):
-                name_inclusions.add( line.strip().lower() )
-        f.close()
-        print "LOADED", len(name_inclusions), "NAMES TO FORCE INCLUDE"
-    except:
-        pass
-
-def read_orphans():
-    """Read names of functions that we want to wrap even though they
-    do not operate on a derived type"""
-    global orphan_names
-    try:
-        f = open(orphans_file)
-        for line in f:
-            # Allow comments
-            if not line.strip().startswith('#') and re.search('\w', line):
-                orphan_names.add( line.strip().lower() )
-        f.close()
-        print "LOADED", len(orphan_names), "ORPHAN FUNCS TO WRAP"
-    except:
-        pass
 
 
 def get_proc(name):
@@ -498,8 +431,8 @@ def is_public(name):
     """Check whether a name is public and not excluded"""
     if name.lower() in name_exclusions:
         return False
-#    elif name.lower() in name_inclusions or name.lower() in orphan_names:
-#         return True
+    elif name.lower() in name_inclusions:
+        return True
     elif default_protection == PUBLIC:
         return not name.lower() in private_names
     else:
@@ -1339,6 +1272,56 @@ def clean_directories():
         os.remove(f)
         
 
+# Class for parsing the configuration file
+class ConfigurationFile:
+    def __init__(self,fname):
+        self.fname = fname
+        if fname:
+            try:
+                self.f = open(fname)
+            except:
+                print "Error opening interface file:", fname
+                return
+            self.process()
+
+    def process(self):
+        global name_exclusions, name_inclusions, name_substitutions
+        for line_num,line in enumerate(self.f):
+            if not line.startswith('%'):
+                continue
+            words = [w.lower() for w in line.split()]
+            if words[0] == '%ignore':
+                if len(words) == 2:
+                    name_exclusions.add( words[1] )
+                else:
+                    self.bad_decl(line_num+1)
+                    continue
+            elif words[0] == '%hide':
+                if len(words) == 3:
+                    proc_arg_exclusions.add( tuple(words[1:]) )
+                else:
+                    self.bad_decl(line_num+1)
+                    continue
+            elif words[0] == '%include':
+                if len(words) == 2:
+                    name_inclusions.add( words[1] )
+                else:
+                    self.bad_decl(line_num+1)
+                    continue
+            elif words[0] == '%rename':
+                if len(words) == 3:
+                    # Note: want new C++ name to preserve case
+                    new_name = line.split()[2]
+                    name_substitutions[words[1]] = new_name
+                else:
+                    self.bad_decl(line_num+1)
+                    continue
+                
+    def bad_decl(self,line_num):
+        print self.fname, "line", line_num, ": bad declaration"
+
+
+# Class for parsing command line options
 class Options:
     def __init__(self):
         self.parse_args()
@@ -1353,6 +1336,7 @@ class Options:
         print "-g\t\t: Wrap source files found in current directory (glob)"
         print "-d <dir>\t: Output generated wrapper code to <dir>"
         print "--file-list=<f>\t: Read list of Fortran source files to parse from file <f>.\n\t\t  The format is a newline-separated list of filenames with full\n\t\t  or relative paths"
+        print "-i <f>\t\t: Read interface configuration file <f>"
         print "--c-arays\t: Wrap arrays arguments as C-sytle arrays instead of\n\t\t  C++ std:vector containers"
         print "--dummy-class=<n>: Use <n> as the name of the dummy class used to wrap\n\t\t  non-method procedures"
         print "--global\t: Wrap non-method procedures as global functions instead of\n\t\t  static methods of a dummy class"
@@ -1364,7 +1348,7 @@ class Options:
     def parse_args(self):
         global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname, file_list
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:', ['file-list=','clean','help','version','c-arrays','dummy-class=','global'])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','c-arrays','dummy-class=','global'])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
@@ -1378,6 +1362,7 @@ class Options:
         self.dry_run = False
         self.c_arrays = False
         self.global_orphans = False
+        self.interface_file = ''
         if ('-h','') in opts or ('--help','') in opts:
             self.usage(0)
         elif ('-v','') in opts or ('--version','') in opts:
@@ -1397,6 +1382,8 @@ class Options:
                 if a!='g95' and a!='gfortran':
                     print "Error, only g95 and gfortran name mangling supported"
                     sys.exit(1)
+            elif o=='-i':
+                self.interface_file = a
             elif o=='-n':
                 self.dry_run = True
             elif o=='--clean':
@@ -1421,13 +1408,10 @@ if __name__ == "__main__":
 
     opts = Options()
 
+    configs = ConfigurationFile(opts.interface_file)
+
     if opts.clean_code:
         clean_directories()
-
-    read_substitutions()
-    read_ignores()
-    read_includes()
-    read_orphans()
 
     if opts.inputs_file:
         # TODO: Add error handler

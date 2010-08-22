@@ -12,6 +12,7 @@
   <li><a href="#Features">Main Features</a></li>
   <li><a href="#Unsupported">Unsupported Features</a></li>
   <li><a href="#GetStarted">Getting Started</a></li>
+  <li><a href="#ConfigFile">The Configuration File</a></li>
   <li><a href="#Swig">Swig Tips (or "How to use with other languages")</a></li>
   <li><a href="#Details">Wrapper Details</a></li>
   <li><a href="#Files">Generated Files</a></li>
@@ -208,6 +209,69 @@ supported:</p>
   </ol>
 
 
+  <h2><a name="ConfigFile">The Configuration File</a></h2>
+
+  <p>The <tt>-i</tt> option can be used to specify a file to read
+    simple configuration directives from.  This is not required, but can
+    provide more control over the generated wrapper interface, and may
+    be useful when wrapping very large projects.</p>
+
+  <p>The format of the configuration file is a simple list of
+    directives separated by newlines.  The directives start with
+    the <tt>%</tt> character: any line that doesn't match a directive
+    is treated as a comment and ignored, so comments may be
+    interspersed freely without any special prefix.  Also any
+    character can be inserted before a valid directive to comment it
+    out, as in "<tt>// %ignore foo</tt>"</p>
+
+  <p>The following directives are supported:</p>
+
+  <ul>
+    <li><tt>%ignore &lt;name&gt;</tt></li>
+    <li><tt>%hide &lt;procedure&gt; &lt;argument&gt;</tt></li>
+    <li><tt>%include &lt;name&gt;</tt></li>
+    <li><tt>%rename &lt;old&gt; &lt;new&gt;</tt></li>
+  </ul>
+
+  <h3>Ignore directive</h3>
+
+  <p>The ignore directive is used to prevent FortWrap from creating
+    wrapper code for certain constructs.  This may be useful when
+    creating a C++ API for a large Fortran project, particularly when
+    some Fortran declarations must be kept public even though they are
+    really not part of the API (keep in mind that FortWrap will
+    resepct <tt>PUBLIC</tt> and <tt>PRIVATE</tt> declarations, so
+    there is no need to use the ignore directive for <tt>PRIVATE</tt>
+    names.)</p>
+
+  <p>In the first form above, <tt>&lt;name&gt;</tt> may be the
+    identifier for either a derived type or a procedure.  If a derived
+    type is ignored, the corresponding wrapper class is not crated.
+    If a procedure is ignored, it is not included in the generated
+    wrapper code.</p>
+
+  <h3>Hide directive</h3>
+
+  <p>The hide directive allows specific procedure arguments to be
+    hidden from the generated interface.  This is only valid if the
+    specified argument of the specified procedure is optional.  All
+    calls from the C++ interface treat the argument as not present.
+    This directive can be useful for simplifying the generated C++
+    API.</p>
+
+  <h3>Include directive</h3>
+
+  <p>The include directive can be used to force-include a wrapper for
+    either a derived type or a procedure that is <tt>PRIVATE</tt> in the
+    Fortran module.</p>
+
+  <h3>Rename directive</h3>
+
+  <p>The rename directive can operate on either a derived type or a
+    procedure.  The name <tt>&lt;old&gt;</tt> found in the Fortran
+    source is replaced by the name <tt>&lt;new&gt;</tt> in the
+    generated wrapper code.</p>
+
 
 <h2><a name="Swig">Swig tips (or how to use with other languages)</a></h2>
 
@@ -290,6 +354,7 @@ supported:</p>
     <li><a href="#details-procpointers">Procedure Pointers</a></li>
     <li><a href="#details-strings">Strings</a></li>
     <li><a href="#details-global">Top-level procedures</a></li>
+    <li><a href="#details-comments">Doxygen comments</a></li>
   </ul>
 
   <h3><a name="details-dt">Derived Types</a></h3>
@@ -491,6 +556,20 @@ X(0,1) = 10;
     "global" procedures (i.e. procedures that are not contained within
     a module).  Note that FortWrap is geared towards wrapping modern
     Fortran code, not legacy code.</p>
+
+  <h3><a name="details-comments">Doxygen Comments</a></h3>
+
+  <p>FortWrap automatically transfers Fortran doxygen comments into
+    C++ doxygen comments in the generated header files.  This way the
+    C++ header files can be processed by doxygen to generate C++ API
+    documentation.</p>
+
+  <p>Comments that are transferred may be attached to derived types,
+    procedures, and arguments.  FortWrap also adds intent in/out
+    specifiers and ARRAY flags to the C++ doxygen comments for
+    arguments.  The example in <tt>tests/comments</tt> is provided to
+    illustrate the format for using doxygen comments in the Fortran
+    source code.</p>
 
 
   <h2><a name="Files">Generated Files</a></h2>

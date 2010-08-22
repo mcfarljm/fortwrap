@@ -6,7 +6,11 @@ import glob
 OPTS = '-g --clean -d wrap'
 cmd = '../../fortwrap.py'
 
-custom_opts = { 'c_arrays':OPTS+' --c-arrays' }
+custom_opts = { 'c_arrays' : OPTS + ' --c-arrays', 
+                'interface_file' : OPTS + ' -i interface.i' }
+
+# Tests for demonstration purposes only:
+excludes = [ 'comments' ]
 
 os.chdir('tests')
 tests = glob.glob('*')
@@ -21,6 +25,8 @@ if tests:
 failed_tests = []
 
 for test in tests:
+    if test in excludes:
+        continue
     os.chdir('..')
     print "Running test:", test,
     os.chdir(test)
