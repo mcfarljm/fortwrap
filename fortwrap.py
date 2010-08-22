@@ -71,9 +71,10 @@ intent_out_def = re.compile(r'.*INTENT\s?\(\s*OUT\s*\)',re.IGNORECASE)
 fort_abstract_def = re.compile(r'\s*ABSTRACT\s+INTERFACE',re.IGNORECASE)
 integer_param_def = re.compile(r'\s+INTEGER,\s+PARAMETER\s+::\s+(.*)\s*=\s*([0-9]+)\s*',re.IGNORECASE)
 # Regular expression to break up arguments.  This is needed to handle
-# matrices (e.g. A(m,n)).  It uses a negative lookahead assertion to
-# exclude the comma inside a matrix definition
-arg_splitter = re.compile(',(?!\s*\w+\s*\))')
+# multi-dimensional arrays (e.g. A(m,n)).  It uses a negative
+# lookahead assertion to exclude commas inside the array definition
+arg_splitter = re.compile(',(?![^(]*\))')
+dimension_def = re.compile(r'DIMENSION\s*\(\s*(.*)\s*\)',re.IGNORECASE)
 
 # ===================================================
 
@@ -117,23 +118,43 @@ matrix_used = False
 # ===================================================
 
 
+class Array:
+    multi_d_warning_written = False
+    def __init__(self,spec):
+        global matrix_used
+        # spec is the part inside the parentheses
+        self.assumed_shape = False
+        self.size_var = ''
+        self.d = spec.count(',') + 1
+        if spec.find(':') > 0:
+            self.assumed_shape = True
+        if self.d == 1:
+            self.size_var = spec.strip()
+        elif self.d == 2:
+            matrix_used = True
+            self.size_var = tuple([v.strip() for v in spec.split(',')])
+        elif self.d > 2:
+            if not Array.multi_d_warning_written:
+                print "Warning, FortWrap does not wrap arrays with dimension > 2"
+                Array.multi_d_warning_written = True
+
+        # Properties queried by the wrapper generator:
+        # vec=vector: 1-d array
+        self.vec = self.d==1 and not self.assumed_shape
+        self.matrix = self.d==2 and not self.assumed_shape
+        self.fort_only = self.d>2 or self.assumed_shape
+
 class DataType:
-    def __init__(self,type,array=False,matrix=False,str_len=-1,hidden=False,array_size_var='',matrix_size_vars=()):
+    def __init__(self,type,array=None,str_len=-1,hidden=False):
         global proc_pointer_used, matrix_used
         self.type = type
         self.array = array
-        self.matrix = matrix
-        if matrix:
-            matrix_used = True
         self.str_len = str_len
         self.proc_pointer = False
         self.dt = False
         self.hidden = hidden # hidden name length arg
         # For array, name of argument used to pass the array length:
-        self.array_size_var = array_size_var 
         self.is_array_size = False # integer defining an array size
-        # Similar bookkeeping for matrices
-        self.matrix_size_vars = matrix_size_vars
         self.is_matrix_size = False
         # Handle real kinds
         if type.upper().startswith('REAL') and type.upper().find('KIND')>=0:
@@ -156,15 +177,20 @@ class DataType:
                 m = fort_data.match(type)
                 self.type = m.group('dt_spec')
 
+        # Properties queried by the wrapper generator:
+        # vec=vector: 1-d array
+        self.vec = self.array and self.array.vec
+        self.matrix = self.array and self.array.matrix
+
+
 class Argument:
-    def __init__(self,name,pos,type=None,optional=False,intent='inout',assumed_shape=False,comment=[]):
+    def __init__(self,name,pos,type=None,optional=False,intent='inout',comment=[]):
         self.name = name
         self.pos = pos
         self.type = type
         self.comment = []
         self.optional=optional
         self.intent = intent
-        self.assumed_shape = assumed_shape
         self.native = False # Will get defined in
                             # associate_procedures; identifies derived
                             # type arguments that will get passed in
@@ -183,31 +209,34 @@ class Argument:
             self.comment.append('OPTIONAL')
         if type:
             if type.array:
-                self.comment.append('ARRAY')
-        if self.assumed_shape:
-            self.comment.append('FORTRAN_ONLY')
+                if type.array.vec:
+                    self.comment.append('ARRAY')
+                elif type.array.fort_only:
+                    self.comment.append('FORTRAN_ONLY')
         if comment:
             for c in comment:
                 self.comment.append(c)
 
     def set_type(self,type):
         self.type = type
-        if type.array:
+        if type.array and type.array.array():
             self.comment.append('ARRAY')
 
     def pass_by_val(self):
         """Whether we can pass this argument by val in the C++ interface"""
-        return not self.optional and not self.type.dt and self.intent=='in' and not (self.type.array or self.type.matrix) and not self.type.type=='CHARACTER' and not self.in_abstract
+        return not self.optional and not self.type.dt and self.intent=='in' and not self.type.array and not self.type.type=='CHARACTER' and not self.in_abstract
 
     def fort_only(self):
         if self.type.hidden:
             return True
         elif self.type.is_array_size or self.type.is_matrix_size:
             return True
-        elif self.exclude or self.assumed_shape:
+        if self.type.array and self.type.array.fort_only:
+            return True
+        elif self.exclude:
             return True
         elif self.type.dt:
-            if self.type.array or self.type.matrix:
+            if self.type.array:
                 return True
         elif self.type.proc_pointer:
             if not self.type.type in abstract_interfaces:
@@ -307,7 +336,7 @@ class Procedure:
         if not opts.c_arrays:
             for arg in self.args.itervalues():
                 if arg.type.type.upper()=='INTEGER' and arg.intent=='in':
-                    if not opts.c_arrays and self.get_array_size_parent(arg.name):
+                    if not opts.c_arrays and self.get_vec_size_parent(arg.name):
                         # The check on opts.c_arrays prevents writing
                         # wrapper code that tries to extract the array
                         # size from a C array
@@ -340,21 +369,21 @@ class Procedure:
             if arg.pos > nargs:
                 self.args_by_pos[arg.pos] = arg
 
-    def get_array_size_parent(self,argname):
-        """Get the first array argument that uses the argument argname to
+    def get_vec_size_parent(self,argname):
+        """Get the first 1d array argument that uses the argument argname to
         define its size"""
         for arg in self.args_by_pos.itervalues():
-            if arg.type.array and not arg.optional and arg.type.array_size_var==argname:
+            if arg.type.vec and not arg.optional and arg.type.array.size_var==argname:
                 return arg.name
         return None
 
     def get_matrix_size_parent(self,argname):
-        """Similar to get_array_size_parent.  Returns (matname,0) if argname
+        """Similar to get_vec_size_parent.  Returns (matname,0) if argname
         is the number of rows and (matname,1) if argname is the number of
         columns"""
         for arg in self.args_by_pos.itervalues():
-            if arg.type.matrix and not arg.optional and argname in arg.type.matrix_size_vars:
-                if argname == arg.type.matrix_size_vars[0]:
+            if arg.type.matrix and not arg.optional and argname in arg.type.array.size_var:
+                if argname == arg.type.array.size_var[0]:
                     return arg.name,0
                 else:
                     return arg.name,1
@@ -463,8 +492,8 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
 
     # Attributes
     optional = line.upper().find('OPTIONAL')>=0
-    # Check for DIMENSION statement (assume it means 1D array...)
-    dimension = line.split('::')[0].upper().find('DIMENSION')>=0
+    # Check for DIMENSION statement
+    dimension = dimension_def.search(line)
     intent = 'inout'
     if intent_in_def.match(line):
         intent = 'in'
@@ -490,28 +519,17 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
     arg_string = line.split('::')[1].split('!')[0]
     names = [name.strip() for name in arg_splitter.split(arg_string)]
     for name in names:
-        array = False
-        array_size_var = ''
-        matrix_size_vars = ()
+        array = None
         if dimension:
-            array = True
-        matrix = False
-        assumed_shape = False
-        if name.find(':') > 0:
-            assumed_shape = True
-        if name.find('(') > 0:
+            array = Array(dimension.group(1))
+        elif name.find('(') > 0:
             size_desc = name.split('(')[1].split(')')[0]
-            if name.find(',') < 0:
-                array = True
-                array_size_var = size_desc.strip()
-            else:
-                matrix = True
-                matrix_size_vars = tuple([v.strip() for v in size_desc.split(',')])
+            array = Array(size_desc)
             name = name.split('(')[0]
-        type = DataType(type_string,array,matrix,char_len,array_size_var=array_size_var,matrix_size_vars=matrix_size_vars)
+        type = DataType(type_string,array,char_len)
         if name in arg_list:
             count += 1
-            args[name] = Argument(name,arg_list.index(name)+1,type,optional,intent,assumed_shape=assumed_shape,comment=comments)
+            args[name] = Argument(name,arg_list.index(name)+1,type,optional,intent,comment=comments)
         elif retval and name==retval.name:
             retval.set_type(type)
     return count
@@ -590,7 +608,7 @@ def parse_proc(file,line,abstract=False):
             method = True
     if retval:
         if retval.type:
-            if retval.type.dt or retval.type.array or retval.type.matrix:
+            if retval.type.dt or retval.type.array:
                 invalid = True
             elif retval.type.type == 'CHARACTER':
                 invalid = True
@@ -728,7 +746,7 @@ def associate_procedures():
     def flag_native_args(proc):
         # Check for arguments to pass as native classes:
         for pos,arg in proc.args_by_pos.iteritems():
-            if pos>1 and arg.type.dt and not arg.type.array and not arg.type.matrix and arg.type.type in objects:
+            if pos>1 and arg.type.dt and not arg.type.array and arg.type.type in objects:
                 arg.native = True
 
     for proc in procedures:
@@ -857,7 +875,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                     string = string + arg.type.type + '* '
                 elif not bind and arg.pass_by_val():
                     string = string + arg.cpp_type()[:-1] + ' '
-                elif not arg.type.dt and arg.type.array:
+                elif not arg.type.dt and arg.type.vec:
                     if not bind and not opts.c_arrays:
                         if arg.intent=='in':
                             # const is manually removed inside <>, so
@@ -884,9 +902,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         elif call and arg.type.proc_pointer:
             # Pass converted Fortran function pointer
             string = string + arg.name + ' ? &FORT_' + arg.name + ' : NULL'
-        elif (bind or opts.c_arrays) and not call and not arg.type.dt and arg.type.array:
+        elif (bind or opts.c_arrays) and not call and not arg.type.dt and arg.type.vec:
             string = string + arg.name + '[]'
-        elif (not opts.c_arrays) and call and not arg.type.dt and arg.type.array:
+        elif (not opts.c_arrays) and call and not arg.type.dt and arg.type.vec:
             if arg.optional:
                 string = string + arg.name + ' ? &(*' + arg.name + ')[0] : NULL'
             else:
@@ -948,7 +966,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
     if call:
         for arg in proc.args.itervalues():
             if arg.type.is_array_size:
-                s = s + prefix + 'int ' + arg.name + ' = ' + proc.get_array_size_parent(arg.name) + '->size();\n'
+                s = s + prefix + 'int ' + arg.name + ' = ' + proc.get_vec_size_parent(arg.name) + '->size();\n'
             elif arg.type.is_matrix_size:
                 matrix_name, i = proc.get_matrix_size_parent(arg.name)
                 size_method = ('num_rows()','num_cols()')[i]

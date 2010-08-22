@@ -1,8 +1,13 @@
+FortWrap 0.9.7 summary:
+
+- Fixed issues parsing high-dimensional arrays and certain
+  declarations with DIMENSION
+
 FortWrap 0.9.6 summary:
-- Adding support for a configuration file (-i command option), which
+- Added support for a configuration file (-i command option), which
   allows more control over the wrapping process (renaming or ignoring
   objects/procedures, etc.)
-- Continuing to expand the documentation
+- More additions to documentation
 
 FortWrap 0.9.5 summary:
 - Fixed bug for processing compiler specification with -c

@@ -7,4 +7,4 @@ fi
 
 version=$1
 
-svn cp . file:///home/mcfarljm/work/svn_repos/fortwrap/tags/release-$version
+svn cp $SVNF/trunk $SVNF/tags/release-$version

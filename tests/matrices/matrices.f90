@@ -16,11 +16,10 @@ CONTAINS
   END FUNCTION one_norm
 
   SUBROUTINE multiply(m,n,A,b,Ab)
-    INTEGER, INTENT(in) :: m,n
-    INTEGER, INTENT(in) :: A(m,n), b(n)
+    INTEGER, INTENT(in) :: m,n, b(n)
+    INTEGER, INTENT(in), DIMENSION(m,n) :: A
     INTEGER, INTENT(out) :: Ab(m)
     Ab = MATMUL(A,b)
   END SUBROUTINE multiply
-  
 
 END MODULE matrices
