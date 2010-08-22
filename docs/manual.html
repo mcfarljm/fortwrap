@@ -21,7 +21,7 @@
 
   <h2><a name="Introduction">Introduction</a></h2>
 
-  <p>FortWrap is a python script that parses Fortran 90/95/200X source
+  <p>FortWrap is a Python script that parses Fortran 90/95/200X source
   files and generates wrapper code for interfacing with the original
   Fortran code from C++.  FortWrap is intended to be used with Fortran
   code that takes an object oriented approach and makes use of Fortran
@@ -287,7 +287,7 @@ supported:</p>
     <li>Make sure to use the <tt>-c++</tt> option with Swig</li>
 
     <li>If your target language supports it, use <tt>-keyword</tt>
-      (python supports this).  This way, even though your optional
+      (Python supports this).  This way, even though your optional
       arguments must be passed by location in C++, they can be passed by
       keyword in the target language.</li>
 
@@ -331,15 +331,15 @@ supported:</p>
       handle the string pointer as an output.</li>
 
     <li>There are a couple different ways to work with function
-      pointers in the target language (in python, at least).  See
+      pointers in the target language (in Python, at least).  See
       the <a href="http://www.swig.org/Doc1.3/SWIG.html#SWIG_nn30">Swig
       documentation</a>.  The simplest is to use Swig directives to
       wrap an existing C/C++ function as a <tt>%constant</tt> that can
-      be passed as an argument in the target language.  With python,
+      be passed as an argument in the target language.  With Python,
       it is also possible to define the callback function in the
-      target language, but this will involve the use of a custom
-      typemap.  <a href="#Support">Contact me</a> if you want help
-      with this.</li>
+      target language; this is
+      explained <a href="http://docs.python.org/release/2.5.2/ext/callingPython.html">here</a>
+      in the Python documentation.</li>
   </ul>
   
 

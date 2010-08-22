@@ -1,3 +1,9 @@
+FortWrap 0.9.6 summary:
+
+- Adding support for a configuration file (-i command option) to gain
+  more control over wrapping process (renaming or ignoring
+  objects/procedures, etc.)
+
 FortWrap 0.9.5 summary:
 - Fixed bug for processing compiler specification with -c
 
