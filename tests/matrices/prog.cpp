@@ -15,6 +15,9 @@ int main(void)
   if (FortFuncs::one_norm(&X) != 6)
     return 1;
 
+  // Test assumed size
+  if (FortFuncs::one_norm_2(&X) != 6)
+    return 1;
 
   std::vector<int> a(2), Xa(3), Xa_test(3);
   a[0] = 1;
@@ -28,7 +31,7 @@ int main(void)
   for (int i=0; i<3; i++) 
     {
       if (Xa[i] != Xa_test[i])
-	return 2;
+	return 3;
     }
 
   return 0;

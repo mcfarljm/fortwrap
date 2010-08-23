@@ -24,4 +24,12 @@ CONTAINS
     y = DOT_PRODUCT(a,b)
   END FUNCTION inner_prod
 
+  ! Test assumed size
+  FUNCTION inner_prod_2(n,a,b) RESULT(y)
+    INTEGER, INTENT(in) :: n
+    INTEGER, INTENT(in), DIMENSION(*) :: a, b
+    INTEGER :: y
+    y = DOT_PRODUCT(a(1:n),b(1:n))
+  END FUNCTION inner_prod_2
+
 END MODULE arrays

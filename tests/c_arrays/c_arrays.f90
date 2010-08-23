@@ -11,6 +11,13 @@ CONTAINS
     y = SUM(x)
   END FUNCTION array_in
 
+  ! Test assumed size array
+  FUNCTION array_in_2(x) RESULT(y)
+    INTEGER, INTENT(in) :: x(*)
+    INTEGER :: y
+    y = SUM(x(1:4))
+  END FUNCTION array_in_2
+
   SUBROUTINE array_out(n,x)
     INTEGER, INTENT(in) :: n
     INTEGER, INTENT(out) :: x(n)

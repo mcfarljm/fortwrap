@@ -23,6 +23,10 @@ int main(void)
     }
   if (FortFuncs::inner_prod(&a,&b) != 8)
     return 3;
+
+  // Test assumed size
+  if (FortFuncs::inner_prod(&a,&b) != 8)
+    return 4;
   
   return 0;
 }

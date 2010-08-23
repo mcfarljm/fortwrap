@@ -3,6 +3,9 @@ FortWrap 0.9.7 summary:
 - Fixed issues parsing high-dimensional arrays and certain
   declarations with DIMENSION
 
+- Correction to manual: FortWrap actually does support assumed size
+  arrays
+
 FortWrap 0.9.6 summary:
 - Added support for a configuration file (-i command option), which
   allows more control over the wrapping process (renaming or ignoring
