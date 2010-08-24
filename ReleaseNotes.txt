@@ -1,3 +1,7 @@
+FortWrap 0.9.8 summary:
+
+- Added a brief walkthrough to the manual
+
 FortWrap 0.9.7 summary:
 - Fixed issues parsing high-dimensional arrays and certain
   declarations with DIMENSION

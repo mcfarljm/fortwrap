@@ -214,6 +214,94 @@ supported:</p>
     of <tt>fortwarp.py</tt></p>
 
 
+  <h3>Walkthrough</h3>
+
+  <p>Change directory to <tt>tests/derived_types</tt>.  The first step
+    is to run FortWrap to generate wrapper code from the Fortran
+    source code.  In this case the code to be wrapped
+    is <tt>DerivedTypes.f90</tt>.  Use the following command to run
+    FortWrap ("<tt>[derived_types]$</tt>" will represent the command
+    prompt):</p>
+
+  <div class="code"><pre>
+[derived_types]$ ../../fortwrap.py -c g95 -g -d wrap
+  </pre></div>
+
+  <p>This should not produce any output on the command line, which
+    means that FortWrap thinks it found something to wrap and did not
+    run into any problems.</p>
+
+  <ul>
+    <li>The <tt>-c</tt> option tells FortWrap which Fortran compiler
+      will be used once you get around to compiling (running FortWrap
+      does not actually compile anything).  Substitute gfortran for
+      g95 if necessary.  A default Fortran compiler is specified near
+      the beginning of <tt>fortwrap.py</tt>, via the line <tt>compiler
+      = 'g95'</tt>; feel free to change this.</li>
+    <li>The <tt>-g</tt> option stands for "glob" and tells FortWrap to
+      try and wrap all files in the current directory that
+      match <tt>*.f90</tt> or <tt>*.F90</tt>.  This is just for
+      convenience, and we could have named the file explicitly instead
+      by adding "<tt>DerivedTypes.f90</tt>" to the end of the command
+      line.</li>
+    <li>The <tt>-d wrap</tt> option tells FortWrap to put the
+      generated wrapper files in the <tt>wrap</tt> directory.  Without
+      this option, the files will be generated in the working
+      directory.</li>
+  </ul>
+    
+  <p>After running FortWrap, you should have a set of wrapper files in
+    the <tt>wrap</tt> directory:</p>
+
+  <div class="code"><pre>
+[derived_types]$ ls wrap/
+CppWrappers.f90  InterfaceDefs.h  ObjectA.h    ObjectB.h
+FortWrap.h       ObjectA.cpp      ObjectB.cpp
+  </pre></div>
+
+  <p>These files are explained more <a href="#Files">here</a>.  The
+    main things to note are that the classes FortWrap created are
+    defined in the header files <tt>ObjectA.h</tt>
+    and <tt>ObjectB.h</tt> (if wrapping non-module procedures, a dummy
+    class called <tt>FortFuncs</tt> is created by default).
+    Also, <tt>FortWrap.h</tt> is the "catch-all" header file that you
+    want to include when writing a program that uses the wrappers.</p>
+
+  <p>The next step is to build the project by compiling the original
+    Fortran file, the wrapper code, and a test program, and linking
+    them all together.  The makefile <tt>tests/Tests.mk</tt> is
+    provided as an example of how this might be done.  On my system,
+    running <tt>make</tt> produces the following commands:</p>
+
+<div class="code"><pre>
+[derived_types]$ make
+g++ -I wrap   -c -o prog.o prog.cpp
+g95 -I wrap -o DerivedTypes.o -c DerivedTypes.f90
+g95 -I wrap -o wrap/CppWrappers.o -c wrap/CppWrappers.f90
+g++ -I wrap   -c -o wrap/ObjectA.o wrap/ObjectA.cpp
+g++ -I wrap   -c -o wrap/ObjectB.o wrap/ObjectB.cpp
+g95 -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/ObjectB.o -lstdc++
+</pre></div>
+
+  <p>In this case Fortran is used as the linker language and the
+    standard C++ library is included on the link line.  It should also
+    be possible to use C++ as the linker language, in which case
+    Fortran runtime libraries may need to be specified on the link
+    line.</p>
+
+  <p>For this example, the compilation produces the
+    executable <tt>prog</tt>.  Running the executable should produce
+    no output.  The FortWrap tests are set up to use return values to
+    indicate expected behavior (0 means success).  For example:</p>
+
+<div class="code"><pre>
+[derived_types]$ ./prog 
+[derived_types]$ echo $?
+0
+</pre></div>
+
+
+
   <h2><a name="ConfigFile">The Configuration File</a></h2>
 
   <p>The <tt>-i</tt> option can be used to specify a file to read

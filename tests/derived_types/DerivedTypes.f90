@@ -21,5 +21,18 @@ CONTAINS
     INTEGER :: getx
     getx = a%x
   END FUNCTION getx
+
+  ! Demonstrate how derived types can be passed as arguments
+  SUBROUTINE b_ctor(b,a)
+    TYPE (ObjectB) :: b
+    TYPE (ObjectA), INTENT(in) :: a
+    b%a = a
+  END SUBROUTINE b_ctor
+
+  FUNCTION getax(b)
+    TYPE (ObjectB) :: b
+    INTEGER :: getax
+    getax = b%a%x
+  END FUNCTION getax
   
 END MODULE DerivedTypes
