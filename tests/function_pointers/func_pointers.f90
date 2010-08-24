@@ -10,7 +10,7 @@ MODULE func_pointers
   END INTERFACE
   
   TYPE Container
-    PROCEDURE(int_template), POINTER :: f
+    PROCEDURE(int_template), POINTER, NOPASS :: f
     INTEGER :: a,b
   END TYPE Container
 

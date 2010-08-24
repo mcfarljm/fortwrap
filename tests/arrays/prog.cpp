@@ -1,4 +1,5 @@
 #include "FortWrap.h"
+#include <algorithm> 		// For count
 
 int main(void)
 {
