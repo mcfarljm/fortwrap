@@ -1,5 +1,5 @@
 FC = g95
-CPPFLAGS = -I $(WRAP)
+CXXFLAGS = -I $(WRAP)
 FFLAGS = -I $(WRAP)
 
 # Directory for wrapper code

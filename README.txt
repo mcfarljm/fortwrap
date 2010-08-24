@@ -40,12 +40,13 @@ Fortran compiler.  The root directory contains a python script
 run_tests.py to execute all tests.  For each test, the script will
 change to the individual test directory, execute fortwrap.py to
 generate wrapper code, execute make to compile and link a simple test
-program, and finally run the test program.
+program, and finally run the test program.  See the note in this
+script about adding "-c gfortran" if you are using gfortran.
 
 To manually run a test, first make sure the compiler specified in
 tests/Tests.mk is valid.  Then change to a test directory, for
-example, tests/arrays.  Execute "../../fortwrap.py -g -d wrap" to
-generate the C++ wrapper code (some tests, for example c_arrays,
+example, tests/arrays.  Execute "../../fortwrap.py -g -d wrap -c <FC>"
+to generate the C++ wrapper code (some tests, for example c_arrays,
 require different FortWrap options, which are defined in
 run_tests.py).  Then execute "make" to build the simple test program
 in that directory, prog.cpp.

@@ -1,9 +1,15 @@
 #!/usr/bin/env python
 
+# Execute this script to run through all tests (wrap, build, run).
+# Check that the correct Fortran compiler is set in Tests.mk.  If
+# necessary, add "-c gfortran" to OPTS below (g95 name mangling is
+# currently the default)
+
+import sys
 import os
 import glob
 
-OPTS = '-g --clean -d wrap'
+OPTS = '-g --clean -d wrap'     # FortWrap options
 cmd = '../../fortwrap.py'
 
 custom_opts = { 'c_arrays' : OPTS + ' --c-arrays', 
@@ -17,6 +23,12 @@ tests = glob.glob('*')
 tests.remove( glob.glob('*.mk')[0] )
 
 num_err = 0
+
+# Use a command arg to force a make clean on each test
+make_clean = False
+if len(sys.argv) > 1:
+    print "Making clean"
+    make_clean = True
 
 # Hack so can go up a directory at start of loop
 if tests:
@@ -35,6 +47,8 @@ for test in tests:
         opts = custom_opts[test]
     else:
         opts = OPTS
+    if make_clean:
+        os.system('make clean > /dev/null')
     stat = os.system(cmd + ' ' + opts + ' > /dev/null')
     if stat!=0:
         num_err += 1
