@@ -19,7 +19,7 @@ import sys
 import os
 
 
-VERSION = '0.9.6'
+VERSION = '0.9.7'
 
 
 # SETTINGS ==========================================
@@ -1355,7 +1355,7 @@ class Options:
         print "-d <dir>\t: Output generated wrapper code to <dir>"
         print "--file-list=<f>\t: Read list of Fortran source files to parse from file <f>.\n\t\t  The format is a newline-separated list of filenames with full\n\t\t  or relative paths"
         print "-i <f>\t\t: Read interface configuration file <f>"
-        print "--c-arrays\t: Wrap arrays arguments as C-sytle arrays instead of\n\t\t  C++ std:vector containers"
+        print "--c-arrays\t: Wrap 1-D array arguments as C-sytle arrays instead of\n\t\t  C++ std:vector containers"
         print "--dummy-class=<n>: Use <n> as the name of the dummy class used to wrap\n\t\t  non-method procedures"
         print "--global\t: Wrap non-method procedures as global functions instead of\n\t\t  static methods of a dummy class"
         # Not documenting, as this option could be dangerous, although
