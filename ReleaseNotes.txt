@@ -1,15 +1,12 @@
-FortWrap 0.9.8 summary:
-
-- Fix for makefile (had CPPFLAGS and CXXFLAGS mixed up, and it was
-  working with gcc 4.1 but not with 4.6)
-
 FortWrap 0.9.7 summary:
 - Fixed issues parsing high-dimensional arrays and certain
   declarations with DIMENSION
-- Correction to manual: FortWrap actually does support assumed size
-  arrays
+- Fix for makefile (had CPPFLAGS and CXXFLAGS mixed up, and it was
+  working with gcc 4.1 but not with 4.6)
 - Tweaks to function_pointer and array tests for improved
   compatibility
+- Correction to manual: FortWrap actually does support assumed size
+  arrays
 
 FortWrap 0.9.6 summary:
 - Added support for a configuration file (-i command option), which

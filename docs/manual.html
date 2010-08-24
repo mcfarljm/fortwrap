@@ -203,6 +203,16 @@ supported:</p>
       file is a newline-separated list of files to be wrapped.</li>
   </ol>
 
+  <h3>Notes about the Fortran compiler</h3>
+
+  <p>FortWrap only supports name mangling for g95 and gfortran.  If
+    using the Makefile <tt>tests/Tests.mk</tt>, edit <tt>FC</tt> to
+    specify your Fortran compiler.  When running FortWrap, use
+    the <tt>-c</tt> option to specify the name mangling you want.
+    Currently the default wrapping is for g95, but this can be changed
+    by editing the <tt>compiler = 'g95'</tt> line near the beginning
+    of <tt>fortwarp.py</tt></p>
+
 
   <h2><a name="ConfigFile">The Configuration File</a></h2>
 
