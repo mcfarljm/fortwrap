@@ -888,11 +888,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                     else:
                         # Chop of the * and add [] after the argname below
                         string = string + arg.cpp_type()[:-1] + ' '
-                elif arg.type.type=='CHARACTER' and not bind:
-                    # Special string handling
-                    if arg.intent=='in':
-                        # const has to be handled separately for this case
-                        string = string + 'const '
+                elif arg.type.type=='CHARACTER' and not bind and not arg.intent=='in':
                     string = string + 'std::string *' # pass by ref not compat with optional
                 else:
                     string = string + arg.cpp_type() + ' '
@@ -972,7 +968,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
                 s = s + prefix + '// Create C array for Fortran input string data\n'
                 s = s + prefix + 'char ' + arg.name + '_c[' + str(arg.type.str_len+1) + '];\n'
                 s = s + prefix + '{\n' + prefix + '  int i;\n'
-                s = s + prefix + '  strcpy(' + arg.name + '_c, ' + arg.name + '->c_str());\n'
+                s = s + prefix + '  strcpy(' + arg.name + '_c, ' + arg.name + ');\n'
                 s = s + prefix + '  for (i=0; ' + arg.name + "_c[i]!='\\0' && i<" + str(arg.type.str_len+1) + '; i++); // Find string end\n'
                 s = s + prefix + '  for ( ; i<' + str(arg.type.str_len+1) + '; i++) ' + arg.name + "_c[i] = ' '; // Add whitespace for Fortran\n"
                 s = s + prefix + '}\n'
@@ -1366,7 +1362,7 @@ class Options:
         print "-v, --version\t: Print version information and exit"
         print "-h, --help\t: Print this usage information"
         print "-n\t\t: Run parser but do not generate any wrapper code (dry run)"
-        print "-c <FC>\t\t: Use name mangling for Fortran compiler <FC>.  Only supports\n\t\t  g95 and gfortran"
+        print "-c <FC>\t\t: Use name mangling for Fortran compiler <FC>.  Only supports\n\t\t  g95 and gfortran.  Default: FC="+compiler
         print "-g\t\t: Wrap source files found in current directory (glob)"
         print "-d <dir>\t: Output generated wrapper code to <dir>"
         print "--file-list=<f>\t: Read list of Fortran source files to parse from file <f>.\n\t\t  The format is a newline-separated list of filenames with full\n\t\t  or relative paths"

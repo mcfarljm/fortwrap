@@ -1,3 +1,8 @@
+FortWrap 0.9.9 summary:
+
+- Changed interface for intent(in) strings to use character arrays,
+  which makes it easier to pass string literals
+
 FortWrap 0.9.8 summary:
 - Added a brief walkthrough to the manual
 - Added support for intent(in) strings

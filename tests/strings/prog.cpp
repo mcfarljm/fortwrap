@@ -5,25 +5,23 @@
 int main(void)
 {
 
-  std::string s1;
+  std::string s;
 
-  FortFuncs::string_literal_len(&s1);
-  if (s1.compare("String A") != 0)
+  FortFuncs::string_literal_len(&s);
+  if (s.compare("String A") != 0)
     return 1;
 
-  FortFuncs::string_param_len(&s1);
-  if (s1.compare("String B") != 0)
+  FortFuncs::string_param_len(&s);
+  if (s.compare("String B") != 0)
     return 2;
 
   // Test intent(in)
-  s1 = "Test String";
-  if (! FortFuncs::string_in_test(&s1))
+  if (! FortFuncs::string_in_test("Test String"))
     return 3;
 
   // Test combination
-  std::string s2;
-  FortFuncs::multiple_args(0,&s1,0.0,&s2);
-  if (s2.compare("Test String suffix") != 0)
+  FortFuncs::multiple_args(0,"Test String",0.0,&s);
+  if (s.compare("Test String suffix") != 0)
     return 4;
 
   return 0;
