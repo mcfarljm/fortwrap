@@ -114,6 +114,7 @@ PUBLIC=0
 proc_pointer_used = False
 # Whether or not matrices are used
 matrix_used = False
+stringh_used = False            # Whether "string.h" is used (needed for strcpy)
 
 # ===================================================
 
@@ -146,7 +147,7 @@ class Array:
 
 class DataType:
     def __init__(self,type,array=None,str_len=-1,hidden=False):
-        global proc_pointer_used, matrix_used
+        global proc_pointer_used, stringh_used
         self.type = type
         self.array = array
         self.str_len = str_len
@@ -156,6 +157,8 @@ class DataType:
         # For array, name of argument used to pass the array length:
         self.is_array_size = False # integer defining an array size
         self.is_matrix_size = False
+        if type=='CHARACTER':
+            stringh_used = True # Really only needed for intent(in)
         # Handle real kinds
         if type.upper().startswith('REAL') and type.upper().find('KIND')>=0:
             kind = type.split('=')[1].split(')')[0].strip()
@@ -1116,6 +1119,8 @@ def write_class(object):
     # Write method code to cpp file
     file = open( code_output_dir+'/' + object.name + '.cpp', 'w')
     file.write(HEADER_STRING + '\n')
+    if stringh_used:
+        file.write('#include "string.h" // For strcpy\n')
     file.write('#include "' + object.name + '.h"\n\n')
     # Constructor(s):
     if fort_ctors:
