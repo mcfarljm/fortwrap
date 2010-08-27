@@ -247,7 +247,7 @@ class Argument:
             # Note: optional strings could be handled, but need
             # protect wrapper code with if(name) statements and make
             # sure name_c is set to NULL before sent to Fortran
-            if self.intent=='out' and self.type.str_len>0 and not self.type.array and not self.optional:
+            if not self.intent=='inout' and self.type.str_len>0 and not self.type.array and not self.optional:
                 return False
             else:
                 return True
@@ -913,7 +913,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             string = string + arg.name
         # -------------------------------------------
         # Special string handling
-        if call and arg.type.type=='CHARACTER' and arg.intent=='out':
+        if call and arg.type.type=='CHARACTER' and not arg.intent=='inout':
             string = string + '_c'
         # Special handling for matrix arguments
         if call and arg.type.matrix:
@@ -962,6 +962,14 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
                 s = s + prefix + '// Declare memory to store output character data\n'
                 s = s + prefix + 'char ' + arg.name + '_c[' + str(arg.type.str_len+1) + '];\n'
                 s = s + prefix + arg.name + '_c[' + str(arg.type.str_len) + "] = '\\0';\n"
+            elif arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='in':
+                s = s + prefix + '// Create C array for Fortran input string data\n'
+                s = s + prefix + 'char ' + arg.name + '_c[' + str(arg.type.str_len+1) + '];\n'
+                s = s + prefix + '{\n' + prefix + '  int i;\n'
+                s = s + prefix + '  strcpy(' + arg.name + '_c, ' + arg.name + '->c_str());\n'
+                s = s + prefix + '  for (i=0; ' + arg.name + "_c[i]!='\\0' && i<" + str(arg.type.str_len+1) + '; i++); // Find string end\n'
+                s = s + prefix + '  for ( ; i<' + str(arg.type.str_len+1) + '; i++) ' + arg.name + "_c[i] = ' '; // Add whitespace for Fortran\n"
+                s = s + prefix + '}\n'
     # Add wrapper code for array size values
     if call:
         for arg in proc.args.itervalues():
