@@ -114,8 +114,8 @@ o.process();
 
   <li> Name mangling support for both gfortran and g95 compilers
     
-  <li> Character arrays with <tt>INTENT(OUT)</tt> and explicit length
-    parameter are translated into C++ strings.</li>
+  <li> Strings with <tt>INTENT(IN)</tt> or <tt>INTENT(OUT)</tt> and
+    explicit length parameter are wrapped using C++ strings.</li>
 
   <li> Where possible, pass by value is used in C++ (e.g. scalar
     arguments that are not optional)</li>

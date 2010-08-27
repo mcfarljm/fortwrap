@@ -97,9 +97,9 @@ o.process();
 
   <li> Name mangling support for both gfortran and g95 compilers
     
-  <li> <a href="#details-strings">Character arrays</a>
-    with <tt>INTENT(OUT)</tt> and explicit length parameter are
-    translated into C++ strings.</li>
+  <li> <a href="#details-strings">Strings</a> with <tt>INTENT(IN)</tt>
+    or <tt>INTENT(OUT)</tt> and explicit length parameter are wrapped
+    using C++ strings.</li>
 
   <li> Where possible, pass by value is used in C++ (e.g. scalar
     arguments that are not optional)</li>
@@ -139,7 +139,7 @@ supported:</p>
       :: X(:)</tt>).  The Fortran standard does not provide an
       interoperability mechanism for assumed shape arrays.</li>
 
-  <li> Character arrays with intent other than <tt>INTENT(OUT)</tt></li>
+  <li> Strings with <tt>INTENT(INOUT)</tt> and arrays of strings</li>
 
   <li> Arrays of dimensionality greater than 2 are not supported.</li>
 
@@ -333,7 +333,7 @@ g95 -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/ObjectB
     creating a C++ API for a large Fortran project, particularly when
     some Fortran declarations must be kept public even though they are
     really not part of the API (keep in mind that FortWrap will
-    resepct <tt>PUBLIC</tt> and <tt>PRIVATE</tt> declarations, so
+    respect <tt>PUBLIC</tt> and <tt>PRIVATE</tt> declarations, so
     there is no need to use the ignore directive for <tt>PRIVATE</tt>
     names.)</p>
 
@@ -636,11 +636,12 @@ X(0,1) = 10;
     In fact, this is a difficult language feature to handle well, and the
     Fortran standard for interoperating with strings is no help.</p>
 
-  <p>FortWrap can only wrap scalar string arguments that
-    are <tt>INTENT(OUT)</tt> and have an explicitly declared length
-    with <tt>len=</tt>.  Integer literals or named integer parameters
-    can be used, provided that the declaration of the parameter name
-    is somewhere in a file that FortWrap parsed.</p>
+  <p>FortWrap can only wrap scalar string arguments that are
+    either <tt>INTENT(IN)</tt> or <tt>INTENT(OUT)</tt> and have an
+    explicitly declared length with <tt>len=</tt>.  Integer literals
+    or named integer parameters can be used as the length parameter,
+    provided that the declaration of the parameter name is somewhere
+    in a file that FortWrap parsed.</p>
 
   <h3><a name="details-global">Top-level (non-module) procedures</a></h3>
 
