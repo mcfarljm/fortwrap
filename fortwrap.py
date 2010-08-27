@@ -890,6 +890,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                         string = string + arg.cpp_type()[:-1] + ' '
                 elif arg.type.type=='CHARACTER' and not bind:
                     # Special string handling
+                    if arg.intent=='in':
+                        # const has to be handled separately for this case
+                        string = string + 'const '
                     string = string + 'std::string *' # pass by ref not compat with optional
                 else:
                     string = string + arg.cpp_type() + ' '
