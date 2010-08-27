@@ -112,11 +112,11 @@ o.process();
     interfacing with two-dimensional Fortran arrays (matrices).  This
     class takes care to store data internally in Fortran order.</li>
 
-  <li> Name mangling support for both gfortran and g95 compilers
-    
-  <li> Strings with <tt>INTENT(IN)</tt> or <tt>INTENT(OUT)</tt> and
+  <li> <b>Strings</b> with <tt>INTENT(IN)</tt> or <tt>INTENT(OUT)</tt> and
     explicit length parameter are wrapped using C++ strings.</li>
 
+  <li> Name mangling support for both gfortran and g95 compilers
+    
   <li> Where possible, pass by value is used in C++ (e.g. scalar
     arguments that are not optional)</li>
 
@@ -153,7 +153,7 @@ supported:</p>
       :: X(:)</tt>).  The Fortran standard does not provide an
       interoperability mechanism for assumed shape arrays.</li>
 
-  <li> Character arrays with intent other than <tt>INTENT(OUT)</tt></li>
+  <li> Strings with <tt>INTENT(INOUT)</tt>.  Arrays of strings</li>
 
   <li> Arrays of dimensionality greater than 2 are not supported.</li>
 
