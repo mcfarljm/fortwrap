@@ -391,6 +391,15 @@ class Procedure:
                 else:
                     return arg.name,1
         return None
+
+    def has_post_call_wrapper_code(self):
+        """Whether or not wrapper code will be needed for after the call to
+        the Fortran procedure"""
+        for arg in self.args.itervalues():
+            # Special string handling for after the call needed
+            if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
+                return True
+        return False
         
         
 class DerivedType:
@@ -992,7 +1001,11 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
     # Now write return type:
     if proc.retval:
         if call:
-            s = s + 'return '
+            if not proc.has_post_call_wrapper_code():
+                s = s + 'return '
+            else:
+                # Save return value and return after wrapper code below
+                s = s + proc.retval.cpp_type()[:-1] + ' __retval = '
         else:
             s = s + proc.retval.cpp_type()[:-1] + ' ' # Strip off the '*'
     elif not call:
@@ -1005,6 +1018,19 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
     else:
         s = s + translate_name(proc.name)
     s = s + '(' + c_arg_list(proc,bind,call,obj!=None) + ')'
+    if not obj:
+        s = s + ';'
+    if call:
+        for arg in proc.args.itervalues():
+            # Special string handling for after the call
+            if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
+                s = s + '\n'
+                s = s + prefix + 'if ('+arg.name+') {\n'
+                s = s + prefix + '  // Trim trailing whitespace and assign character array to string:\n'
+                s = s + prefix + '  for (int i=' + str(arg.type.str_len-1) + '; ' + arg.name + "_c[i]==' '; i--) " + arg.name + "_c[i] = '\\0';\n"
+                s = s + prefix + '  ' + arg.name + '->assign(' + arg.name + '_c);\n  }'
+        if proc.retval and proc.has_post_call_wrapper_code():
+            s = s + '\n' + prefix + 'return __retval;'
     return s
 
 def write_constructor(file,object,fort_ctor=None):
@@ -1026,7 +1052,7 @@ def write_constructor(file,object,fort_ctor=None):
     # If present, call Fortran ctor
     if fort_ctor:
         file.write(function_def_str(fort_ctor,bind=True,call=True) )
-        file.write('; // Fortran Constructor\n')
+        file.write(' // Fortran Constructor\n')
         file.write('  initialized = true;\n')
     else:
         file.write('  initialized = false;\n')
@@ -1077,7 +1103,7 @@ def write_class(object):
         file.write('  void ' + mangle_name(fort_wrap_file, 'allocate_'+object.name) + '(ADDRESS *caddr);\n')
         file.write('  void ' + mangle_name(fort_wrap_file, 'deallocate_'+object.name) + '(ADDRESS caddr);\n')
     for proc in object.procs:
-        file.write(function_def_str(proc,bind=True) + ';\n')
+        file.write(function_def_str(proc,bind=True) + '\n')
     file.write('}\n')
 
     if SWIG:
@@ -1106,7 +1132,7 @@ def write_class(object):
         if proc.ctor or (proc.dtor and not is_public(proc.name)):
             continue
         write_cpp_dox_comments(file,proc.comment,proc.args_by_pos)
-        file.write(function_def_str(proc) + ';\n\n')
+        file.write(function_def_str(proc) + '\n\n')
     #file.write('\nprivate:\n')
     if object.name!=orphan_classname:
         file.write('  ADDRESS data_ptr;\n')
@@ -1140,15 +1166,7 @@ def write_class(object):
         file.write(function_def_str(proc,obj=object,prefix='') + ' {\n')
         if proc.dtor:
             file.write('  if (initialized) ')
-        file.write(function_def_str(proc,bind=True,call=True,prefix='  ') + ';\n')
-        for arg in proc.args.itervalues():
-            # Special string handling for after the call (wrapper code
-            # before the call is added by function_def_str)
-            if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
-                file.write('  if ('+arg.name+') {\n')
-                file.write('    // Trim trailing whitespace and assign character array to string:\n')
-                file.write('    for (int i=' + str(arg.type.str_len-1) + '; ' + arg.name + "_c[i]==' '; i--) " + arg.name + "_c[i] = '\\0';\n")
-                file.write('    ' + arg.name + '->assign(' + arg.name + '_c);\n  }\n')
+        file.write(function_def_str(proc,bind=True,call=True,prefix='  ') + '\n')
         if proc.dtor:
             file.write('  initialized = false;\n')
         elif proc.name.lower().startswith('new_'):
