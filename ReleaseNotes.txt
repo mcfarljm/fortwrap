@@ -1,12 +1,8 @@
 FortWrap 0.9.9 summary:
-
-- Support for string arguments that are optional
-
+- Added support for string arguments that are optional
 - Changed interface for intent(in) strings to use character arrays,
   which makes it easier to pass string literals
-
 - Fixed bug using intent(out) strings with functions
-
 - Made run_tests.py script more portable: should now work on Windows
   under msys and cygwin (and possibly cmd.exe)
 
