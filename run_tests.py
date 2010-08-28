@@ -10,7 +10,7 @@ import os
 import glob
 
 OPTS = '-g --clean -d wrap'     # FortWrap options
-cmd = '../../fortwrap.py'
+cmd = os.path.normpath('../../fortwrap.py')
 
 custom_opts = { 'c_arrays' : OPTS + ' --c-arrays', 
                 'interface_file' : OPTS + ' -i interface.i' }
@@ -21,6 +21,11 @@ excludes = [ 'comments' ]
 os.chdir('tests')
 tests = glob.glob('*')
 tests.remove( glob.glob('*.mk')[0] )
+
+if sys.platform.find('win') >= 0:
+    null_dev = 'NUL'
+else:
+    null_dev = '/dev/null'
 
 num_err = 0
 
@@ -48,22 +53,22 @@ for test in tests:
     else:
         opts = OPTS
     if make_clean:
-        os.system('make clean > /dev/null')
-    stat = os.system(cmd + ' ' + opts + ' > /dev/null')
+        os.system('make clean > ' + null_dev)
+    stat = os.system(cmd + ' ' + opts + ' > ' + null_dev)
     if stat!=0:
         num_err += 1
         failed_tests.append((test,'wrapper'))
         print "[FAIL: wrapper]"
         continue
     # Build test program
-    stat = os.system('make > /dev/null')
+    stat = os.system('make > ' + null_dev)
     if stat!=0:
         num_err += 1
         failed_tests.append((test,'build'))
         print "[FAIL: build]"
         continue
     # Run test program
-    stat = os.system('./prog')
+    stat = os.system(os.path.abspath('prog'))
     if stat!=0:
         num_err += 1
         failed_tests.append((test,'run'))
