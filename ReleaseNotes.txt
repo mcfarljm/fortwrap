@@ -1,5 +1,7 @@
 FortWrap 0.9.9 summary:
 
+- Support for string arguments that are optional
+
 - Changed interface for intent(in) strings to use character arrays,
   which makes it easier to pass string literals
 

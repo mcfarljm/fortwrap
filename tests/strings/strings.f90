@@ -38,4 +38,29 @@ CONTAINS
     END IF
   END SUBROUTINE multiple_args
 
+  ! Test optional arguments
+  FUNCTION optional_in(s) RESULT(res)
+    CHARACTER(len=STRING_LEN), OPTIONAL, INTENT(in) :: s
+    INTEGER :: res ! 0=fail, 1=success(present), 2=success(not present)
+    
+    res = 0
+    IF (PRESENT(s)) THEN
+      IF (TRIM(s) == 'Test String') res = 1
+    ELSE ! Not present
+      res = 2
+    END IF
+  END FUNCTION optional_in
+
+  FUNCTION optional_out(s) RESULT(res)
+    CHARACTER(len=STRING_LEN), OPTIONAL, INTENT(out) :: s
+    INTEGER :: res ! 1=present, 0=not present
+    
+    res = 0
+    IF (PRESENT(s)) THEN
+      res = 1
+      s = 'Test String'
+    END IF
+  END FUNCTION optional_out
+
+
 END MODULE strings
