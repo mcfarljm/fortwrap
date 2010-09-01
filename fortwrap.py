@@ -222,7 +222,7 @@ class Argument:
 
     def set_type(self,type):
         self.type = type
-        if type.array and type.array.array():
+        if type.array and type.array.vec:
             self.comment.append('ARRAY')
 
     def pass_by_val(self):
