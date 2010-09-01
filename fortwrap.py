@@ -74,7 +74,7 @@ integer_param_def = re.compile(r'\s+INTEGER,\s+PARAMETER\s+::\s+(.*)\s*=\s*([0-9
 # multi-dimensional arrays (e.g. A(m,n)).  It uses a negative
 # lookahead assertion to exclude commas inside the array definition
 arg_splitter = re.compile(',(?![^(]*\))')
-dimension_def = re.compile(r'DIMENSION\s*\(\s*(.*)\s*\)',re.IGNORECASE)
+dimension_def = re.compile(r'DIMENSION\s*\(\s*([^(]+)\s*\)',re.IGNORECASE)
 
 # ===================================================
 

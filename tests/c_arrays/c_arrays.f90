@@ -18,10 +18,12 @@ CONTAINS
     y = SUM(x(1:4))
   END FUNCTION array_in_2
 
-  SUBROUTINE array_out(n,x)
-    INTEGER, INTENT(in) :: n
-    INTEGER, INTENT(out) :: x(n)
+  SUBROUTINE array_out(nx,ny,x,y)
+    INTEGER, INTENT(in) :: nx,ny
+    INTEGER, INTENT(out) :: x(nx)
+    INTEGER, DIMENSION(ny), INTENT(out) :: y
     x = 20
+    y = 30
   END SUBROUTINE  array_out
 
   FUNCTION inner_prod(n,a,b) RESULT(y)

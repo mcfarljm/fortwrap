@@ -2,6 +2,8 @@ FortWrap 0.9.10 summary:
 
 - Fixed bug parsing functions with array return values
 
+- Fixed bug handling DIMENSION when it is followed by INTENT
+
 FortWrap 0.9.9 summary:
 - Added support for string arguments that are optional
 - Changed interface for intent(in) strings to use character arrays,
