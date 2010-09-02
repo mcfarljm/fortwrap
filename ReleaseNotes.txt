@@ -1,7 +1,5 @@
 FortWrap 0.9.10 summary:
-
 - Fixed bug parsing functions with array return values
-
 - Fixed bug handling DIMENSION when it is followed by INTENT
 
 FortWrap 0.9.9 summary:
