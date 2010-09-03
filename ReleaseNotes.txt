@@ -1,3 +1,8 @@
+FortWrap 0.9.11 summary:
+
+- Added exception handler to gracefully handle FortWrap internal
+  errors
+
 FortWrap 0.9.10 summary:
 - Fixed bug parsing functions with array return values
 - Fixed bug handling DIMENSION when it is followed by INTENT

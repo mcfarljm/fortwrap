@@ -17,6 +17,7 @@ import glob
 from datetime import date
 import sys
 import os
+import traceback
 
 
 VERSION = '0.9.10'
@@ -26,6 +27,8 @@ VERSION = '0.9.10'
 
 # Default Fortran compiler.  Can be overridden by command option
 compiler = 'g95'
+
+ERROR_FILE_NAME = 'FortWrap-error.txt'
 
 code_output_dir = '.'
 include_output_dir = '.'
@@ -1324,6 +1327,17 @@ def clean_directories():
         os.remove(f)
         
 
+def internal_error():
+    sys.stderr.write('FortWrap internal error encountered\n\n')
+    sys.stderr.write('Please submit a bug report to mcfarljm@gmail.com which includes the error log\n'+ERROR_FILE_NAME+' and the Fortran source code being wrapped\n')
+    f = open(ERROR_FILE_NAME,'w')
+    f.write('FortWrap version ' + VERSION + '\n')
+    f.write('Platform: ' + sys.platform + '\n\n')
+    traceback.print_exc(file=f)
+    f.close()
+    sys.exit(1)
+
+
 # Class for parsing the configuration file
 class ConfigurationFile:
     def __init__(self,fname):
@@ -1378,7 +1392,7 @@ class Options:
     def __init__(self):
         self.parse_args()
 
-    def usage(self,exit_val=1):
+    def usage(self,exit_val=2):
         print "Usage:", sys.argv[0], "[options] [filenames]\n"
         print "Source files to be wrapped can be specified on the command line ([filenames]),\nby globbing the current directory (-g), or listed in a file (--file-list)\n"
         print "-v, --version\t: Print version information and exit"
@@ -1433,7 +1447,7 @@ class Options:
                 compiler = a
                 if a!='g95' and a!='gfortran':
                     print "Error, only g95 and gfortran name mangling supported"
-                    sys.exit(1)
+                    sys.exit(2)
             elif o=='-i':
                 self.interface_file = a
             elif o=='-n':
@@ -1456,54 +1470,63 @@ class Options:
 
 if __name__ == "__main__":
 
-    file_list = []
+    try:
 
-    opts = Options()
+        file_list = []
 
-    configs = ConfigurationFile(opts.interface_file)
+        opts = Options()
 
-    if opts.clean_code:
-        clean_directories()
+        configs = ConfigurationFile(opts.interface_file)
 
-    if opts.inputs_file:
-        # TODO: Add error handler
-        f = open(opts.inputs_file)
-        for line in f:
-            if not line.strip().startswith('#') and re.search('\w', line):
-                file_list.append( line.strip() )
-        f.close()
-        print "LOADED", len(file_list), 'FILES FROM LIST'
+        if opts.clean_code:
+            clean_directories()
 
-    if opts.glob_files:
-        file_list += glob.glob('*.[fF]90')
-    
-    if not file_list:
-        print "Error: no source files"
-        sys.exit(2)
+        if opts.inputs_file:
+            # TODO: Add error handler
+            f = open(opts.inputs_file)
+            for line in f:
+                if not line.strip().startswith('#') and re.search('\w', line):
+                    file_list.append( line.strip() )
+            f.close()
+            print "LOADED", len(file_list), 'FILES FROM LIST'
 
-    fcount = 0  # Counts valid files
-    for f in file_list:
-        fcount += parse_file(f)
-    if fcount==0:
-        print "Error: no source files"
-        sys.exit(2)
+        if opts.glob_files:
+            file_list += glob.glob('*.[fF]90')
 
-    # Prevent writing any files if there is nothing to wrap
-    if len(procedures)==0:
-        print "No procedures to wrap"
-        sys.exit(5)
+        if not file_list:
+            print "Error: no source files"
+            sys.exit(3)
 
-    associate_procedures()
+        fcount = 0  # Counts valid files
+        for f in file_list:
+            fcount += parse_file(f)
+        if fcount==0:
+            print "Error: no source files"
+            sys.exit(3)
 
-    if opts.dry_run:
+        # Prevent writing any files if there is nothing to wrap
+        if len(procedures)==0:
+            print "No procedures to wrap"
+            sys.exit(4)
+
+        associate_procedures()
+
+        if opts.dry_run:
+            sys.exit(0)
+
+        for obj in objects.itervalues():
+            write_class(obj)
+
+        write_global_header_file()
+        write_misc_defs()
+        write_matrix_class()
+        write_fortran_wrapper()
+
         sys.exit(0)
 
-    for obj in objects.itervalues():
-        write_class(obj)
+    except SystemExit:
+        # Raised by sys.exit
+        pass
 
-    write_global_header_file()
-    write_misc_defs()
-    write_matrix_class()
-    write_fortran_wrapper()
-
-    sys.exit(0)
+    except:
+        internal_error()
