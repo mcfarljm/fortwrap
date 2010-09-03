@@ -57,7 +57,7 @@ fort_type_def = re.compile(r'\s*TYPE\s+[a-z]',re.IGNORECASE)
 fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(',re.IGNORECASE)
 fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)',re.IGNORECASE)
 fort_comment = re.compile('\s*!')
-fort_data_string = r'\s*(TYPE\s*\((?P<dt_spec>\S*)\)|INTEGER|REAL(\*8|\s*\(C_DOUBLE\)|\s*\(KIND=(?P<real_spec>[0-9]+)\s*\))?|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
+fort_data_string = r'\s*(TYPE\s*\((?P<dt_spec>\S*)\)|INTEGER|REAL(\*8|\s*\(C_DOUBLE\)|\s*\(KIND=(?P<real_spec>[0-9]+)\s*\))?|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER|COMPLEX)'
 fort_data = re.compile(fort_data_string,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_string + '.*::',re.IGNORECASE)
 # CLASS: not yet supported, but print warnings
@@ -65,7 +65,7 @@ fort_class_data_def = re.compile(r'\s*CLASS\s*\(\S*\).*::',re.IGNORECASE)
 module_def = re.compile(r'\s*MODULE\s+\S',re.IGNORECASE)
 end_module_def = re.compile(r'\s*END\s+MODULE',re.IGNORECASE)
 # INT below is used to represent the hidden length arguments, passed by value
-primitive_data = re.compile('(INTEGER|REAL|LOGICAL|CHARACTER|INT)',re.IGNORECASE)
+primitive_data = re.compile('(INTEGER|REAL|LOGICAL|CHARACTER|INT|COMPLEX)',re.IGNORECASE)
 fort_dox_comments = re.compile(r'\s*!\>')
 fort_dox_inline = re.compile(r'\s*\w+.*!\<')
 result_name_def = re.compile(r'.*RESULT\s*\(\s*(\w+)\s*\)',re.IGNORECASE)
@@ -119,6 +119,8 @@ proc_pointer_used = False
 matrix_used = False
 stringh_used = False            # Whether "string.h" is used (needed for strcpy)
 
+not_wrapped = [] # List of procedures that weren't wrapped
+
 # ===================================================
 
 class FWTypeException(Exception):
@@ -162,6 +164,7 @@ class Array:
         self.fort_only = self.d>2 or self.assumed_shape
 
 class DataType:
+    complex_warning_written = False
     def __init__(self,type,array=None,str_len=-1,hidden=False):
         global proc_pointer_used, stringh_used
         self.type = type
@@ -175,6 +178,10 @@ class DataType:
         self.is_matrix_size = False
         if type=='CHARACTER':
             stringh_used = True # Really only needed for intent(in)
+        elif type.upper()=='COMPLEX':
+            if not DataType.complex_warning_written:
+                warning("COMPLEX data not supported")
+                DataType.complex_warning_written = True
         # Handle real kinds
         if type.upper().startswith('REAL') and type.upper().find('KIND')>=0:
             kind = type.split('=')[1].split(')')[0].strip()
@@ -191,10 +198,12 @@ class DataType:
                 m = fort_data.match(type)
                 self.type = m.group('proc_spec')
                 proc_pointer_used = True
-            else:
+            elif type.find('TYPE') >= 0:
                 self.dt = True
                 m = fort_data.match(type)
                 self.type = m.group('dt_spec')
+            else:
+                raise FWTypeException(type)
 
         # Properties queried by the wrapper generator:
         # vec=vector: 1-d array
@@ -273,6 +282,8 @@ class Argument:
         elif self.type.type.upper().find('KIND')>=0:
             # Supported KIND= types are translated in the DataType
             # constructor
+            return True
+        elif self.type.type.upper()=='COMPLEX':
             return True
         return False
     
@@ -563,7 +574,7 @@ def parse_proc(file,line,abstract=False):
     """
     Parse a procedure definition, given starting line
     """
-    global dox_comments, abstract_interfaces, module_proc_num
+    global dox_comments, abstract_interfaces, module_proc_num, not_wrapped
     # Store in case decide to overwrite them when parsing arg comments
     proc_comments = dox_comments 
 
@@ -619,8 +630,8 @@ def parse_proc(file,line,abstract=False):
             warning("CLASS arguments not currently supported: " + proc_name)
     # Check args:
     if len(args) != len(arg_list):
-        error("Missing argument definitions: " + proc_name + '\n' +
-              str(set(arg_list).difference(set(args.keys()))))
+        missing_args = set(arg_list).difference(set(args.keys()))
+        error("Missing argument definitions in procedure %s: %s" % (proc_name, ', '.join(missing_args)))
         invalid = True
     for arg in args.itervalues():
         if arg.fort_only() and not arg.optional:
@@ -641,7 +652,7 @@ def parse_proc(file,line,abstract=False):
             error("Untyped return value in %s: %s" % (proc_name,retval.name))
             invalid = True
     if invalid:
-        warning("Not wrapping procedure: " + proc_name)
+        not_wrapped.append(proc_name)
     else:
         proc = Procedure(proc_name,args,method,retval,proc_comments)
         # dtors automatically get added.  This way we can hide them
@@ -1450,6 +1461,9 @@ class Options:
             if o=='--file-list':
                 self.inputs_file = a
             elif o=='-d':
+                if not os.path.isdir(a):
+                    error("Directory does not exist: " + a)
+                    sys.exit(2)
                 code_output_dir = a
                 include_output_dir = a
                 fort_output_dir = a
@@ -1531,6 +1545,9 @@ if __name__ == "__main__":
         write_misc_defs()
         write_matrix_class()
         write_fortran_wrapper()
+
+        if len(not_wrapped) > 0:
+            warning("Some procedures not wrapped:\n " + '\n '.join(not_wrapped))
 
         sys.exit(0)
 
