@@ -121,6 +121,19 @@ stringh_used = False            # Whether "string.h" is used (needed for strcpy)
 
 # ===================================================
 
+class FWTypeException(Exception):
+    """Raised when an unexpected type is enountered in the code generation
+    phase"""
+    def __init__(self,type):
+        self.type = type
+    def __str__(self):
+        return self.type
+
+def warning(msg):
+    sys.stderr.write('Warning: ' + msg + '\n')
+
+def error(msg):
+    sys.stderr.write('Error: ' + msg + '\n')
 
 class Array:
     multi_d_warning_written = False
@@ -139,7 +152,7 @@ class Array:
             self.size_var = tuple([v.strip() for v in spec.split(',')])
         elif self.d > 2:
             if not Array.multi_d_warning_written:
-                print "Warning, FortWrap does not wrap arrays with dimension > 2"
+                warning("FortWrap does not wrap arrays with dimension > 2")
                 Array.multi_d_warning_written = True
 
         # Properties queried by the wrapper generator:
@@ -170,7 +183,7 @@ class DataType:
             elif kind=='8':
                 self.type = 'REAL*8'
             else:
-                print type, "not supported"
+                warning(type+" not supported")
         if not primitive_data.match(type):
             if type.upper().find('PROCEDURE') >= 0:
                 self.proc_pointer = True
@@ -292,12 +305,9 @@ class Argument:
                 string = 'void '
             string = string + '(*' + self.name + ')'
             string = string + '(' + c_arg_list(proc,bind=True) + ')'
-            #print "String:", string
-            #return "ctype"
             return string
         else:
-            print "No corresponding c++ type:", self.type.type
-            return "ctype*"    
+            raise FWTypeException(self.type.type)
 
 
 class Procedure:
@@ -326,7 +336,7 @@ class Procedure:
                 if arg.optional:
                     arg.exclude = True
                 else:
-                    print "Argument exclusions only valid for optional arguments:", name, arg.name
+                    warning("Argument exclusions only valid for optional arguments: " + name + ', ' + arg.name)
         # Make position map
         for arg in self.args.itervalues():
             self.args_by_pos[arg.pos] = arg
@@ -563,7 +573,7 @@ def parse_proc(file,line,abstract=False):
 
     # If not in a module, print warning and return
     if not current_module:
-        print "Warning, wrapping top-level (non-module) procedures not supported:", proc_name
+        warning("Wrapping top-level (non-module) procedures not supported: " + proc_name)
         return
 
     arg_string = line.split('(')[1].split(')')[0]
@@ -588,7 +598,7 @@ def parse_proc(file,line,abstract=False):
     while True:
         line = readline(file)
         if line=='':
-            print "Unexpected end of file in procedure"
+            error("Unexpected end of file in procedure")
             return
         elif fort_dox_comments.match(line):
             arg_comments = parse_comments(file,line)
@@ -606,11 +616,11 @@ def parse_proc(file,line,abstract=False):
             parse_argument_defs(line,file,arg_list,args,retval,arg_comments)
             arg_comments = []
         elif fort_class_data_def.match(line):
-            print "Warning, CLASS arguments not currently supported:", proc_name
+            warning("CLASS arguments not currently supported: " + proc_name)
     # Check args:
     if len(args) != len(arg_list):
-        print "****** Missing argument definitions:", proc_name
-        print set(arg_list).difference(set(args.keys()))
+        error("Missing argument definitions: " + proc_name + '\n' +
+              str(set(arg_list).difference(set(args.keys()))))
         invalid = True
     for arg in args.itervalues():
         if arg.fort_only() and not arg.optional:
@@ -628,10 +638,10 @@ def parse_proc(file,line,abstract=False):
             elif retval.type.type == 'CHARACTER':
                 invalid = True
         else:
-            print "******* Untyped retval:", retval.name, proc_name
+            error("Untyped return value in %s: %s" % (proc_name,retval.name))
             invalid = True
     if invalid:
-        print "Warning, not wrapping procedure:", proc_name
+        warning("Not wrapping procedure: " + proc_name)
     else:
         proc = Procedure(proc_name,args,method,retval,proc_comments)
         # dtors automatically get added.  This way we can hide them
@@ -651,7 +661,7 @@ def parse_type(file,line):
     while True:
         line = readline(file)
         if line == '':
-            print "Unexpected end of file in TYPE", typename
+            error("Unexpected end of file in TYPE " + typename)
             return
         if line.upper().strip().startswith('END TYPE'):
             return
@@ -672,7 +682,7 @@ def parse_comments(file,line):
     elif fort_dox_inline.match(line):
         com.append(line.split('!<')[1].strip())
     else:
-        print "Bad line in parse_comments:", line
+        warning("Bad line in parse_comments: " + line)
     while True:
         line = readline(file).strip()
         if line.startswith('!!'):
@@ -695,7 +705,7 @@ def parse_file(fname):
     try:
         f = open(fname)
     except:
-        print "Error opening file", fname
+        error("Error opening file " + fname)
         return 0
     file_lines_list = f.readlines()
     file_pointer = 0
@@ -773,7 +783,7 @@ def associate_procedures():
                 objects[typename].procs.append(proc)
                 flag_native_args(proc)
             elif typename.lower() not in name_exclusions:
-                print "Unknown object in associate_procedures:", proc.name, typename
+                error("Method %s declared for unknown derived type %s" % (proc.name, typename))
         # Associate orphan functions with a dummy class
         else:
             if not orphan_classname in objects:
@@ -858,7 +868,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # associate_procedures is run).  Can always exclude these args
         # from the arg list or add the derived type to the interface
         if (not arg.fort_only() and not bind and not call and definition) and (arg.type.dt and not arg.native):
-            print "****** Warning, derived type argument not in interface:", proc.name, arg.type.type, arg.name
+            error("Derived type argument %s::%s of procedure %s is not defined" % (arg.type.type, arg.name, proc.name))
         if arg.fort_only():
             # Hide from user -- requires special treatement for three of
             # the four cases
@@ -905,7 +915,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                 else:
                     string = string + arg.cpp_type() + ' '
             else:
-                string = string + 'ctype '
+                raise FWTypeException(arg.type.type)
         # Change pass-by-value to reference for Fortran
         if call and bind and arg.pass_by_val():
             string = string + '&'
@@ -1346,7 +1356,7 @@ class ConfigurationFile:
             try:
                 self.f = open(fname)
             except:
-                print "Error opening interface file:", fname
+                error("Error opening interface file: " + fname)
                 return
             self.process()
 
@@ -1384,7 +1394,7 @@ class ConfigurationFile:
                     continue
                 
     def bad_decl(self,line_num):
-        print self.fname, "line", line_num, ": bad declaration"
+        error("%s, line %i <-- bad declaration" % (self.fname, line_num))
 
 
 # Class for parsing command line options
@@ -1446,7 +1456,7 @@ class Options:
             elif o=='-c':
                 compiler = a
                 if a!='g95' and a!='gfortran':
-                    print "Error, only g95 and gfortran name mangling supported"
+                    error("Only g95 and gfortran name mangling supported")
                     sys.exit(2)
             elif o=='-i':
                 self.interface_file = a
@@ -1462,7 +1472,7 @@ class Options:
                 self.global_orphans = True
 
         if self.clean_code and code_output_dir=='.':
-            print "Error, cleaning wrapper code output dir requires -d"
+            error("Cleaning wrapper code output dir requires -d")
             sys.exit(2)
 
 
@@ -1494,19 +1504,19 @@ if __name__ == "__main__":
             file_list += glob.glob('*.[fF]90')
 
         if not file_list:
-            print "Error: no source files"
+            error("No source files")
             sys.exit(3)
 
         fcount = 0  # Counts valid files
         for f in file_list:
             fcount += parse_file(f)
         if fcount==0:
-            print "Error: no source files"
+            error("No source files")
             sys.exit(3)
 
         # Prevent writing any files if there is nothing to wrap
         if len(procedures)==0:
-            print "No procedures to wrap"
+            error("No procedures to wrap")
             sys.exit(4)
 
         associate_procedures()
