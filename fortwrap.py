@@ -448,7 +448,10 @@ def mangle_name(mod,func):
         else: # gfortran
             return '__' + mod.lower() + '_MOD_' + func.lower()
     else:
-        return func.lower() + '_'
+        suffix = '_'
+        if compiler=='g95' and func.find('_')>=0:
+            suffix = suffix + '_'
+        return func.lower() + suffix
 
 
 def get_proc(name):
