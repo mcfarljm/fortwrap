@@ -145,7 +145,7 @@ class Array:
         self.assumed_shape = False
         self.size_var = ''
         self.d = spec.count(',') + 1
-        if spec.find(':') > 0:
+        if spec.find(':') >= 0:
             self.assumed_shape = True
         if self.d == 1:
             self.size_var = spec.strip()
