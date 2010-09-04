@@ -34,7 +34,7 @@ code_output_dir = '.'
 include_output_dir = '.'
 fort_output_dir = '.'
 
-HEADER_STRING = '/* This source file automatically generated on ' + str(date.today()) + ' using \n   FortWrap wrapper generator */\n'
+HEADER_STRING = '/* This source file automatically generated on ' + str(date.today()) + ' using \n   FortWrap wrapper generator version ' + VERSION + ' */\n'
 
 func_pointer_converter = 'convert_c_funcpointer'
 
@@ -97,7 +97,7 @@ name_inclusions = set()
 proc_arg_exclusions = set()
 
 # 'INT' is for the hidden name length argument
-cpp_type_map = {'INTEGER':'int*', 'REAL':'float*', 'REAL*8':'double*', 'REAL(C_DOUBLE)':'double*','LOGICAL':'int*', 'CHARACTER':'char*', 'INT':'int'}
+cpp_type_map = {'INTEGER':'int*', 'REAL':'float*', 'REAL*8':'double*', 'LOGICAL':'int*', 'CHARACTER':'char*', 'INT':'int'}
 
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
 
@@ -1154,8 +1154,8 @@ def write_class(object):
         file.write('#endif // SWIG\n')
     file.write('\n')
     
-    write_cpp_dox_comments(file,object.comment)
     if not opts.global_orphans:
+        write_cpp_dox_comments(file,object.comment)
         file.write('class ' + object.name + ' {\n\n')
         file.write('public:\n')
     # Constructor:
