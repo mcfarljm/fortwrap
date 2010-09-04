@@ -100,6 +100,8 @@ o.process();
     or <tt>INTENT(OUT)</tt> and explicit length parameter are wrapped
     using C++ strings.</li>
 
+  <li>"Top-level" (a.k.a. global or non-module) procedures</li>
+
   <li> Name mangling support for both gfortran and g95 compilers
     
   <li> Where possible, pass by value is used in C++ (e.g. scalar
@@ -132,10 +134,6 @@ and calls the target routine.</p>
 supported:</p>
 
 <ul>
-  <li>"Top-level" (a.k.a. global or non-module) procedures are not
-    currently wrapped.  Note that FortWrap is geared towards wrapping
-    modern Fortran code, not legacy code.</li>
-
   <li><tt>ALLOCATABLE</tt> or <tt>POINTER</tt> arguments</li>
 
   <li> Assumed shape arrays (a declaration that looks like <tt>INTEGER

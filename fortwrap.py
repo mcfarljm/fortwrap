@@ -442,10 +442,13 @@ class DerivedType:
 
 
 def mangle_name(mod,func):
-    if compiler == 'g95':
-        return mod.lower() + "_MP_" + func.lower()
-    else: # gfortran
-        return '__' + mod.lower() + '_MOD_' + func.lower()
+    if mod:
+        if compiler == 'g95':
+            return mod.lower() + "_MP_" + func.lower()
+        else: # gfortran
+            return '__' + mod.lower() + '_MOD_' + func.lower()
+    else:
+        return func.lower() + '_'
 
 
 def get_proc(name):
@@ -582,11 +585,6 @@ def parse_proc(file,line,abstract=False):
     line = join_lines(line,file)
     proc_name = line.split('(')[0].split()[-1]
 
-    # If not in a module, print warning and return
-    if not current_module:
-        warning("Wrapping top-level (non-module) procedures not supported: " + proc_name)
-        return
-
     arg_string = line.split('(')[1].split(')')[0]
     if re.search(r'\S',arg_string):
         arg_list = arg_string.split(',')
@@ -710,6 +708,12 @@ def parse_comments(file,line):
     return com
     
 
+def initialize_protection():
+    global default_protection, private_names, public_names
+    default_protection = PUBLIC
+    private_names = set()
+    public_names = set()
+
 
 def parse_file(fname):
     global current_module, file_pointer, file_lines_list, dox_comments, default_protection, private_names, public_names
@@ -718,6 +722,9 @@ def parse_file(fname):
     except:
         error("Error opening file " + fname)
         return 0
+    current_module = ''
+    initialize_protection()
+    dox_comments = []
     file_lines_list = f.readlines()
     file_pointer = 0
     while True:
@@ -733,10 +740,8 @@ def parse_file(fname):
             current_module = line.split()[1]
             #print 'MOD:', current_module
             dox_comments = []
-            default_protection = PUBLIC
+            initialize_protection()
             module_proc_num = 1
-            private_names = set()
-            public_names = set()
         elif end_module_def.match(line):
             current_module = ''
         elif fort_type_def.match(line):
@@ -1528,6 +1533,9 @@ if __name__ == "__main__":
             error("No source files")
             sys.exit(3)
 
+        if len(not_wrapped) > 0:
+            warning("Some procedures not wrapped:\n " + '\n '.join(not_wrapped))
+
         # Prevent writing any files if there is nothing to wrap
         if len(procedures)==0:
             error("No procedures to wrap")
@@ -1545,9 +1553,6 @@ if __name__ == "__main__":
         write_misc_defs()
         write_matrix_class()
         write_fortran_wrapper()
-
-        if len(not_wrapped) > 0:
-            warning("Some procedures not wrapped:\n " + '\n '.join(not_wrapped))
 
         sys.exit(0)
 

@@ -1,5 +1,7 @@
 FortWrap 0.9.11 summary:
 
+- Added capability to wrap non-module procedures
+
 - Added exception handler to gracefully handle FortWrap internal
   errors
 
