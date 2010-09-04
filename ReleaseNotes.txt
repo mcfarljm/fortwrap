@@ -1,15 +1,14 @@
 FortWrap 0.9.11 summary:
-
-- Added capability to wrap non-module procedures
-
+- Added capability to wrap non-module (top-level) procedures
 - Added exception handler to gracefully handle FortWrap internal
   errors
-
-- Added error handling for COMPLEX types (which are not supported)
-
+- Improved error and warning messages
+- Fixes to handle data statements with * and KIND; however, wrapper
+  generation is currently only supported for REAL*8, REAL(KIND=4), and
+  REAL(KIND=8)
 - Fixed bug parsing assumed shape arrays
-
 - Added support for DOUBLE PRECISION statement
+- Added error handling for COMPLEX types (which are not supported)
 
 FortWrap 0.9.10 summary:
 - Fixed bug parsing functions with array return values
