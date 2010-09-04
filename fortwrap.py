@@ -57,15 +57,19 @@ fort_type_def = re.compile(r'\s*TYPE\s+[a-z]',re.IGNORECASE)
 fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(',re.IGNORECASE)
 fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)',re.IGNORECASE)
 fort_comment = re.compile('\s*!')
-fort_data_string = r'\s*(TYPE\s*\((?P<dt_spec>\S*)\)|INTEGER|REAL(\*8|\s*\(C_DOUBLE\)|\s*\(KIND=(?P<real_spec>[0-9]+)\s*\))?|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER|COMPLEX)'
-fort_data = re.compile(fort_data_string,re.IGNORECASE)
-fort_data_def = re.compile(fort_data_string + '.*::',re.IGNORECASE)
+
+# Data types
+primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(KIND\s*=\s*(?P<kind_spec>[0-9]+)\s*\)))?'
+primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
+fort_data_str = r'\s*(' + primitive_data_str + '|TYPE\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
+fort_data = re.compile(fort_data_str,re.IGNORECASE)
+fort_data_def = re.compile(fort_data_str + '.*::',re.IGNORECASE)
 # CLASS: not yet supported, but print warnings
 fort_class_data_def = re.compile(r'\s*CLASS\s*\(\S*\).*::',re.IGNORECASE)
+
 module_def = re.compile(r'\s*MODULE\s+\S',re.IGNORECASE)
 end_module_def = re.compile(r'\s*END\s+MODULE',re.IGNORECASE)
 # INT below is used to represent the hidden length arguments, passed by value
-primitive_data = re.compile('(INTEGER|REAL|LOGICAL|CHARACTER|INT|COMPLEX)',re.IGNORECASE)
 fort_dox_comments = re.compile(r'\s*!\>')
 fort_dox_inline = re.compile(r'\s*\w+.*!\<')
 result_name_def = re.compile(r'.*RESULT\s*\(\s*(\w+)\s*\)',re.IGNORECASE)
@@ -182,16 +186,21 @@ class DataType:
             if not DataType.complex_warning_written:
                 warning("COMPLEX data not supported")
                 DataType.complex_warning_written = True
+        primitive_data_match = primitive_data.match(type)
         # Handle real kinds
         if type.upper().startswith('REAL') and type.upper().find('KIND')>=0:
-            kind = type.split('=')[1].split(')')[0].strip()
+            kind = primitive_data_match.group('kind_spec')
             if kind=='4':
                 self.type = 'REAL'
             elif kind=='8':
                 self.type = 'REAL*8'
             else:
                 warning(type+" not supported")
-        if not primitive_data.match(type):
+        elif type.upper() == 'DOUBLE PRECISION':
+            self.type = 'REAL*8'
+        if not primitive_data_match and type!='INT':
+            # (INT is used to represent the hidden length arguments,
+            # passed by value)
             if type.upper().find('PROCEDURE') >= 0:
                 self.proc_pointer = True
                 # Matching broken b/c of "::'
@@ -282,6 +291,9 @@ class Argument:
         elif self.type.type.upper().find('KIND')>=0:
             # Supported KIND= types are translated in the DataType
             # constructor
+            return True
+        elif self.type.type.find('*')>=0 and self.type.type.upper()!='REAL*8':
+            # REAL*8 is translated
             return True
         elif self.type.type.upper()=='COMPLEX':
             return True

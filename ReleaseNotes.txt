@@ -5,6 +5,12 @@ FortWrap 0.9.11 summary:
 - Added exception handler to gracefully handle FortWrap internal
   errors
 
+- Added error handling for COMPLEX types (which are not supported)
+
+- Fixed bug parsing assumed shape arrays
+
+- Added support for DOUBLE PRECISION statement
+
 FortWrap 0.9.10 summary:
 - Fixed bug parsing functions with array return values
 - Fixed bug handling DIMENSION when it is followed by INTENT

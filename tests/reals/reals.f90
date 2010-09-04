@@ -11,9 +11,10 @@ CONTAINS
     y = a+b
   END FUNCTION add_floats
 
-  ! REAL(KIND=8) and REAL*8 get mapped to C doubles
+  ! REAL(KIND=8), REAL*8, and DOUBLE PRECISION get mapped to C doubles
   FUNCTION add_doubles(a,b) RESULT(y)
-    REAL(KIND=8), INTENT(in) :: a,b
+    REAL(KIND=8), INTENT(in) :: a
+    DOUBLE PRECISION, INTENT(in) :: b
     REAL*8 :: y
     y = a+b
   END FUNCTION add_doubles
