@@ -112,8 +112,9 @@ o.process();
     interfacing with two-dimensional Fortran arrays (matrices).  This
     class takes care to store data internally in Fortran order.</li>
 
-  <li> <b>Strings</b> with <tt>INTENT(IN)</tt> or <tt>INTENT(OUT)</tt> and
-    explicit length parameter are wrapped using C++ strings.</li>
+  <li> <b>Strings</b> with <tt>INTENT(IN)</tt> or <tt>INTENT(OUT)</tt>
+    and explicit length parameter are wrapped using C++ strings or
+    character arrays.</li>
 
   <li>"Top-level" (a.k.a. global or non-module) procedures are wrapped</li>
 

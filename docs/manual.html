@@ -98,7 +98,7 @@ o.process();
 
   <li> <a href="#details-strings"><b>Strings</b></a> with <tt>INTENT(IN)</tt>
     or <tt>INTENT(OUT)</tt> and explicit length parameter are wrapped
-    using C++ strings.</li>
+    using C++ strings or character arrays.</li>
 
   <li>"Top-level" (a.k.a. global or non-module) procedures are wrapped</li>
 
@@ -449,7 +449,6 @@ g95 -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/ObjectB
     <li><a href="#details-matrices">Matrices</a></li>
     <li><a href="#details-procpointers">Procedure Pointers</a></li>
     <li><a href="#details-strings">Strings</a></li>
-    <li><a href="#details-global">Top-level procedures</a></li>
     <li><a href="#details-comments">Doxygen comments</a></li>
   </ul>
 
@@ -571,10 +570,9 @@ o.foo(a,NULL,NULL,&d);
     arrays, although with this option FortWrap can not hide the array
     size arguments from the generated interface.</p>
 
-  <p>FortWrap does not currently support assumed size
-    (e.g. <tt>X(*)</tt>) or assumed shape (e.g. <tt>X(:)</tt>) array
-    arguments.  However, both of these cases can be handled by
-    creating a Fortran wrapper that FortWrap can wrap.  For
+  <p>FortWrap does not currently support assumed shape
+    (e.g. <tt>X(:)</tt>) array arguments.  However, these cases can be
+    handled by writing a Fortran wrapper that FortWrap can wrap.  For
     example, in order to handle a subroutine like:</p>
 
 <div class="code"><pre>
@@ -646,13 +644,6 @@ X(0,1) = 10;
     or named integer parameters can be used as the length parameter,
     provided that the declaration of the parameter name is somewhere
     in a file that FortWrap parsed.</p>
-
-  <h3><a name="details-global">Top-level (non-module) procedures</a></h3>
-
-  <p>FortWrap does not currently wrap so-called "top-level" or
-    "global" procedures (i.e. procedures that are not contained within
-    a module).  Note that FortWrap is geared towards wrapping modern
-    Fortran code, not legacy code.</p>
 
   <h3><a name="details-comments">Doxygen Comments</a></h3>
 
