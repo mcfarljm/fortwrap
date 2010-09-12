@@ -14,7 +14,7 @@ int main(void)
 
   int a=1, b=2;
 
-  // Demonstrate the function pointers can be stored in a derived type
+  // Demonstrate that function pointers can be stored in a derived type
   Container c(add, a,b);
   if (c.container_callf() != a + b)
     return 1;

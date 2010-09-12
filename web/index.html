@@ -48,10 +48,10 @@ CONTAINS
     ...
   END SUBROUTINE object_ctor
 
-  SUBROUTINE process(o)
+  SUBROUTINE foo(o)
     TYPE (Object) :: o
     ...
-  END SUBROUTINE process
+  END SUBROUTINE foo
   
 END MODULE m
   </pre></div>      
@@ -63,7 +63,7 @@ END MODULE m
 std::vector&lt;float&gt; x(10);
 ... // Define values for x
 Object o(&x); // C++ constructor: automatically calls object_ctor
-o.process();
+o.foo();
   </pre></div>
 
   <p>Additional examples can be found <a href="examples.html">here</a>

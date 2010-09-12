@@ -7,10 +7,62 @@
   <body>
     <h1>Examples</h1>
 
-    <p>Note that for simplicity, most of the examples below are not
+    <p>Note that for simplicity, some of the examples below are not
     shown with derived types.  When the first argument is not a
-    derived type, FortWrap wraps the routine as a static method of the
-    special "utility class" <tt>FortFuncs</tt>.</p>
+    derived type, FortWrap by default wraps the routine as a static
+    method of the special "utility class" <tt>FortFuncs</tt> (this can
+    be overriden with the <tt>--global</tt> option).</p>
+
+
+    <h2>Derived Types</h2>
+
+    <p>"<tt>ctor</tt>" procedures are wrapped as C++ constructors.
+      Multiple constructors are supported.  "<tt>dtor</tt>" procedures
+      are automatically called by the C++ destructor.  For
+      example:</p>
+
+ <div class="code"> <pre>
+MODULE m
+
+  TYPE Object
+    REAL, ALLOCATABLE :: x(:)
+  END TYPE Object
+
+CONTAINS
+
+  SUBROUTINE default_ctor(o,n)
+    TYPE(Object) :: o
+    INTEGER, INTENT(in) :: n
+    ALLOCATE(o%x(n))
+  END SUBROUTINE default_ctor
+
+  SUBROUTINE value_ctor(o,n,val)
+    TYPE(Object) :: o
+    INTEGER, INTENT(in) :: n
+    REAL, INTENT(in) :: val
+    ALLOCATE(o%x(n))
+    o%x = val
+  END SUBROUTINE value_ctor
+
+  SUBROUTINE object_dtor(o)
+    TYPE(Object) :: o
+    IF(ALLOCATED(o%x)) DEALLOCATE(o%x)
+  END SUBROUTINE object_dtor
+
+END MODULE m
+  </pre></div>
+
+    <p> will generate multiple constructors for the C++
+    class <tt>Object</tt>:</p>
+
+    <div class="targetlang"> <pre>
+Object(int n);
+Object(int n, float val);
+    </pre></div>
+
+    <p>The Fortran destructor <tt>object_dtor</tt> will automatically
+    be called by the C++ destructor.</p>
+    
 
     <h2>Arrays</h2>
 
