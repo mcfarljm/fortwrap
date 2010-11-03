@@ -343,7 +343,7 @@ g95 -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/ObjectB
 
   <p><tt>&lt;name&gt;</tt> may be the identifier for either a derived
     type or a procedure.  If a derived type is ignored, the
-    corresponding proxy class is not crated.  If a procedure is
+    corresponding proxy class is not created.  If a procedure is
     ignored, it is not included in the generated wrapper code.</p>
 
   <h3>Hide directive</h3>
@@ -559,12 +559,12 @@ o.foo(a,NULL,NULL,&d);
 
   <h3><a name="details-arrays">Arrays</a></h3>
 
-  <p>By default, arrays are wrapped to <tt>std::vector&lt;&gt;*</tt>,
-    with a <tt>const</tt> qualifier for <tt>INTENT(IN)</tt> arguments.
-    FortWrap will detect arguments that are used to define the Fortran
-    array size; these are hidden from the generated interface and are
-    calculated automatically based on the size of the vector container
-    that is passed in.</p>
+  <p>By default, one-dimensional arrays are wrapped
+    to <tt>std::vector&lt;&gt;*</tt>, with a <tt>const</tt> qualifier
+    for <tt>INTENT(IN)</tt> arguments.  FortWrap will detect arguments
+    that are used to define the Fortran array size; these are hidden
+    from the generated interface and are calculated automatically
+    based on the size of the vector container that is passed in.</p>
   
   <p>The option <tt>--c-arrays</tt> can be used to create C-style
     arrays, although with this option FortWrap can not hide the array
