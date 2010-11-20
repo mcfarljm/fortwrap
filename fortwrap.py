@@ -76,7 +76,7 @@ result_name_def = re.compile(r'.*RESULT\s*\(\s*(\w+)\s*\)',re.IGNORECASE)
 intent_in_def = re.compile(r'.*INTENT\s?\(\s*IN\s*\)',re.IGNORECASE)
 intent_out_def = re.compile(r'.*INTENT\s?\(\s*OUT\s*\)',re.IGNORECASE)
 fort_abstract_def = re.compile(r'\s*ABSTRACT\s+INTERFACE',re.IGNORECASE)
-integer_param_def = re.compile(r'\s+INTEGER,\s+PARAMETER\s+::\s+(.*)\s*=\s*([0-9]+)\s*',re.IGNORECASE)
+integer_param_def = re.compile(r'\s+INTEGER,\s+PARAMETER\s+::',re.IGNORECASE)
 # Regular expression to break up arguments.  This is needed to handle
 # multi-dimensional arrays (e.g. A(m,n)).  It uses a negative
 # lookahead assertion to exclude commas inside the array definition
@@ -789,8 +789,10 @@ def parse_file(fname):
                 for name in line.split('::')[1].split(','):
                     public_names.add(name.strip().lower())
         elif integer_param_def.match(line):
-            m = integer_param_def.match(line)
-            fort_integer_params[m.group(1)] = int(m.group(2))
+            line = join_lines(line,file)
+            for param in line.split('::')[1].split(','):
+                name,val = param.split('=')
+                fort_integer_params[name.strip()] = int( val.strip() )
     f.close()
     return 1
 

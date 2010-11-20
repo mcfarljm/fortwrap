@@ -2,7 +2,9 @@ MODULE strings
 
   IMPLICIT NONE
 
-  INTEGER, PARAMETER :: STRING_LEN=20
+  INTEGER, PARAMETER :: STRING_LEN=20, STRING_LEN2 = 20, &
+    STRING_LEN3 = 20
+  INTEGER, PARAMETER :: STRING_LEN4 = 20
 
 CONTAINS
 
@@ -11,9 +13,15 @@ CONTAINS
     s = 'String A'
   END SUBROUTINE string_literal_len
   
-  SUBROUTINE string_param_len(s)
-    CHARACTER(len=STRING_LEN), INTENT(out) :: s
-    s = 'String B'
+  SUBROUTINE string_param_len(s1,s2,s3, s4)
+    CHARACTER(len=STRING_LEN), INTENT(out) :: s1
+    CHARACTER(len=STRING_LEN2), INTENT(out) :: s2
+    CHARACTER(len=STRING_LEN3), INTENT(out) :: s3
+    CHARACTER(len=STRING_LEN4), INTENT(out) :: s4
+    s1 = 'String A'
+    s2 = 'String B'
+    s3 = 'String C'
+    s4 = 'String D'
   END SUBROUTINE string_param_len
 
   FUNCTION string_in_test(s) RESULT(t)

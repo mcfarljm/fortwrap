@@ -1,3 +1,8 @@
+FortWrap 0.9.12 summary:
+
+- Improved robustness for processing Fortran integer parameter
+  declarations, which might be used in character length definitions
+
 FortWrap 0.9.11 summary:
 - Added capability to wrap non-module (top-level) procedures
 - Added exception handler to gracefully handle FortWrap internal
