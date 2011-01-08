@@ -59,7 +59,7 @@ fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)',re.IGNORECASE)
 fort_comment = re.compile('\s*!')
 
 # Data types
-primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(KIND\s*=\s*(?P<kind_spec>[0-9]+)\s*\)))?'
+primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*KIND\s*=\s*(?P<kind_spec>[0-9]+)\s*\)))?'
 primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
 fort_data_str = r'\s*(' + primitive_data_str + '|TYPE\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
@@ -97,7 +97,7 @@ name_inclusions = set()
 proc_arg_exclusions = set()
 
 # 'INT' is for the hidden name length argument
-cpp_type_map = {'INTEGER':'int*', 'REAL':'float*', 'REAL*8':'double*', 'LOGICAL':'int*', 'CHARACTER':'char*', 'INT':'int'}
+cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*'}, 'REAL':{'':'float*', '4':'float*', '8':'double*'}, 'LOGICAL':{'':'int*'}, 'CHARACTER':{'':'char*'}, 'INT':{'':'int'}}
 
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
 
@@ -172,6 +172,7 @@ class DataType:
     def __init__(self,type,array=None,str_len=-1,hidden=False):
         global proc_pointer_used, stringh_used
         self.type = type
+        self.kind = ''
         self.array = array
         self.str_len = str_len
         self.proc_pointer = False
@@ -186,18 +187,23 @@ class DataType:
             if not DataType.complex_warning_written:
                 warning("COMPLEX data not supported")
                 DataType.complex_warning_written = True
+
         primitive_data_match = primitive_data.match(type)
-        # Handle real kinds
-        if type.upper().startswith('REAL') and type.upper().find('KIND')>=0:
-            kind = primitive_data_match.group('kind_spec')
-            if kind=='4':
+        if primitive_data_match:
+            if primitive_data_match.group('old_kind_spec'):
+                self.kind = primitive_data_match.group('old_kind_spec')
+                self.type = primitive_data_match.group(1).upper()
+            elif primitive_data_match.group('kind_spec'):
+                self.kind = primitive_data_match.group('kind_spec')
+                self.type = primitive_data_match.group(1).upper()
+
+            if type.upper() == 'DOUBLE PRECISION':
                 self.type = 'REAL'
-            elif kind=='8':
-                self.type = 'REAL*8'
-            else:
-                warning(type+" not supported")
-        elif type.upper() == 'DOUBLE PRECISION':
-            self.type = 'REAL*8'
+                self.kind = '8'
+
+            if not self.valid_primitive():
+                warning(self.type+'('+self.kind+') not supported')
+
         if not primitive_data_match and type!='INT':
             # (INT is used to represent the hidden length arguments,
             # passed by value)
@@ -219,6 +225,13 @@ class DataType:
         self.vec = self.array and self.array.vec
         self.matrix = self.array and self.array.matrix
 
+    # Determine whether type is a valid primitive type.  Intended to
+    # verify KIND specs.  Doesn't check string lengths.  Kind specs
+    # should already be stripped from type string and stored in kind
+    # variable
+    def valid_primitive(self):
+        type_map = cpp_type_map.get(self.type)
+        return type_map and self.kind in type_map
 
 class Argument:
     def __init__(self,name,pos,type=None,optional=False,intent='inout',comment=[]):
@@ -288,12 +301,7 @@ class Argument:
                 return False
             else:
                 return True
-        elif self.type.type.upper().find('KIND')>=0:
-            # Supported KIND= types are translated in the DataType
-            # constructor
-            return True
-        elif self.type.type.find('*')>=0 and self.type.type.upper()!='REAL*8':
-            # REAL*8 is translated
+        if self.type.type in cpp_type_map and not self.type.valid_primitive():
             return True
         elif self.type.type.upper()=='COMPLEX':
             return True
@@ -313,17 +321,17 @@ class Argument:
         """
         if self.type.dt:
             return 'ADDRESS'
-        elif self.type.type.upper() in cpp_type_map:
+        elif self.type.valid_primitive():
             if self.cpp_const():
                 prefix = 'const '
             else:
                 prefix = ''
-            return prefix + cpp_type_map[self.type.type.upper()]
+            return prefix + cpp_type_map[self.type.type.upper()][self.type.kind]
         elif self.type.proc_pointer and self.type.type in abstract_interfaces:
             #print "Proc pointer not implemented yet:", self.type.type
             proc = abstract_interfaces[self.type.type]
             if proc.retval:
-                string = cpp_type_map[proc.retval.type.type.upper()][:-1] + ' '
+                string = cpp_type_map[proc.retval.type.type.upper()][proc.retval.type.kind][:-1] + ' '
             else:
                 string = 'void '
             string = string + '(*' + self.name + ')'

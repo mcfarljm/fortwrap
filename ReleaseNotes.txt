@@ -1,5 +1,7 @@
 FortWrap 0.9.12 summary:
 
+- Added support for integer kinds 1,2,4
+
 - Added support for character length specification via '*':
   CHARACTER*20
 
