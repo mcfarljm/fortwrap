@@ -1,5 +1,8 @@
 FortWrap 0.9.12 summary:
 
+- Added support for character length specification via '*':
+  CHARACTER*20
+
 - Improved robustness for processing Fortran integer parameter
   declarations, which might be used in character length definitions
 

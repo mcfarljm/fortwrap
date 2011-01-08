@@ -12,6 +12,11 @@ CONTAINS
     CHARACTER(len=20), INTENT(out) :: s
     s = 'String A'
   END SUBROUTINE string_literal_len
+
+  SUBROUTINE string_literal_len2(s)
+    CHARACTER*20, INTENT(out) :: s
+    s = 'String A'
+  END SUBROUTINE string_literal_len2
   
   SUBROUTINE string_param_len(s1,s2,s3, s4)
     CHARACTER(len=STRING_LEN), INTENT(out) :: s1

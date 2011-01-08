@@ -558,16 +558,19 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
     char_len=-1
     if type_string.upper().startswith('CHARACTER'):
         type_string = 'CHARACTER'
-        try:
-            len_spec = m.group('char_spec').split('=')[1].split(')')[0].strip()
+        if m.group('old_kind_spec'):
+            char_len = int( m.group('old_kind_spec') )
+        else:
             try:
-                char_len = int(len_spec)
-            except ValueError:
-                # Check for string in Fortran parameter dictionary
-                char_len = fort_integer_params[len_spec]
-        except:
-            # char_len remains =-1
-            pass
+                len_spec = m.group('char_spec').split('=')[1].split(')')[0].strip()
+                try:
+                    char_len = int(len_spec)
+                except ValueError:
+                    # Check for string in Fortran parameter dictionary
+                    char_len = fort_integer_params[len_spec]
+            except:
+                # char_len remains =-1
+                pass
 
     # Get name(s)
     arg_string = line.split('::')[1].split('!')[0]
