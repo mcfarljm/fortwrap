@@ -1,12 +1,9 @@
 FortWrap 0.9.12 summary:
-
 - Added support for integer kinds 1,2,4
-
 - Added support for character length specification via '*':
   CHARACTER*20
-
 - Improved robustness for processing Fortran integer parameter
-  declarations, which might be used in character length definitions
+  declarations, which might be used in string length definitions
 
 FortWrap 0.9.11 summary:
 - Added capability to wrap non-module (top-level) procedures
