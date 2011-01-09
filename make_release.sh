@@ -34,3 +34,7 @@ echo "Make sure to update Version number in python source"
 
 # Create version-specific release notes file for upload
 cp ReleaseNotes.txt release-notes-$v.txt
+
+# Now create dir again and put tar and notes there for easy upload
+mkdir $dir
+mv $dir.tar.gz release-notes-$v.txt $dir

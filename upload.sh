@@ -7,4 +7,4 @@ fi
 
 echo $@
 
-scp $@ mcfarljm,fortwrap@frs.sourceforge.net:/home/frs/project/f/fo/fortwrap
+scp -r $@ mcfarljm,fortwrap@frs.sourceforge.net:/home/frs/project/f/fo/fortwrap
