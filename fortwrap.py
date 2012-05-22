@@ -20,13 +20,13 @@ import os
 import traceback
 
 
-VERSION = '0.9.12'
+VERSION = '0.9.13'
 
 
 # SETTINGS ==========================================
 
 # Default Fortran compiler.  Can be overridden by command option
-compiler = 'g95'
+compiler = 'gfortran'
 
 ERROR_FILE_NAME = 'FortWrap-error.txt'
 

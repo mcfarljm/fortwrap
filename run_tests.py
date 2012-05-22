@@ -2,8 +2,8 @@
 
 # Execute this script to run through all tests (wrap, build, run).
 # Check that the correct Fortran compiler is set in Tests.mk.  If
-# necessary, add "-c gfortran" to OPTS below (g95 name mangling is
-# currently the default)
+# necessary, add "-c gfortran" to OPTS below (gfortran name mangling
+# is currently the default)
 
 import sys
 import os

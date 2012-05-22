@@ -1,4 +1,4 @@
-FC = g95
+FC = gfortran
 CXXFLAGS = -I $(WRAP)
 FFLAGS = -I $(WRAP)
 
