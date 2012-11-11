@@ -4,7 +4,7 @@ MODULE strings
 
   INTEGER, PARAMETER :: STRING_LEN=20, STRING_LEN2 = 20, &
     STRING_LEN3 = 20
-  INTEGER, PARAMETER :: STRING_LEN4 = 20
+  integer, parameter :: STRING_LEN4 = 20
 
 CONTAINS
 
@@ -20,8 +20,8 @@ CONTAINS
   
   SUBROUTINE string_param_len(s1,s2,s3, s4)
     CHARACTER(len=STRING_LEN), INTENT(out) :: s1
-    CHARACTER(len=STRING_LEN2), INTENT(out) :: s2
-    CHARACTER(len=STRING_LEN3), INTENT(out) :: s3
+    character(len=STRING_LEN2), INTENT(out) :: s2
+    CHARACTER(LEN=STRING_LEN3), INTENT(out) :: s3
     CHARACTER(len=STRING_LEN4), INTENT(out) :: s4
     s1 = 'String A'
     s2 = 'String B'

@@ -190,12 +190,13 @@ class DataType:
 
         primitive_data_match = primitive_data.match(type)
         if primitive_data_match:
+            # This line must be outside the next two checks since they
+            # won't catch the case of just 'real'
+            self.type = primitive_data_match.group(1).upper()
             if primitive_data_match.group('old_kind_spec'):
                 self.kind = primitive_data_match.group('old_kind_spec')
-                self.type = primitive_data_match.group(1).upper()
             elif primitive_data_match.group('kind_spec'):
                 self.kind = primitive_data_match.group('kind_spec')
-                self.type = primitive_data_match.group(1).upper()
 
             if type.upper() == 'DOUBLE PRECISION':
                 self.type = 'REAL'
@@ -213,7 +214,7 @@ class DataType:
                 m = fort_data.match(type)
                 self.type = m.group('proc_spec')
                 proc_pointer_used = True
-            elif type.find('TYPE') >= 0:
+            elif type.upper().find('TYPE') >= 0:
                 self.dt = True
                 m = fort_data.match(type)
                 self.type = m.group('dt_spec')

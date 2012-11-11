@@ -19,4 +19,19 @@ CONTAINS
     y = a+b
   END FUNCTION add_doubles
 
+  ! Test lower case parsing:
+
+  function add_floats_lower(a,b) result(y)
+    real(kind=4), intent(in) :: a,b
+    real :: y
+    y = a+b
+  end function add_floats_lower
+
+  function add_doubles_lower(a,b) result(y)
+    real(kind=8), intent(in) :: a
+    double precision, intent(in) :: b
+    real*8 :: y
+    y = a+b
+  end function add_doubles_lower
+
 END MODULE reals

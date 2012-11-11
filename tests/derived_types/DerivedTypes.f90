@@ -4,9 +4,9 @@ MODULE DerivedTypes
     INTEGER :: x
   END TYPE ObjectA
 
-  TYPE ObjectB
-    TYPE (ObjectA) :: a
-  END TYPE ObjectB
+  type ObjectB
+    type (ObjectA) :: a
+  end type ObjectB
 
 CONTAINS
 
@@ -17,7 +17,7 @@ CONTAINS
   END SUBROUTINE a_ctor
 
   FUNCTION getx(a)
-    TYPE (ObjectA) :: a
+    type (ObjectA) :: a
     INTEGER :: getx
     getx = a%x
   END FUNCTION getx

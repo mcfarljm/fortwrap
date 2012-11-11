@@ -21,7 +21,7 @@ CONTAINS
 
   FUNCTION inner_prod(n,a,b) RESULT(y)
     INTEGER, INTENT(in) :: n
-    INTEGER, INTENT(in), DIMENSION(n) :: a, b
+    INTEGER, INTENT(in), dimension(n) :: a, b
     INTEGER :: y
     y = DOT_PRODUCT(a,b)
   END FUNCTION inner_prod

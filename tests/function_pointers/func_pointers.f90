@@ -28,7 +28,7 @@ MODULE func_pointers
     FUNCTION container_callf(c) RESULT(y)
       TYPE (Container) :: c
       INTEGER :: y
-      PROCEDURE(int_template), POINTER :: f
+      procedure(int_template), pointer :: f
       f => c%f
       y = f(c%a,c%b)
     END FUNCTION container_callf
