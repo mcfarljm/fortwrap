@@ -1,3 +1,6 @@
+FortWrap 0.9.14 summary:
+- Fixes for parsing lower case type definitions, such as 'real'
+
 FortWrap 0.9.13 summary:
 - Changed default compiler from g95 to gfortran
 
