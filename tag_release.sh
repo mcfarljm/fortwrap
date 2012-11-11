@@ -7,4 +7,4 @@ fi
 
 version=$1
 
-svn cp $SVNF/trunk $SVNF/tags/release-$version
+svn cp $SVNF/trunk $SVNF/tags/release-$version -m "Tagging version $version"
