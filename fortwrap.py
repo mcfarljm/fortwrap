@@ -153,7 +153,7 @@ class Array:
             self.assumed_shape = True
         if self.d == 1:
             self.size_var = spec.strip()
-        elif self.d == 2:
+        elif self.d == 2 and not opts.no_fmat:
             matrix_used = True
             self.size_var = tuple([v.strip() for v in spec.split(',')])
         elif self.d > 2:
@@ -165,7 +165,7 @@ class Array:
         # vec=vector: 1-d array
         self.vec = self.d==1 and not self.assumed_shape
         self.matrix = self.d==2 and not self.assumed_shape
-        self.fort_only = self.d>2 or self.assumed_shape
+        self.fort_only = self.assumed_shape
 
 class DataType:
     complex_warning_written = False
@@ -381,16 +381,15 @@ class Procedure:
                 break
         self.add_hidden_strlen_args()
         # Check for integer arguments that define array sizes:
-        if not opts.c_arrays:
-            for arg in self.args.itervalues():
-                if arg.type.type.upper()=='INTEGER' and arg.intent=='in':
-                    if not opts.c_arrays and self.get_vec_size_parent(arg.name):
-                        # The check on opts.c_arrays prevents writing
-                        # wrapper code that tries to extract the array
-                        # size from a C array
-                        arg.type.is_array_size = True
-                    elif self.get_matrix_size_parent(arg.name):
-                        arg.type.is_matrix_size = True
+        for arg in self.args.itervalues():
+            if arg.type.type.upper()=='INTEGER' and arg.intent=='in':
+                if not opts.c_arrays and self.get_vec_size_parent(arg.name):
+                    # The check on opts.c_arrays prevents writing
+                    # wrapper code that tries to extract the array
+                    # size from a C array
+                    arg.type.is_array_size = True
+                elif not opts.no_fmat and self.get_matrix_size_parent(arg.name):
+                    arg.type.is_matrix_size = True
             
     def has_args_past_pos(self,pos,bind):
         """Query whether or not the argument list continues past pos,
@@ -932,7 +931,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         if not call:
             # Prepend type spec
             if arg.type:
-                if not bind and arg.type.matrix:
+                if not bind and arg.type.matrix and not opts.no_fmat:
                     # Special matrix handling
                     if arg.intent=='in':
                         # const has to be handled separately for this case
@@ -985,7 +984,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         if call and arg.type.type=='CHARACTER' and not arg.intent=='inout':
             string = string + '_cp' # Pass pointer, which might be NULL
         # Special handling for matrix arguments
-        if call and arg.type.matrix:
+        if call and arg.type.matrix and not opts.no_fmat:
             if arg.optional:
                 string = string + ' ? ' + arg.name + '->data : NULL'
             else:
@@ -1243,7 +1242,7 @@ def get_native_includes(object):
         for argname,arg in proc.args.iteritems():
             if arg.native:
                 includes.add(arg.type.type)
-            if arg.type.matrix:
+            if arg.type.matrix and not opts.no_fmat:
                 includes.add(matrix_classname)
     return includes
 
@@ -1459,6 +1458,7 @@ class Options:
         print "--file-list=<f>\t: Read list of Fortran source files to parse from file <f>.\n\t\t  The format is a newline-separated list of filenames with full\n\t\t  or relative paths"
         print "-i <f>\t\t: Read interface configuration file <f>"
         print "--c-arrays\t: Wrap 1-D array arguments as C-sytle arrays instead of\n\t\t  C++ std::vector containers"
+        print "--no-fmat\t: Do not wrap 2-D array arguments with the FortranMatrix type"
         print "--dummy-class=<n>: Use <n> as the name of the dummy class used to wrap\n\t\t  non-method procedures"
         print "--global\t: Wrap non-method procedures as global functions instead of\n\t\t  static methods of a dummy class"
         # Not documenting, as this option could be dangerous, although
@@ -1469,7 +1469,7 @@ class Options:
     def parse_args(self):
         global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname, file_list
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','c-arrays','dummy-class=','global'])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','c-arrays','no-fmat','dummy-class=','global'])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
@@ -1482,6 +1482,7 @@ class Options:
         self.clean_code = False
         self.dry_run = False
         self.c_arrays = False
+        self.no_fmat = False
         self.global_orphans = False
         self.interface_file = ''
         if ('-h','') in opts or ('--help','') in opts:
@@ -1514,6 +1515,8 @@ class Options:
                 self.clean_code = True
             elif o=='--c-arrays':
                 self.c_arrays = True
+            elif o=='--no-fmat':
+                self.no_fmat = True
             elif o=='--dummy-class':
                 orphan_classname = a
             elif o=='--global':
