@@ -142,8 +142,6 @@ supported:</p>
 
   <li> Strings with <tt>INTENT(INOUT)</tt>.  Arrays of strings</li>
 
-  <li> Arrays of dimensionality greater than 2 are not supported.</li>
-
   <li> Arrays of a derived type.  These can be wrapped by creating a
     new derived type to contain an array of the derived type of
     interest.  Create an "append" function in Fortran that accepts
@@ -207,9 +205,9 @@ supported:</p>
     using the Makefile <tt>tests/Tests.mk</tt>, edit <tt>FC</tt> to
     specify your Fortran compiler.  When running FortWrap, use
     the <tt>-c</tt> option to specify the name mangling you want.
-    Currently the default wrapping is for g95, but this can be changed
-    by editing the <tt>compiler = 'g95'</tt> line near the beginning
-    of <tt>fortwarp.py</tt></p>
+    Currently the default wrapping is for gfortran, but this can be changed
+    by editing the <tt>compiler = 'gfortran'</tt> line near the beginning
+    of <tt>fortwrap.py</tt></p>
 
 
   <h2><a name="Walkthrough">Walkthrough</a></h2>
@@ -222,7 +220,7 @@ supported:</p>
     prompt):</p>
 
   <div class="code"><pre>
-[derived_types]$ ../../fortwrap.py -c g95 -g -d wrap
+[derived_types]$ ../../fortwrap.py -c gfortran -g -d wrap
   </pre></div>
 
   <p>This should not produce any output on the command line, which
@@ -232,10 +230,10 @@ supported:</p>
   <ul>
     <li>The <tt>-c</tt> option tells FortWrap which Fortran compiler
       will be used once you get around to compiling (running FortWrap
-      does not actually compile anything).  Substitute gfortran for
-      g95 if necessary.  A default Fortran compiler is specified near
+      does not actually compile anything).  Substitute g95 for
+      gfortran if necessary.  A default Fortran compiler is specified near
       the beginning of <tt>fortwrap.py</tt>, via the line <tt>compiler
-      = 'g95'</tt>; feel free to change this.</li>
+      = 'gfortran'</tt>; feel free to change this.</li>
     <li>The <tt>-g</tt> option stands for "glob" and tells FortWrap to
       try and wrap all files in the current directory that
       match <tt>*.f90</tt> or <tt>*.F90</tt>.  This is just for
@@ -274,11 +272,11 @@ FortWrap.h       ObjectA.cpp      ObjectB.cpp
 <div class="code"><pre>
 [derived_types]$ make
 g++ -I wrap   -c -o prog.o prog.cpp
-g95 -I wrap -o DerivedTypes.o -c DerivedTypes.f90
-g95 -I wrap -o wrap/CppWrappers.o -c wrap/CppWrappers.f90
+gfortran -I wrap -o DerivedTypes.o -c DerivedTypes.f90
+gfortran -I wrap -o wrap/CppWrappers.o -c wrap/CppWrappers.f90
 g++ -I wrap   -c -o wrap/ObjectA.o wrap/ObjectA.cpp
 g++ -I wrap   -c -o wrap/ObjectB.o wrap/ObjectB.cpp
-g95 -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/ObjectB.o -lstdc++
+gfortran -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/ObjectB.o -lstdc++
 </pre></div>
 
   <p>In this case Fortran is used as the linker language and the
@@ -382,11 +380,15 @@ g95 -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/ObjectB
       keyword in the target language.</li>
 
     <li>Use <tt>%apply int *INPUT { const int* };</tt> to create an
-      input typemap (repeat for <tt>double*</tt>).  This will only
-      catch scalars because FortWrap uses classes
-      (<tt>std::vector</tt> and <tt>FortranMatrix</tt>) for arrays (or
-      "<tt>[]</tt>" in the case of <tt>--c-arrays</tt>).  This is
-      compatible with the way optional arguments are treated.</li>
+      input typemap (repeat for <tt>double*</tt>).  With the default
+      options, this will only catch scalars because FortWrap uses
+      classes (<tt>std::vector</tt> and <tt>FortranMatrix</tt>) for
+      arrays (or "<tt>[]</tt>" in the case of <tt>--no-vector</tt>).
+      This is compatible with the way optional arguments are treated.
+      (Note that using <tt>--no-fmat</tt> or otherwise wrapping
+      higher-dimensional arrays will result in wrapping these arrays
+      with basic pointers, which may interfere with this type of Swig
+      typemap.)</li>
 
     <li>Use <tt>%apply int *OUTPUT { int* };</tt> to create an
       output typemap.  Note, however, that <tt>INTENT(OUT)</tt>
@@ -413,7 +415,7 @@ g95 -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/ObjectB
       own typemaps to handle the <tt>const</tt> and
       non-<tt>const</tt> <tt>vector</tt> arguments.  If you would
       rather have Swig handle C-style arrays, use FortWrap
-      with <tt>--c-arrays</tt></li>
+      with <tt>--no-vector</tt></li>
 
     <li>To wrap string outputs, you may <tt>%include
 	"<a href="http://www.swig.org/Doc1.3/Library.html#Library_nn14">std_string.i</a>"</tt>,
@@ -560,7 +562,7 @@ o.foo(a,NULL,NULL,&d);
     from the generated interface and are calculated automatically
     based on the size of the vector container that is passed in.</p>
   
-  <p>The option <tt>--c-arrays</tt> can be used to create C-style
+  <p>The option <tt>--no-vector</tt> can be used to create C-style
     arrays, although with this option FortWrap can not hide the array
     size arguments from the generated interface.</p>
 
@@ -591,7 +593,7 @@ END SUBROUTINE bad_sub_wrap
 
   <h3><a name="details-matrices">Matrices</a></h3>
 
-  <p>Matrices are wrapped using a special template
+  <p>By default, matrices are wrapped using a special template
     class <tt>FortranMatrix</tt>.  The header
     file <tt>FortranMatrix.h</tt> is created when needed.  Part of its
     purpose is to hide the fact that C and Fortran store
@@ -603,13 +605,18 @@ END SUBROUTINE bad_sub_wrap
     as needed.</p>
 
   <p>As an example usage, consider declaring an integer matrix with 4
-  rows and 2 columns, and setting the value of the 1st row and 2nd
-  column:</p>
+    rows and 2 columns, and setting the value of the 1st row and 2nd
+    column:</p>
 
 <div class="targetlang"><pre>
 FortranMatrix&lt;int&gt; X(4,2);
 X(0,1) = 10;
 </pre></div>
+
+  <p>The <tt>--no-fmat</tt> option can be used to prevent use of
+    the <tt>FortranMatrix</tt> wrapper class, in which case
+    two-dimensional arrays are wrapped as pointers.</p>
+
 
 
   <h3><a name="details-procpointers">Procedure Pointers</a></h3>

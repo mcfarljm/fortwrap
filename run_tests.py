@@ -13,9 +13,9 @@ import subprocess
 OPTS = '-g --clean -d wrap'     # FortWrap options
 cmd = os.path.normpath('../../fortwrap.py')
 
-custom_opts = { 'c_arrays' : OPTS + ' --c-arrays', 
+custom_opts = { 'c_arrays' : OPTS + ' --no-vector', 
                 'interface_file' : OPTS + ' -i interface.i',
-                'multidim_arrays' : OPTS + ' --c-arrays --no-fmat'}
+                'multidim_arrays' : OPTS + ' --no-vector --no-fmat'}
 
 # Tests for demonstration purposes only:
 excludes = [ 'comments' ]
