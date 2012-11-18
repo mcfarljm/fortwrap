@@ -142,7 +142,6 @@ def error(msg):
     sys.stderr.write('Error: ' + msg + '\n')
 
 class Array:
-    multi_d_warning_written = False
     def __init__(self,spec):
         global matrix_used
         # spec is the part inside the parentheses
@@ -156,10 +155,6 @@ class Array:
         elif self.d == 2 and not opts.no_fmat:
             matrix_used = True
             self.size_var = tuple([v.strip() for v in spec.split(',')])
-        elif self.d > 2:
-            if not Array.multi_d_warning_written:
-                warning("FortWrap does not wrap arrays with dimension > 2")
-                Array.multi_d_warning_written = True
 
         # Properties queried by the wrapper generator:
         # vec=vector: 1-d array
