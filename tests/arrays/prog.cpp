@@ -31,7 +31,7 @@ int main(void)
     return 4;
 
   // Test assumed size
-  if (FortFuncs::inner_prod(&a,&b) != 8)
+  if (FortFuncs::inner_prod_2(3,&a,&b) != 8)
     return 5;
   
   return 0;
