@@ -142,6 +142,8 @@ def error(msg):
     sys.stderr.write('Error: ' + msg + '\n')
 
 class Array:
+    two_d_warning_written = False
+    multi_d_warning_written = False
     def __init__(self,spec):
         global matrix_used
         # spec is the part inside the parentheses
@@ -155,6 +157,15 @@ class Array:
         elif self.d == 2 and not opts.no_fmat:
             matrix_used = True
             self.size_var = tuple([v.strip() for v in spec.split(',')])
+
+        if self.d==2 and opts.no_fmat:
+            if not Array.two_d_warning_written:
+                warning("Wrapping 2-D arrays as pointers can lead to ambiguity if writing SWIG typemaps for pointers.  This can be avoided by not using --no-fmat")
+                Array.two_d_warning_written = True
+        if self.d>2:
+            if not Array.multi_d_warning_written:
+                warning("Wrapping higher-dimensional arrays as pointers can lead to ambiguity if writing SWIG typemaps for pointers.")
+                Array.multi_d_warning_written = True
 
         # Properties queried by the wrapper generator:
         # vec=vector: 1-d array

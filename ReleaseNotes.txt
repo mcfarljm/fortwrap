@@ -1,3 +1,8 @@
+FortWrap 0.9.15 summary:
+- Added support for higher dimensional (>2) arrays
+- Added option to turn off use of FortranMatrix wrapper class
+- Changed --c-arrays option to --no-vector
+
 FortWrap 0.9.14 summary:
 - Fixes for parsing lower case type definitions, such as 'real'
 
