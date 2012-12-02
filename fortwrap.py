@@ -958,8 +958,10 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                             string = string + 'const '
                         string = string + 'std::vector<' + remove_const(arg.cpp_type()[:-1]) + '>* '
                     else:
-                        # Chop of the * and add [] after the argname below
-                        string = string + arg.cpp_type()[:-1] + ' '
+                        string = string + arg.cpp_type() + ' '
+                        if not opts.array_as_ptr:
+                            # Chop of the * and add [] after the argname below
+                            string = string[:-2] + ' '
                 elif arg.type.type=='CHARACTER' and not bind and not arg.intent=='in':
                     string = string + 'std::string *' # pass by ref not compat with optional
                 else:
@@ -976,7 +978,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         elif call and arg.type.proc_pointer:
             # Pass converted Fortran function pointer
             string = string + arg.name + ' ? &FORT_' + arg.name + ' : NULL'
-        elif (bind or opts.no_vector) and not call and not arg.type.dt and arg.type.vec:
+        elif (bind or opts.no_vector) and not call and not arg.type.dt and arg.type.vec and not opts.array_as_ptr:
             string = string + arg.name + '[]'
         elif (not opts.no_vector) and call and not arg.type.dt and arg.type.vec:
             if arg.optional:
@@ -1147,6 +1149,9 @@ def write_class(object):
     file.write(HEADER_STRING + '\n')
     file.write('#ifndef ' + object.name.upper() + '_H_\n')
     file.write('#define ' + object.name.upper() + '_H_\n\n')
+    if SWIG:
+        # Needs to be before the include's in the case of swig -includeall
+        file.write('\n#ifndef SWIG // Protect declarations from SWIG')
     file.write('#include <stdlib.h>\n') # Needed for NULL
     file.write('#include <string>\n') # Needed for special string handling
     if not opts.no_vector:
@@ -1158,8 +1163,6 @@ def write_class(object):
     for include in includes:
         file.write('#include "' + include + '.h"\n')
     # C Bindings
-    if SWIG:
-        file.write('\n#ifndef SWIG // Protect declarations from SWIG')
     file.write('\nextern "C" {\n')
     # Write bindings for allocate/deallocate funcs
     if object.name!=orphan_classname:
@@ -1463,8 +1466,9 @@ class Options:
         print "-d <dir>\t: Output generated wrapper code to <dir>"
         print "--file-list=<f>\t: Read list of Fortran source files to parse from file <f>.\n\t\t  The format is a newline-separated list of filenames with full\n\t\t  or relative paths"
         print "-i <f>\t\t: Read interface configuration file <f>"
-        print "--no-vector\t: Wrap 1-D array arguments as C-sytle arrays instead of\n\t\t  C++ std::vector containers"
+        print "--no-vector\t: Wrap 1-D array arguments as C-style arrays ('[]') instead of\n\t\t  C++ std::vector containers"
         print "--no-fmat\t: Do not wrap 2-D array arguments with the FortranMatrix type"
+        print "--array-as-ptr\t: Wrap 1-D arrays with '*' instead of '[]'. Implies --no-vector"
         print "--dummy-class=<n>: Use <n> as the name of the dummy class used to wrap\n\t\t  non-method procedures"
         print "--global\t: Wrap non-method procedures as global functions instead of\n\t\t  static methods of a dummy class"
         # Not documenting, as this option could be dangerous, although
@@ -1475,7 +1479,7 @@ class Options:
     def parse_args(self):
         global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname, file_list
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','dummy-class=','global'])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','array-as-ptr','dummy-class=','global'])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
@@ -1489,6 +1493,7 @@ class Options:
         self.dry_run = False
         self.no_vector = False
         self.no_fmat = False
+        self.array_as_ptr = False
         self.global_orphans = False
         self.interface_file = ''
         if ('-h','') in opts or ('--help','') in opts:
@@ -1523,6 +1528,9 @@ class Options:
                 self.no_vector = True
             elif o=='--no-fmat':
                 self.no_fmat = True
+            elif o=='--array-as-ptr':
+                self.array_as_ptr = True
+                self.no_vector = True
             elif o=='--dummy-class':
                 orphan_classname = a
             elif o=='--global':
