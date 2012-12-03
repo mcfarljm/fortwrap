@@ -1,3 +1,9 @@
+FortWrap 0.9.16 summary:
+- New option --array-as-ptr for wrapping 1-D arrays with '*' instead
+  of '[]'
+- Minor tweak to support re-wrapping with swig -includeall
+- Fix for return codes
+
 FortWrap 0.9.15 summary:
 - Added support for higher dimensional (>2) arrays
 - Added option to turn off use of FortranMatrix wrapper class
