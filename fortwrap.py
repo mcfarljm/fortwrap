@@ -1604,7 +1604,7 @@ if __name__ == "__main__":
 
     except SystemExit:
         # Raised by sys.exit
-        pass
+        raise
 
     except:
         internal_error()
