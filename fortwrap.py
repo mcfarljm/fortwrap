@@ -20,7 +20,7 @@ import os
 import traceback
 
 
-VERSION = '0.9.16'
+VERSION = '0.9.17'
 
 
 # SETTINGS ==========================================
@@ -1152,7 +1152,7 @@ def write_class(object):
     if SWIG:
         # Needs to be before the include's in the case of swig -includeall
         file.write('\n#ifndef SWIG // Protect declarations from SWIG\n')
-    file.write('#include <stdlib.h>\n') # Needed for NULL
+    file.write('#include <cstdlib>\n') # Needed for NULL
     file.write('#include <string>\n') # Needed for special string handling
     if not opts.no_vector:
         file.write('#include <vector>\n')
@@ -1298,7 +1298,7 @@ def write_matrix_class():
     f.write(HEADER_STRING + '\n')
     f.write('#ifndef ' + matrix_classname.upper() + '_H_\n')
     f.write('#define ' + matrix_classname.upper() + '_H_\n\n')
-    f.write('#include <stdlib.h>\n#include <cassert>\n\n')
+    f.write('#include <cstdlib>\n#include <cassert>\n\n')
     write_cpp_dox_comments(f, comments)
     f.write('template <class T>\nclass ' + matrix_classname + '{\n\n')
     f.write('  int nrows, ncols;\n\npublic:\n\n  ')
