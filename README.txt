@@ -41,7 +41,7 @@ run_tests.py to execute all tests.  For each test, the script will
 change to the individual test directory, execute fortwrap.py to
 generate wrapper code, execute make to compile and link a simple test
 program, and finally run the test program.  See the note in this
-script about adding "-c gfortran" if you are using gfortran.
+script about adding "-c g95" if you are using g95.
 
 To manually run a test, first make sure the compiler specified in
 tests/Tests.mk is valid.  Then change to a test directory, for
@@ -65,10 +65,6 @@ intended to wrap legacy code and should not be used with Fortran 77
 code.  For more details regarding the Fortran constructs that FortWrap
 is set up to wrap, refer to the html documentation and the tests
 directory.
-
-The command line options are fairly new, so haven't been tested
-extensively and may be subject to change in the future, but I believe
-they should work as described by "fortwrap.py -h".
 
 
 CONTACT
