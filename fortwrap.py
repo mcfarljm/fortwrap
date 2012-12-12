@@ -1151,7 +1151,7 @@ def write_class(object):
     file.write('#define ' + object.name.upper() + '_H_\n\n')
     if SWIG:
         # Needs to be before the include's in the case of swig -includeall
-        file.write('\n#ifndef SWIG // Protect declarations from SWIG')
+        file.write('\n#ifndef SWIG // Protect declarations from SWIG\n')
     file.write('#include <stdlib.h>\n') # Needed for NULL
     file.write('#include <string>\n') # Needed for special string handling
     if not opts.no_vector:
