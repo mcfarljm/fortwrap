@@ -1282,7 +1282,7 @@ def get_native_includes(object):
     return includes
 
 def write_global_header_file():
-    f = open(include_output_dir+'/' + 'FortWrap.h','w')
+    f = open(include_output_dir+'/' + opts.main_header + '.h','w')
     f.write(HEADER_STRING + '\n')
     for objname,obj in objects.iteritems():
         f.write('#include "' + objname + '.h"\n')
