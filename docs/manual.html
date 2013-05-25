@@ -320,6 +320,8 @@ gfortran -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/Ob
     <li><tt>%hide &lt;procedure&gt; &lt;argument&gt;</tt></li>
     <li><tt>%include &lt;name&gt;</tt></li>
     <li><tt>%rename &lt;old&gt; &lt;new&gt;</tt></li>
+    <li><tt>%ctor &lt;regex&gt;</tt></li>
+    <li><tt>%dtor &lt;regex&gt;</tt></li>
   </ul>
 
   <h3>Ignore directive</h3>
@@ -359,6 +361,14 @@ gfortran -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/Ob
     procedure.  The name <tt>&lt;old&gt;</tt> found in the Fortran
     source is replaced by the name <tt>&lt;new&gt;</tt> in the
     generated wrapper code.</p>
+
+  <h3>Constructor and destructor directives</h3>
+  
+  <p>These directives allow custom regular expressions to be used for
+    determining which procedures to be treated as constructors and
+    destructors.  The search will be case insensitive, and the
+    Python <tt>re match</tt> method is used, meaning the regular
+    expression must match the beginning of the name</p>
 
 
 <h2><a name="Swig">Swig tips (or how to use with other languages)</a></h2>
@@ -480,7 +490,10 @@ gfortran -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/Ob
     contains the string "<tt>_dtor</tt>", it is treated as a
     destructor and automatically called from the C++ destructor.
     These types of methods are useful for derived types that make use
-    of dynamically allocated memory.</p>
+    of dynamically allocated memory.  The regular expressions used to
+    identify constructors and destructors can be modified by using
+    the <tt>%ctor</tt> and <tt>%dtor</tt> directives in the
+    configuration file.</p>
     
 
   <h3><a name="details-opt">Optional Arguments</a></h3>

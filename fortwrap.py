@@ -86,6 +86,10 @@ integer_param_def = re.compile(r'\s+INTEGER,\s+PARAMETER\s+::',re.IGNORECASE)
 arg_splitter = re.compile(',(?![^(]*\))')
 dimension_def = re.compile(r'DIMENSION\s*\(\s*([^(]+)\s*\)',re.IGNORECASE)
 
+# Constructor and desctructor methods (these regexes are configurable):
+ctor_def = re.compile('.*_ctor', re.IGNORECASE)
+dtor_def = re.compile('.*_dtor', re.IGNORECASE)
+
 # ===================================================
 
 
@@ -364,6 +368,7 @@ class Procedure:
         self.name = name
         self.retval = retval
         self.args = args # By name
+        # TODO: this is a dict but using it as if it is sorted:
         self.args_by_pos = dict()
         self.nargs = len(args)
         self.mod = current_module
@@ -374,11 +379,10 @@ class Procedure:
         self.dtor = False
         self.in_orphan_class = False # Set in associate_procedures
         if self.method:
-            if name.find('_ctor')>=0:
+            if ctor_def.match(name):
                 self.ctor = True
-            elif name.find('_dtor')>=0:
-                if self.nargs==1:
-                    self.dtor = True
+            elif dtor_def.match(name) and self.valid_dtor():
+                self.dtor = True
         # Check for exclusion:
         for arg in args.itervalues():
             if (name.lower(),arg.name.lower()) in proc_arg_exclusions:
@@ -461,6 +465,14 @@ class Procedure:
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
                 return True
         return False
+
+    def valid_dtor(self):
+        """Whether the procedure is a valid dtor.  Mainly this just
+        checks that there are no required arguments"""
+        for arg in self.args.itervalues():
+            if arg.pos > 1 and not arg.optional:
+                return False
+        return True
         
         
 class DerivedType:
@@ -1159,6 +1171,10 @@ def write_destructor(file,object):
     for proc in object.procs:
         if proc.dtor:
             file.write('  ' + 'if (initialized) ' + mangle_name(proc.mod,proc.name) + '(data_ptr')
+            # Add NULL for any optional arguments (only optional
+            # arguments are allowed in the destructor call)
+            for i in xrange(proc.nargs-1):
+                file.write(', NULL')
             file.write('); // Fortran Destructor\n')
     # Deallocate Fortran derived type
     file.write('  ' + mangle_name(fort_wrap_file,'deallocate_'+object.name) + '(data_ptr); // Deallocate Fortran derived type\n')
@@ -1440,7 +1456,7 @@ class ConfigurationFile:
             self.process()
 
     def process(self):
-        global name_exclusions, name_inclusions, name_substitutions
+        global name_exclusions, name_inclusions, name_substitutions, ctor_def, dtor_def
         for line_num,line in enumerate(self.f):
             if not line.startswith('%'):
                 continue
@@ -1471,6 +1487,10 @@ class ConfigurationFile:
                 else:
                     self.bad_decl(line_num+1)
                     continue
+            elif words[0] == '%ctor':
+                ctor_def = re.compile(line.strip().split('%ctor ')[1], re.IGNORECASE)
+            elif words[0] == '%dtor':
+                dtor_def = re.compile(line.strip().split('%dtor ')[1], re.IGNORECASE)
                 
     def bad_decl(self,line_num):
         error("%s, line %i <-- bad declaration" % (self.fname, line_num))
