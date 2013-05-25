@@ -65,6 +65,7 @@ primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
 fort_data_str = r'\s*(' + primitive_data_str + '|TYPE\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_str + '.*::',re.IGNORECASE)
+optional_def = re.compile('OPTIONAL.*::', re.IGNORECASE)
 # CLASS: not yet supported, but print warnings
 fort_class_data_def = re.compile(r'\s*CLASS\s*\(\S*\).*::',re.IGNORECASE)
 
@@ -560,8 +561,8 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
 
     m = fort_data.match(line)
 
-    # Attributes
-    optional = line.upper().find('OPTIONAL')>=0
+    # Attributes.
+    optional = True if optional_def.search(line) else False
     # Check for DIMENSION statement
     dimension = dimension_def.search(line)
     intent = 'inout'
@@ -632,7 +633,7 @@ def parse_proc(file,line,abstract=False):
     args = dict()
     #print arg_list
     retval = None
-    if line.upper().find('FUNCTION') >= 0:
+    if re.match('^\s*function', line, re.IGNORECASE):
         m = result_name_def.match(line)
         if m:
             retval = Argument(m.group(1),0)
