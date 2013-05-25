@@ -1498,6 +1498,8 @@ class Options:
         print "--dummy-class=<n>: Use <n> as the name of the dummy class used to wrap\n\t\t  non-method procedures"
         print "--global\t: Wrap non-method procedures as global functions instead of\n\t\t  static methods of a dummy class"
         print "--no-orphans\t: Do not by default wrap non-method procedures.  They can still\n\t\t  be wrapped by using %include directives"
+        print "--no-W-not-wrapped: Do not warn about procedures that were not wrapped"
+        print "--main-header=<n>: Use <n> as name of the main header file (default FortWrap.h)"
         # Not documenting, as this option could be dangerous, although
         # it is protected from "-d .":
         #print "--clean\t\t: Remove all wrapper-related files from wrapper code directory\n\t\t  before generating new code.  Requires -d.  Warning: this\n\t\t  deletes files.  Use with caution and assume it will delete\n\t\t  everything in the wrapper directory"
@@ -1506,7 +1508,7 @@ class Options:
     def parse_args(self):
         global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname, file_list
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','array-as-ptr','dummy-class=','global','no-orphans'])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','array-as-ptr','dummy-class=','global','no-orphans','no-W-not-wrapped','main-header='])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
@@ -1524,6 +1526,8 @@ class Options:
         self.global_orphans = False
         self.interface_file = ''
         self.no_orphans = False
+        self.warn_not_wrapped = True
+        self.main_header = 'FortWrap'
 
         if ('-h','') in opts or ('--help','') in opts:
             self.usage(0)
@@ -1566,6 +1570,10 @@ class Options:
                 self.global_orphans = True
             elif o=='--no-orphans':
                 self.no_orphans = True
+            elif o=='--no-W-not-wrapped':
+                self.warn_not_wrapped = False
+            elif o=='--main-header':
+                self.main_header = a.split('.h')[0]
 
         if self.clean_code and code_output_dir=='.':
             error("Cleaning wrapper code output dir requires -d")
@@ -1610,7 +1618,7 @@ if __name__ == "__main__":
             error("No source files")
             sys.exit(3)
 
-        if len(not_wrapped) > 0:
+        if opts.warn_not_wrapped and len(not_wrapped) > 0:
             warning("Some procedures not wrapped:\n " + '\n '.join(not_wrapped))
 
         # Prevent writing any files if there is nothing to wrap

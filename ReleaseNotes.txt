@@ -1,5 +1,7 @@
 FortWrap 1.0 summary:
 - Added option to disable wrapping non-method procedures
+- Added option to suppress warnings for procedures not wrapped
+- Added option to change name of main header file
 - Added support for KIND spec's without KIND keyword (e.g. REAL(8)).
   Also added support for C_INT, C_FLOAT, and C_DOUBLE
 - Better handling of ABSTRACT INTERFACE
