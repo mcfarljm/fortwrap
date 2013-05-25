@@ -6,7 +6,8 @@ CONTAINS
 
   ! REAL(KIND=4) and REAL get mapped to C floats
   FUNCTION add_floats(a,b) RESULT(y)
-    REAL(KIND=4), INTENT(in) :: a,b
+    REAL(KIND=4), INTENT(in) :: a
+    REAL(4), INTENT(in) :: b
     REAL :: y
     y = a+b
   END FUNCTION add_floats

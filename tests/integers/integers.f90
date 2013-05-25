@@ -5,7 +5,8 @@ MODULE integers
 CONTAINS
 
   FUNCTION add_ints1(a,b) RESULT(y)
-    INTEGER ( KIND = 1 ) , INTENT(in) :: a,b
+    INTEGER ( KIND = 1 ) , INTENT(in) :: a
+    INTEGER(1), INTENT(in) :: b
     INTEGER*1 :: y
     y = a+b
   END FUNCTION add_ints1
@@ -26,7 +27,8 @@ CONTAINS
   ! Test lower case parsing:
 
   function add_ints1_lower(a,b) result(y)
-    integer ( kind = 1 ) , intent(in) :: a,b
+    integer ( kind = 1 ) , intent(in) :: a
+    integer ( 1), intent(in) :: b
     integer*1 :: y
     y = a+b
   end function add_ints1_lower

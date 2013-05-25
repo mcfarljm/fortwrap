@@ -1,4 +1,6 @@
 FortWrap 1.0 summary:
+- Added support for KIND spec's without KIND keyword (e.g. REAL(8)).
+  Also added support for C_INT, C_FLOAT, and C_DOUBLE
 - Better handling of ABSTRACT INTERFACE
 
 FortWrap 0.9.17 summary:

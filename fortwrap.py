@@ -60,7 +60,7 @@ fort_end_interface = re.compile(r'\s*END\s*INTERFACE', re.IGNORECASE)
 fort_comment = re.compile('\s*!')
 
 # Data types
-primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*KIND\s*=\s*(?P<kind_spec>[0-9]+)\s*\)))?'
+primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*(KIND\s*=)?\s*(?P<kind_spec>\w+)\s*\)))?'
 primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
 fort_data_str = r'\s*(' + primitive_data_str + '|TYPE\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
@@ -98,7 +98,11 @@ name_inclusions = set()
 proc_arg_exclusions = set()
 
 # 'INT' is for the hidden name length argument
-cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*'}, 'REAL':{'':'float*', '4':'float*', '8':'double*'}, 'LOGICAL':{'':'int*'}, 'CHARACTER':{'':'char*'}, 'INT':{'':'int'}}
+cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*','C_INT':'int*'}, 
+                'REAL':{'':'float*', '4':'float*', '8':'double*', 'C_DOUBLE':'double*', 'C_FLOAT':'float*'},
+                'LOGICAL':{'':'int*'}, 
+                'CHARACTER':{'':'char*'}, 
+                'INT':{'':'int'}}
 
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
 
@@ -239,7 +243,7 @@ class DataType:
     # variable
     def valid_primitive(self):
         type_map = cpp_type_map.get(self.type)
-        return type_map and self.kind in type_map
+        return type_map and self.kind.upper() in type_map
 
 class Argument:
     def __init__(self,name,pos,type=None,optional=False,intent='inout',comment=[]):
@@ -554,10 +558,7 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
 
     line = join_lines(line,file)
 
-    # Get type string [e.g. INTEGER, TYPE(ErrorType),
-    # PROCEDURE(template), POINTER]
     m = fort_data.match(line)
-    type_string = m.group(1)
 
     # Attributes
     optional = line.upper().find('OPTIONAL')>=0
@@ -568,6 +569,10 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
         intent = 'in'
     elif intent_out_def.match(line):
         intent = 'out'
+
+    # Get type string [e.g. INTEGER, TYPE(ErrorType),
+    # PROCEDURE(template), POINTER]
+    type_string = m.group(1)
 
     # Process character length
     char_len=-1
@@ -671,7 +676,7 @@ def parse_proc(file,line,abstract=False):
             # defined.  Make sure the Fortran source file that
             # contains those definitions is parsed first
             invalid = True
-        if arg.type.dt and arg.pos==1:
+        if arg.pos==1 and arg.type.dt:
             method = True
     if retval:
         if retval.type:
