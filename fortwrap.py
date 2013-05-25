@@ -53,9 +53,10 @@ SWIG = True  # Whether or not to include preprocessor defs that will
 
 # REGULAR EXPRESSIONS ===============================
 
-fort_type_def = re.compile(r'\s*TYPE\s+[a-z]',re.IGNORECASE)
-fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(',re.IGNORECASE)
-fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)',re.IGNORECASE)
+fort_type_def = re.compile(r'\s*TYPE\s+[a-zA-Z]', re.IGNORECASE)
+fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(', re.IGNORECASE)
+fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)', re.IGNORECASE)
+fort_end_interface = re.compile(r'\s*END\s*INTERFACE', re.IGNORECASE)
 fort_comment = re.compile('\s*!')
 
 # Data types
@@ -695,6 +696,25 @@ def parse_proc(file,line,abstract=False):
             else:
                 abstract_interfaces[proc_name] = proc
 
+def parse_abstract_interface(file,line):
+    global dox_comments
+    while True:
+        line = readline(file)
+        if line=='':
+            print "Unexpected end of file in abstract interface"
+            return
+        elif fort_dox_comments.match(line):
+            # Grab comments and ignore them
+            dox_comments = parse_comments(file,line)
+            continue
+        elif fort_end_interface.match(line):
+            break
+        elif fort_comment.match(line):
+            continue
+        elif fort_proc_def.match(line):
+            parse_proc(f,line,abstract=True)
+            dox_comments = []
+
 def parse_type(file,line):
     typename = line.split()[1]
     add_type(typename)
@@ -785,13 +805,7 @@ def parse_file(fname):
             parse_proc(f,line)
             dox_comments = []
         elif fort_abstract_def.match(line):
-            line = readline(f)
-            if fort_dox_comments.match(line):
-                # Handle comment if it is inside the ABSTRACT
-                # INTERFACE block
-                dox_comments = parse_comments(file,line)
-                line = readline(f)
-            parse_proc(f,line,abstract=True)
+            parse_abstract_interface(f,line)
             dox_comments = []
         elif line.strip().upper().startswith('PRIVATE'):
             if line.find('::')==-1:

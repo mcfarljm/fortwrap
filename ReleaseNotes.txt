@@ -1,3 +1,6 @@
+FortWrap 1.0 summary:
+- Better handling of ABSTRACT INTERFACE
+
 FortWrap 0.9.17 summary:
 - Minor fix for newline before #include <stdlib.h>
 - Changing <stdlib.h> to <cstdlib>
