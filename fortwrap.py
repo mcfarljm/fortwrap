@@ -66,6 +66,7 @@ fort_data_str = r'\s*(' + primitive_data_str + '|TYPE\s*\((?P<dt_spec>\S*)\)|PRO
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_str + '.*::',re.IGNORECASE)
 optional_def = re.compile('OPTIONAL.*::', re.IGNORECASE)
+byval_def = re.compile('VALUE.*::', re.IGNORECASE)
 # CLASS: not yet supported, but print warnings
 fort_class_data_def = re.compile(r'\s*CLASS\s*\(\S*\).*::',re.IGNORECASE)
 
@@ -247,13 +248,14 @@ class DataType:
         return type_map and self.kind.upper() in type_map
 
 class Argument:
-    def __init__(self,name,pos,type=None,optional=False,intent='inout',comment=[]):
+    def __init__(self,name,pos,type=None,optional=False,intent='inout',byval=False,comment=[]):
         self.name = name
         self.pos = pos
         self.type = type
         self.comment = []
         self.optional=optional
         self.intent = intent
+        self.byval = byval
         self.native = False # Will get defined in
                             # associate_procedures; identifies derived
                             # type arguments that will get passed in
@@ -317,6 +319,9 @@ class Argument:
         if self.type.type in cpp_type_map and not self.type.valid_primitive():
             return True
         elif self.type.type.upper()=='COMPLEX':
+            return True
+        if self.byval and not self.type.type.upper()=='C_PTR':
+            # This could be supported for other cases if needed
             return True
         return False
     
@@ -563,6 +568,7 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
 
     # Attributes.
     optional = True if optional_def.search(line) else False
+    byval = True if byval_def.search(line) else False
     # Check for DIMENSION statement
     dimension = dimension_def.search(line)
     intent = 'inout'
@@ -607,7 +613,7 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
         type = DataType(type_string,array,char_len)
         if name in arg_list:
             count += 1
-            args[name] = Argument(name,arg_list.index(name)+1,type,optional,intent,comment=comments)
+            args[name] = Argument(name,arg_list.index(name)+1,type,optional,intent,byval,comment=comments)
         elif retval and name==retval.name:
             retval.set_type(type)
     return count
@@ -937,7 +943,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # list (the native property isn't assigned until
         # associate_procedures is run).  Can always exclude these args
         # from the arg list or add the derived type to the interface
-        if (not arg.fort_only() and not bind and not call and definition) and (arg.type.dt and not arg.native):
+        if (not arg.fort_only() and not bind and not call and definition) and (arg.type.dt and not arg.native and arg.type.type.upper()!='C_PTR'):
             error("Derived type argument %s::%s of procedure %s is not defined" % (arg.type.type, arg.name, proc.name))
         if arg.fort_only():
             # Hide from user -- requires special treatement for three of
