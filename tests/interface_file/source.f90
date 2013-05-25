@@ -4,32 +4,34 @@ MODULE source
 
   ! For the Fortran module, these can be made private since they are
   ! accessed via the generic interface object_ctor
-  PRIVATE :: object_ctor_i, object_ctor_f
+  PRIVATE :: object_constructor_i, object_constructor_f
 
   TYPE Object
     INTEGER :: i
     REAL :: f
   END TYPE Object
 
-  INTERFACE object_ctor
-    MODULE PROCEDURE object_ctor_i, object_ctor_f
+  INTERFACE object_constructor
+    MODULE PROCEDURE object_constructor_i, object_constructor_f
   END INTERFACE
 
 CONTAINS
 
-  SUBROUTINE object_ctor_i(o,x)
+  ! Demonstrate use of a different regular expression for matching
+  !  constructors (default is to match "_ctor")
+  SUBROUTINE object_constructor_i(o,x)
     TYPE (Object) :: o
     INTEGER, INTENT(in) :: x
     o%i = x
     o%f = 0.0
-  END SUBROUTINE object_ctor_i
+  END SUBROUTINE object_constructor_i
 
-  SUBROUTINE object_ctor_f(o,f)
+  SUBROUTINE object_constructor_f(o,f)
     TYPE (Object) :: o
     REAL, INTENT(in) :: f
     o%f = f
     o%i = 0
-  END SUBROUTINE object_ctor_f
+  END SUBROUTINE object_constructor_f
 
   SUBROUTINE work_sub(x)
     INTEGER :: x
