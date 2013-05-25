@@ -258,7 +258,7 @@ FortWrap.h       ObjectA.cpp      ObjectB.cpp
   <p>These files are explained more <a href="#Files">here</a>.  The
     main things to note are that the classes FortWrap created are
     defined in the header files <tt>ObjectA.h</tt>
-    and <tt>ObjectB.h</tt> (if wrapping non-module procedures, a dummy
+    and <tt>ObjectB.h</tt> (if wrapping non-method procedures, a dummy
     class called <tt>FortFuncs</tt> is created by default).
     Also, <tt>FortWrap.h</tt> is the "catch-all" header file that you
     want to include when writing a program that uses the wrappers.</p>
@@ -551,6 +551,11 @@ o.foo(a,NULL,NULL,&d);
   <p>As an alternative, the <tt>--global</tt> option can be used to
     wrap non-method procedures as global functions defined in
     the <tt>FortFuncs.h</tt> header file.</p>
+
+  <p>Default wrapping of these procedures can also be disabled by
+    using <tt>--no-orphans</tt>.  It is still possible to include
+    specific non-method procedures in the interfaces by
+    using <tt>%include</tt> directives.</p>
     
 
   <h3><a name="details-arrays">Arrays</a></h3>

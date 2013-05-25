@@ -861,7 +861,7 @@ def associate_procedures():
             elif typename.lower() not in name_exclusions:
                 error("Method %s declared for unknown derived type %s" % (proc.name, typename))
         # Associate orphan functions with a dummy class
-        else:
+        elif (not opts.no_orphans) or proc.name.lower() in name_inclusions:
             if not orphan_classname in objects:
                 objects[orphan_classname] = DerivedType(orphan_classname,orphan_class_comments)
             objects[orphan_classname].procs.append(proc)
@@ -1497,6 +1497,7 @@ class Options:
         print "--array-as-ptr\t: Wrap 1-D arrays with '*' instead of '[]'. Implies --no-vector"
         print "--dummy-class=<n>: Use <n> as the name of the dummy class used to wrap\n\t\t  non-method procedures"
         print "--global\t: Wrap non-method procedures as global functions instead of\n\t\t  static methods of a dummy class"
+        print "--no-orphans\t: Do not by default wrap non-method procedures.  They can still\n\t\t  be wrapped by using %include directives"
         # Not documenting, as this option could be dangerous, although
         # it is protected from "-d .":
         #print "--clean\t\t: Remove all wrapper-related files from wrapper code directory\n\t\t  before generating new code.  Requires -d.  Warning: this\n\t\t  deletes files.  Use with caution and assume it will delete\n\t\t  everything in the wrapper directory"
@@ -1505,7 +1506,7 @@ class Options:
     def parse_args(self):
         global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname, file_list
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','array-as-ptr','dummy-class=','global'])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','array-as-ptr','dummy-class=','global','no-orphans'])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
@@ -1522,6 +1523,8 @@ class Options:
         self.array_as_ptr = False
         self.global_orphans = False
         self.interface_file = ''
+        self.no_orphans = False
+
         if ('-h','') in opts or ('--help','') in opts:
             self.usage(0)
         elif ('-v','') in opts or ('--version','') in opts:
@@ -1561,6 +1564,8 @@ class Options:
                 orphan_classname = a
             elif o=='--global':
                 self.global_orphans = True
+            elif o=='--no-orphans':
+                self.no_orphans = True
 
         if self.clean_code and code_output_dir=='.':
             error("Cleaning wrapper code output dir requires -d")
