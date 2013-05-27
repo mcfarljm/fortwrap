@@ -540,8 +540,8 @@ def readline(f):
 
 def join_lines(line,file):
     """Join lines possibly continued by & character"""
-    while line.find('&') > 0:
-        line1 = line.strip()[:-1]
+    while '&' in line.split('!')[0]:
+        line1 = line.split('&')[0]
         line2 = readline(file)
         line = line1 + line2.strip()
     return line
@@ -575,6 +575,7 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
     count = 0
 
     line = join_lines(line,file)
+    line = line.split('!')[0]
 
     m = fort_data.match(line)
 
@@ -832,19 +833,19 @@ def parse_file(fname):
             parse_abstract_interface(f,line)
             dox_comments = []
         elif line.strip().upper().startswith('PRIVATE'):
-            if line.find('::')==-1:
+            if '::' not in line:
                 default_protection = PRIVATE
             else:
                 line = join_lines(line,file)
                 for name in line.split('::')[1].split(','):
                     private_names.add(name.strip().lower())
         elif line.strip().upper().startswith('PUBLIC'):
-            if line.find('::')>=0:
+            if '::' in line:
                 line = join_lines(line,file)
                 for name in line.split('::')[1].split(','):
                     public_names.add(name.strip().lower())
         elif integer_param_def.match(line):
-            line = join_lines(line,file)
+            line = join_lines(line,file).split('!')[0]
             for param in line.split('::')[1].split(','):
                 name,val = param.split('=')
                 fort_integer_params[name.strip()] = int( val.strip() )

@@ -14,7 +14,7 @@ MODULE opt_args
     END FUNCTION add_allopt
 
     FUNCTION add_mixed(a,b,c,d) RESULT(y)
-      INTEGER, INTENT(in) :: a,b
+      INTEGER, INTENT(in) :: a,b ! test optional ::
       INTEGER, INTENT(in), OPTIONAL :: c,d
       INTEGER :: y
       y = a+b

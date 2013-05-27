@@ -4,7 +4,7 @@ MODULE strings
 
   INTEGER, PARAMETER :: STRING_LEN=20, STRING_LEN2 = 20, &
     STRING_LEN3 = 20
-  integer, parameter :: STRING_LEN4 = 20
+  integer, parameter :: STRING_LEN4 = 20 ! Test comment
 
 CONTAINS
 
