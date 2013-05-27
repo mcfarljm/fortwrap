@@ -20,7 +20,7 @@ import os
 import traceback
 
 
-VERSION = '0.9.17'
+VERSION = '1.0'
 
 
 # SETTINGS ==========================================
