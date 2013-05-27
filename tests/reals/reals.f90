@@ -2,14 +2,17 @@ MODULE reals
 
   IMPLICIT NONE
 
+  INTEGER, PARAMETER :: wp = 4  ! Test named precision
+
 CONTAINS
 
   ! REAL(KIND=4) and REAL get mapped to C floats
-  FUNCTION add_floats(a,b) RESULT(y)
+  FUNCTION add_floats(a,b,c) RESULT(y)
     REAL(KIND=4), INTENT(in) :: a
     REAL(4), INTENT(in) :: b
+    REAL(wp), INTENT(in) :: c
     REAL :: y
-    y = a+b
+    y = a+b+c
   END FUNCTION add_floats
 
   ! REAL(KIND=8), REAL*8, and DOUBLE PRECISION get mapped to C doubles

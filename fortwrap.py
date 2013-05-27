@@ -219,6 +219,10 @@ class DataType:
                 self.type = 'REAL'
                 self.kind = '8'
 
+            # Handle use of named parameter as kind:
+            if self.kind.upper() in fort_integer_params:
+                self.kind = str(fort_integer_params[self.kind.upper()])
+
             if not self.valid_primitive():
                 warning(self.type+'('+self.kind+') not supported')
 
@@ -607,7 +611,7 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
                     char_len = int(len_spec)
                 except ValueError:
                     # Check for string in Fortran parameter dictionary
-                    char_len = fort_integer_params[len_spec]
+                    char_len = fort_integer_params[len_spec.upper()]
             except:
                 # char_len remains =-1
                 pass
@@ -848,7 +852,7 @@ def parse_file(fname):
             line = join_lines(line,file).split('!')[0]
             for param in line.split('::')[1].split(','):
                 name,val = param.split('=')
-                fort_integer_params[name.strip()] = int( val.strip() )
+                fort_integer_params[name.strip().upper()] = int( val.strip() )
     f.close()
     return 1
 
