@@ -161,7 +161,7 @@ class Array:
         self.assumed_shape = False
         self.size_var = ''
         self.d = spec.count(',') + 1
-        if spec.find(':') >= 0:
+        if ':' in spec:
             self.assumed_shape = True
         if self.d == 1:
             self.size_var = spec.strip()
@@ -229,13 +229,13 @@ class DataType:
         if not primitive_data_match and type!='INT':
             # (INT is used to represent the hidden length arguments,
             # passed by value)
-            if type.upper().find('PROCEDURE') >= 0:
+            if 'PROCEDURE' in type.upper():
                 self.proc_pointer = True
                 # Matching broken b/c of "::'
                 m = fort_data.match(type)
                 self.type = m.group('proc_spec')
                 proc_pointer_used = True
-            elif type.upper().find('TYPE') >= 0:
+            elif 'TYPE' in type.upper():
                 self.dt = True
                 m = fort_data.match(type)
                 self.type = m.group('dt_spec')
@@ -502,7 +502,7 @@ def mangle_name(mod,func):
             return '__' + mod.lower() + '_MOD_' + func.lower()
     else:
         suffix = '_'
-        if compiler=='g95' and func.find('_')>=0:
+        if compiler=='g95' and '_' in func:        
             suffix = suffix + '_'
         return func.lower() + suffix
 
@@ -623,7 +623,7 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
         array = None
         if dimension:
             array = Array(dimension.group(1))
-        elif name.find('(') > 0:
+        elif '(' in name:
             size_desc = name.split('(')[1].split(')')[0]
             array = Array(size_desc)
             name = name.split('(')[0]
@@ -817,7 +817,7 @@ def parse_file(fname):
             continue
         elif fort_comment.match(line):
             continue
-        elif module_def.match(line) and line.upper().find("PROCEDURE")==-1:
+        elif module_def.match(line) and 'PROCEDURE' not in line.upper():
             current_module = line.split()[1]
             #print 'MOD:', current_module
             dox_comments = []
