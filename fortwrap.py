@@ -43,6 +43,7 @@ matrix_classname = 'FortranMatrix'
 
 orphan_classname = 'FortFuncs'
 orphan_class_comments = ['Wrapper class for Fortran routines that do not operate on a derived type']
+constants_classname = 'FortConstants'
 
 fort_wrap_file = 'CppWrappers'
 SWIG = True  # Whether or not to include preprocessor defs that will
@@ -85,6 +86,7 @@ integer_param_def = re.compile(r'\s+INTEGER,\s+PARAMETER\s+::',re.IGNORECASE)
 # lookahead assertion to exclude commas inside the array definition
 arg_splitter = re.compile(',(?![^(]*\))')
 dimension_def = re.compile(r'DIMENSION\s*\(\s*([^(]+)\s*\)',re.IGNORECASE)
+enum_def = re.compile(r'\s*ENUM,\s*BIND',re.IGNORECASE)
 
 # Constructor and desctructor methods (these regexes are configurable):
 ctor_def = re.compile('.*_ctor', re.IGNORECASE)
@@ -121,6 +123,7 @@ module_proc_num = 1 # For keeping track of the order that the
 dox_comments = []
 
 fort_integer_params = dict()
+enumerations = []
 
 file_pointer = -1
 file_lines_list = []
@@ -787,6 +790,35 @@ def parse_comments(file,line):
             file_pointer -= 1
             break
     return com
+
+def parse_enum(file,line):
+    """
+    Parse enum definition
+    """
+    enums = []
+    while True:
+        line = readline(file)
+        if line == '':
+            print "Unexpected end of file in ENUM"
+            return
+        if line.strip().upper().startswith('END'):
+            break
+        else:
+            if line.strip().upper().startswith('ENUMERATOR'):
+                line = join_lines(line,file)
+                try:
+                    s = line.split('::')[1].split('!')[0]
+                    if s.find('=')>=0:
+                        print "Non-default enum values not supported"
+                        enums = []
+                        break
+                    for enum in s.split(','):
+                        enums.append(enum.strip())
+                except:
+                    print "Problem parsing ENUMERATOR:", line
+    if len(enums) > 0:
+        #print "Adding enum:", enums
+        enumerations.append(enums)
     
 
 def initialize_protection():
@@ -853,6 +885,8 @@ def parse_file(fname):
             for param in line.split('::')[1].split(','):
                 name,val = param.split('=')
                 fort_integer_params[name.strip().upper()] = int( val.strip() )
+        elif enum_def.match(line):
+            parse_enum(f,line)
     f.close()
     return 1
 
@@ -1253,6 +1287,21 @@ def write_class(object):
         file.write('  bool initialized;\n')
     if not opts.global_orphans:
         file.write('};\n\n')
+    if object.name == orphan_classname:
+        # Write out constant/enum defs inside a class def.  For now,
+        # this small class def piggybacks off the orphan class header
+        # file.  When wrapping in Swig for Python, it makes no
+        # difference, since the __init__ file brings in everything in
+        # this module
+        if len(enumerations) > 0:
+            file.write('class ' + constants_classname + ' {\n')
+            file.write('public:\n')
+            for enum_set in enumerations:
+                file.write('  enum { ')
+                for i,enum in enumerate(enum_set):
+                    file.write('{0}{1}'.format(enum,', ' if i+1<len(enum_set) else ''))
+                file.write(' };\n')
+            file.write('};\n\n')
     file.write('#endif /* ' + object.name.upper() + '_H_ */\n')
     file.close()
 
