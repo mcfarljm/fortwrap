@@ -1,4 +1,4 @@
-FortWrap 1.01 summary:
+FortWrap 1.0.1 summary:
 - Added support for enumerations
 
 FortWrap 1.0 summary:
