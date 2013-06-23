@@ -1574,15 +1574,16 @@ class Options:
         print "--no-orphans\t: Do not by default wrap non-method procedures.  They can still\n\t\t  be wrapped by using %include directives"
         print "--no-W-not-wrapped: Do not warn about procedures that were not wrapped"
         print "--main-header=<n>: Use <n> as name of the main header file (default FortWrap.h)"
+        print "--constants-class=<n>: Use <n> as name of the class for wrapping enumerations\n\t\t  (default: {0}).".format(constants_classname)
         # Not documenting, as this option could be dangerous, although
         # it is protected from "-d .":
         #print "--clean\t\t: Remove all wrapper-related files from wrapper code directory\n\t\t  before generating new code.  Requires -d.  Warning: this\n\t\t  deletes files.  Use with caution and assume it will delete\n\t\t  everything in the wrapper directory"
         sys.exit(exit_val)
 
     def parse_args(self):
-        global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname, file_list
+        global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname, file_list, constants_classname
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','array-as-ptr','dummy-class=','global','no-orphans','no-W-not-wrapped','main-header='])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','array-as-ptr','dummy-class=','global','no-orphans','no-W-not-wrapped','main-header=','constants-class='])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
@@ -1648,6 +1649,8 @@ class Options:
                 self.warn_not_wrapped = False
             elif o=='--main-header':
                 self.main_header = a.split('.h')[0]
+            elif o=='--constants-class':
+                constants_classname = a
 
         if self.clean_code and code_output_dir=='.':
             error("Cleaning wrapper code output dir requires -d")

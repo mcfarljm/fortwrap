@@ -26,11 +26,11 @@ tests.remove( glob.glob('*.mk')[0] )
 
 num_err = 0
 
-# Use a command arg to force a make clean on each test
-make_clean = False
+# Use a command arg to prevent making clean
+make_clean = True
 if len(sys.argv) > 1:
-    print "Making clean"
-    make_clean = True
+    print "Not making clean"
+    make_clean = False
 
 # Hack so can go up a directory at start of loop
 if tests:
