@@ -1670,8 +1670,11 @@ if __name__ == "__main__":
             clean_directories()
 
         if opts.inputs_file:
-            # TODO: Add error handler
-            f = open(opts.inputs_file)
+            try:
+                f = open(opts.inputs_file)
+            except IOError:
+                error('Unable to open file list: ' + opts.inputs_file)
+                sys.exit(3)
             for line in f:
                 if not line.strip().startswith('#') and re.search('\w', line):
                     file_list.append( line.strip() )
