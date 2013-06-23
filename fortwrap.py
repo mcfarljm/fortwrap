@@ -1574,7 +1574,7 @@ class Options:
         print "--no-orphans\t: Do not by default wrap non-method procedures.  They can still\n\t\t  be wrapped by using %include directives"
         print "--no-W-not-wrapped: Do not warn about procedures that were not wrapped"
         print "--main-header=<n>: Use <n> as name of the main header file (default FortWrap.h)"
-        print "--constants-class=<n>: Use <n> as name of the class for wrapping enumerations\n\t\t  (default: {0}).".format(constants_classname)
+        print "--constants-class=<n>: Use <n> as name of the class for wrapping enumerations\n\t\t  (default: {0})".format(constants_classname)
         # Not documenting, as this option could be dangerous, although
         # it is protected from "-d .":
         #print "--clean\t\t: Remove all wrapper-related files from wrapper code directory\n\t\t  before generating new code.  Requires -d.  Warning: this\n\t\t  deletes files.  Use with caution and assume it will delete\n\t\t  everything in the wrapper directory"
