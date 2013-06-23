@@ -21,6 +21,10 @@ int main(void)
   if (FortFuncs::add_ints4_lower(a4,b4) != 300000)
     return 6;
 
+  long long a8=5000000000, b8=6000000000;
+  if (FortFuncs::add_ints8(a8,b8) != (a8+b8))
+    return 7;
+
   return 0;
 }
 

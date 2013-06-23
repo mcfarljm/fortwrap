@@ -24,6 +24,13 @@ CONTAINS
     y = a+b
   END FUNCTION add_ints4
 
+  FUNCTION add_ints8(a,b) RESULT(y)
+    INTEGER (KIND= 8), INTENT(in) :: a
+    INTEGER*8, INTENT(in) :: b
+    INTEGER(8) :: y
+    y = a+b
+  END FUNCTION add_ints8
+
   ! Test lower case parsing:
 
   function add_ints1_lower(a,b) result(y)

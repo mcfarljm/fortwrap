@@ -20,7 +20,7 @@ import os
 import traceback
 
 
-VERSION = '1.0.1'
+VERSION = '1.0.2'
 
 
 # SETTINGS ==========================================
@@ -106,7 +106,7 @@ name_inclusions = set()
 proc_arg_exclusions = set()
 
 # 'INT' is for the hidden name length argument
-cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*','C_INT':'int*'}, 
+cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*','8':'long long*','C_INT':'int*'}, 
                 'REAL':{'':'float*', '4':'float*', '8':'double*', 'C_DOUBLE':'double*', 'C_FLOAT':'float*'},
                 'LOGICAL':{'':'int*'}, 
                 'CHARACTER':{'':'char*'}, 
