@@ -32,12 +32,34 @@ CONTAINS
   FUNCTION string_in_test(s) RESULT(t)
     CHARACTER(len=20), INTENT(in) :: s
     LOGICAL :: t
-    IF (TRIM(s) == 'Test String') THEN
+    IF (s == 'Test String') THEN
       t = .TRUE.
     ELSE
       t = .FALSE.
     END IF
   END FUNCTION string_in_test
+
+  !> Make sure conversion gets handled properly when dummy length is less
+  !! than actual length
+  FUNCTION string_in_cutoff(s) RESULT(t)
+    CHARACTER(len=6), INTENT(in) :: s
+    LOGICAL :: t
+    IF (s == 'Test S') THEN
+      t = .TRUE.
+    ELSE
+      t = .FALSE.
+    END IF
+  END FUNCTION string_in_cutoff
+
+!!$  FUNCTION string_in_assumed_len(s) RESULT(t)
+!!$    CHARACTER(len=*), INTENT(in) :: s
+!!$    LOGICAL :: t
+!!$    IF (s == 'Test String') THEN
+!!$      t = .TRUE.
+!!$    ELSE
+!!$      t = .FALSE.
+!!$    END IF
+!!$  END FUNCTION string_in_assumed_len
 
   ! Test combination of intent(in) and intent(out), with additional
   ! interspersed arguments
@@ -58,7 +80,7 @@ CONTAINS
     
     res = 0
     IF (PRESENT(s)) THEN
-      IF (TRIM(s) == 'Test String') res = 1
+      IF (s == 'Test String') res = 1
     ELSE ! Not present
       res = 2
     END IF

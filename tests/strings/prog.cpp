@@ -24,24 +24,27 @@ int main(void)
   if (! FortFuncs::string_in_test("Test String"))
     return 3;
 
+  if (! FortFuncs::string_in_cutoff("Test String"))
+    return 4;
+
   // Test combination
   FortFuncs::multiple_args(0,"Test String",0.0,&s);
   if (s.compare("Test String suffix") != 0)
-    return 4;
+    return 5;
 
   // Test optionals
 
   // Intent(in) optionals
   if (FortFuncs::optional_in("Test String") != 1) // Present
-    return 5;
-  if (FortFuncs::optional_in() != 2) // Not present
     return 6;
+  if (FortFuncs::optional_in() != 2) // Not present
+    return 7;
 
   // Intent(out) optionals
   if (FortFuncs::optional_out(&s) != 1) // Present
-    return 7;
-  if (s.compare("Test String") != 0)
     return 8;
+  if (s.compare("Test String") != 0)
+    return 9;
 
   return 0;
 }
