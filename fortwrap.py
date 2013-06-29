@@ -13,6 +13,7 @@
 
 import getopt
 import re
+import copy
 import glob
 from datetime import date
 import sys
@@ -61,7 +62,7 @@ fort_end_interface = re.compile(r'\s*END\s*INTERFACE', re.IGNORECASE)
 fort_comment = re.compile('\s*!')
 
 # Data types
-primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>\w+)\s*\)))?'
+primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>(\w+|\*))\s*\)))?'
 primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
 fort_data_str = r'\s*(' + primitive_data_str + '|TYPE\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
@@ -187,9 +188,22 @@ class Array:
         self.matrix = self.d==2 and not self.assumed_shape
         self.fort_only = self.assumed_shape
 
+class CharacterLength:
+    """
+    val may be either a number, or in the case of assumed length, a
+    string containing the argument name, which is needed in the
+    wrapper code
+    """
+    def __init__(self,val):
+        self.val = val
+        self.assumed = False
+    def set_assumed(self, argname):
+        self.val = argname
+        self.assumed = True
+
 class DataType:
     complex_warning_written = False
-    def __init__(self,type,array=None,str_len=-1,hidden=False):
+    def __init__(self,type,array=None,str_len=None,hidden=False):
         global proc_pointer_used, stringh_used
         self.type = type
         self.kind = ''
@@ -612,12 +626,19 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
                 try:
                     char_len = int(spec)
                 except ValueError:
-                    # Check for string in Fortran parameter dictionary
+                    # Check for string in Fortran parameter
+                    # dictionary.  Note, this conversion/check could
+                    # be done later when writing the wrapper code (so
+                    # that all source has been parsed): in that case,
+                    # make sure have proper checks so that it doesn't
+                    # conflict with treatment of assumed length
+                    # strings
                     char_len = fort_integer_params.get(spec.upper(), None)
         else:
             # No char length spec found.  Could use this to wrap
             # scalar CHARACTER
             char_len = None     # Redundant
+        char_len = CharacterLength(char_len)
 
     # Get name(s)
     arg_string = line.split('::')[1].split('!')[0]
@@ -633,6 +654,13 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
         type = DataType(type_string,array,char_len)
         if name in arg_list:
             count += 1
+            if char_len and char_len.val=='*':
+                # Make a new type instance, and update its char_len
+                # instance to contain a reference to the argument
+                # name, which will be needed in the wrapper code
+                type = copy.copy(type) # Shallow copy
+                type.str_len = CharacterLength('*')
+                type.str_len.set_assumed(name)
             args[name] = Argument(name,arg_list.index(name)+1,type,optional,intent,byval,comment=comments)
         elif retval and name==retval.name:
             retval.set_type(type)
@@ -1002,7 +1030,13 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             # the four cases
             if bind and call:
                 if arg.type.hidden:
-                    string = string + str(arg.type.str_len)
+                    if arg.type.str_len.assumed:
+                        # val stores the arg name of the string
+                        # itself.  In wrapper code, length variable is
+                        # declared as name+'_len'
+                        string = string + arg.type.str_len.val + '_len'
+                    else:
+                        string = string + str(arg.type.str_len.val)
                 elif arg.type.is_array_size or arg.type.is_matrix_size:
                     string = string + '&' + arg.name
                 else:
@@ -1113,17 +1147,30 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
     # Add wrapper code for strings
     if call:
         for arg in proc.args.itervalues():
+            if arg.type.type=='CHARACTER' and not arg.fort_only():
+                if arg.type.str_len.assumed:
+                    str_len = arg.name+'_len'
+                else:
+                    str_len = str(arg.type.str_len.val)
+                str_len_1 = str_len + '+1'
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
                 s = s + prefix + '// Declare memory to store output character data\n'
-                s = s + prefix + 'char ' + arg.name + '_c[' + str(arg.type.str_len+1) + '];\n'
-                s = s + prefix + arg.name + '_c[' + str(arg.type.str_len) + "] = '\\0';\n"
+                s = s + prefix + 'char ' + arg.name + '_c[' + str_len_1 + '];\n'
+                s = s + prefix + arg.name + '_c[' + str_len + "] = '\\0';\n"
             elif arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='in':
+                s = s + prefix + 'int ' + arg.name + '_len;\n'
+                s = s + prefix + 'if (' + arg.name + ') '+ arg.name+ '_len = strlen('+arg.name+'); // Protect Optional args\n'
                 s = s + prefix + '// Create C array for Fortran input string data\n'
-                s = s + prefix + 'char ' + arg.name + '_c[' + str(arg.type.str_len+1) + '];\n'
+                s = s + prefix + 'char ' + arg.name + '_c[' + str_len_1 + '];\n'
                 s = s + prefix + 'if (' + arg.name + ') {\n'
                 s = s + prefix + '  int i;\n'
-                s = s + prefix + '  strncpy(' + arg.name + '_c, ' + arg.name + ', ' + str(arg.type.str_len+1) + '); ' +arg.name+'_c['+str(arg.type.str_len+1)+'] = 0; // strncpy protects in case '+arg.name+' is too long\n'
-                s = s + prefix + '  for (i=strlen('+arg.name+'_c); i<'+str(arg.type.str_len+1)+'; i++) '+arg.name+"_c[i] = ' '; // Add whitespace for Fortran\n"
+                if arg.type.str_len.assumed:
+                    s = s + prefix + '  strcpy('+arg.name+'_c, '+arg.name+');\n'
+                    s = s + prefix + '  // No need to pad with whitespace b/c Fortran hidden length arg\n'
+                    s = s + prefix + '  // will signal actual length\n'
+                else:
+                    s = s + prefix + '  strncpy(' + arg.name + '_c, ' + arg.name + ', ' + str_len_1 + '); ' +arg.name+'_c['+str_len_1+'] = 0; // strncpy protects in case '+arg.name+' is too long\n'
+                    s = s + prefix + '  for (i=strlen('+arg.name+'_c); i<'+str_len_1+'; i++) '+arg.name+"_c[i] = ' '; // Add whitespace for Fortran\n"
                 s = s + prefix + '}\n'
     # Add wrapper code for array size values
     if call:
@@ -1168,7 +1215,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
                 s = s + '\n'
                 s = s + prefix + 'if ('+arg.name+') {\n'
                 s = s + prefix + '  // Trim trailing whitespace and assign character array to string:\n'
-                s = s + prefix + '  for (int i=' + str(arg.type.str_len-1) + '; ' + arg.name + "_c[i]==' '; i--) " + arg.name + "_c[i] = '\\0';\n"
+                s = s + prefix + '  for (int i=' + str(arg.type.str_len.val-1) + '; ' + arg.name + "_c[i]==' '; i--) " + arg.name + "_c[i] = '\\0';\n"
                 s = s + prefix + '  ' + arg.name + '->assign(' + arg.name + '_c);\n  }'
         if proc.retval and proc.has_post_call_wrapper_code():
             s = s + '\n' + prefix + 'return __retval;'

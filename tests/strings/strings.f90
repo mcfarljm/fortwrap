@@ -29,6 +29,14 @@ CONTAINS
     s4 = 'String D'
   END SUBROUTINE string_param_len
 
+  SUBROUTINE string_param_len2(s1,s2,s3, s4)
+    CHARACTER(len=STRING_LEN), INTENT(out) :: s1, s2, s3, s4
+    s1 = 'String A'
+    s2 = 'String B'
+    s3 = 'String C'
+    s4 = 'String D'
+  END SUBROUTINE string_param_len2
+
   FUNCTION string_in_test(s) RESULT(t)
     CHARACTER(len=20), INTENT(in) :: s
     LOGICAL :: t
@@ -51,15 +59,16 @@ CONTAINS
     END IF
   END FUNCTION string_in_cutoff
 
-!!$  FUNCTION string_in_assumed_len(s) RESULT(t)
-!!$    CHARACTER(len=*), INTENT(in) :: s
-!!$    LOGICAL :: t
-!!$    IF (s == 'Test String') THEN
-!!$      t = .TRUE.
-!!$    ELSE
-!!$      t = .FALSE.
-!!$    END IF
-!!$  END FUNCTION string_in_assumed_len
+  FUNCTION string_in_assumed_len(s1,x,s2) RESULT(t)
+    CHARACTER(len=*), INTENT(in) :: s1, s2
+    INTEGER, INTENT(in) :: x ! Dummy
+    LOGICAL :: t
+    IF (s1=='Test String 1' .AND. s2=='String 2') THEN
+      t = .TRUE.
+    ELSE
+      t = .FALSE.
+    END IF
+  END FUNCTION string_in_assumed_len
 
   ! Test combination of intent(in) and intent(out), with additional
   ! interspersed arguments
@@ -85,6 +94,18 @@ CONTAINS
       res = 2
     END IF
   END FUNCTION optional_in
+
+ FUNCTION optional_in_assumed(s) RESULT(res)
+    CHARACTER(len=*), OPTIONAL, INTENT(in) :: s
+    INTEGER :: res ! 0=fail, 1=success(present), 2=success(not present)
+    
+    res = 0
+    IF (PRESENT(s)) THEN
+      IF (s == 'Test String') res = 1
+    ELSE ! Not present
+      res = 2
+    END IF
+  END FUNCTION optional_in_assumed
 
   FUNCTION optional_out(s) RESULT(res)
     CHARACTER(len=STRING_LEN), OPTIONAL, INTENT(out) :: s
