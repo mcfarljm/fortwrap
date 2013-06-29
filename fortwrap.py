@@ -1309,7 +1309,7 @@ def write_class(object):
     file = open( code_output_dir+'/' + object.name + '.cpp', 'w')
     file.write(HEADER_STRING + '\n')
     if stringh_used:
-        file.write('#include "string.h" // For strcpy\n')
+        file.write('#include <cstring> // For strcpy\n')
     file.write('#include "' + object.name + '.h"\n\n')
     # Constructor(s):
     if fort_ctors:
