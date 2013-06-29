@@ -14,7 +14,7 @@ CONTAINS
   END SUBROUTINE string_out_literal_len
 
   SUBROUTINE string_out_literal_len2(s)
-    CHARACTER*20, INTENT(out) :: s
+    CHARACTER*8, INTENT(out) :: s
     s = 'String A'
   END SUBROUTINE string_out_literal_len2
   
