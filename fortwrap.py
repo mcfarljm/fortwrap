@@ -13,7 +13,6 @@
 
 import getopt
 import re
-import copy
 import glob
 from datetime import date
 import sys
@@ -655,10 +654,9 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
         if name in arg_list:
             count += 1
             if char_len and char_len.val=='*':
-                # Make a new type instance, and update its char_len
-                # instance to contain a reference to the argument
-                # name, which will be needed in the wrapper code
-                type = copy.copy(type) # Shallow copy
+                # Assign a new char_len instance and set it to contain
+                # a reference to the argument name, which will be
+                # needed in the wrapper code
                 type.str_len = CharacterLength('*')
                 type.str_len.set_assumed(name)
             args[name] = Argument(name,arg_list.index(name)+1,type,optional,intent,byval,comment=comments)
