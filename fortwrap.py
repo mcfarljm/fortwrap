@@ -813,7 +813,8 @@ def parse_enum(file,line):
                         enums = []
                         break
                     for enum in s.split(','):
-                        enums.append(enum.strip())
+                        if is_public(enum.strip()):
+                            enums.append(enum.strip())
                 except:
                     print "Problem parsing ENUMERATOR:", line
     if len(enums) > 0:
