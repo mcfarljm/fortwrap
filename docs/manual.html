@@ -658,8 +658,8 @@ X(0,1) = 10;
   <h3><a name="details-strings">Strings</a></h3>
 
   <p>FortWrap provides powerful support for processing strings.  This
-  is a difficult language feature to handle well, and the Fortran
-  standard for string interoperability is no help.</p>
+    is a difficult language feature to handle well, and the Fortran
+    standard for string interoperability is no help.</p>
 
   <p>FortWrap can wrap any scalar string arguments that are
     either <tt>INTENT(IN)</tt> or <tt>INTENT(OUT)</tt>.  The string
@@ -676,6 +676,14 @@ X(0,1) = 10;
     to Fortran.  Conversion between the C null terminator and
     Fortran's trailing whitespace, as well as passing the hidden
     string length argument, are all handled automatically.</p>
+
+  <p>Note that when wrapping a character argument that has assumed
+    length and is <tt>INTENT(OUT)</tt>, FortWrap will determine the
+    size of the temporary array to be allocated based on the size of
+    the <tt>std::string</tt> input.  Thus, consider
+    using <tt>std::string::resize</tt>; otherwise, if an unitialized
+    string of size 0 is passed from C++, the Fortran code will receive
+    a character dummy argument with length 0.</p>
 
   <h3><a name="details-comments">Doxygen Comments</a></h3>
 

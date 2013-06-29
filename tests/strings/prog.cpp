@@ -25,8 +25,15 @@ int main(void)
       s3.compare("String C") != 0 || s4.compare("String D") != 0)
     return 3;
 
-  FortFuncs::string_out_assumed_len(&s, 0, &s2);
-  if (s.compare("String A") != 0 || s2.compare("String B") != 0)
+  std::string sa1, sa2;
+  // Note: assumed-length output arguments will determine the size of
+  // the temporary array (which actually gets passed to the Fortran
+  // code) based on the size of the input string.  Thus, the input
+  // string should be initialized or resized before calling
+  sa1.resize(10); sa2.resize(10);
+
+  FortFuncs::string_out_assumed_len(&sa1, 0, &sa2);
+  if (sa1.compare("String A") != 0 || sa2.compare("String B") != 0)
     return 4;  
 
   // Test intent(in)
