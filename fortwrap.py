@@ -1067,7 +1067,8 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # -------------------------------------------
         # Special string handling
         if call and arg.type.type=='CHARACTER' and not arg.intent=='inout':
-            string = string + '_cp' # Pass pointer, which might be NULL
+            # Pass NULL if optional arg not present
+            string = string + ' ? ' + arg.name + '_c : NULL'
         # Special handling for matrix arguments
         if call and arg.type.matrix and not opts.no_fmat:
             if arg.optional:
@@ -1113,14 +1114,12 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
         for arg in proc.args.itervalues():
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
                 s = s + prefix + '// Declare memory to store output character data\n'
-                s = s + prefix + 'char ' + arg.name + '_c[' + str(arg.type.str_len+1) + '], *'+arg.name+'_cp=NULL;\n'
-                s = s + prefix + 'if ('+arg.name+') '+arg.name+'_cp = '+arg.name+'_c;\n'
+                s = s + prefix + 'char ' + arg.name + '_c[' + str(arg.type.str_len+1) + '];\n'
                 s = s + prefix + arg.name + '_c[' + str(arg.type.str_len) + "] = '\\0';\n"
             elif arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='in':
                 s = s + prefix + '// Create C array for Fortran input string data\n'
-                s = s + prefix + 'char ' + arg.name + '_c[' + str(arg.type.str_len+1) + '], *'+arg.name+'_cp=NULL;\n'
+                s = s + prefix + 'char ' + arg.name + '_c[' + str(arg.type.str_len+1) + '];\n'
                 s = s + prefix + 'if (' + arg.name + ') {\n'
-                s = s + prefix + '  '+arg.name+'_cp = '+arg.name+'_c;\n'
                 s = s + prefix + '  int i;\n'
                 s = s + prefix + '  strcpy(' + arg.name + '_c, ' + arg.name + ');\n'
                 s = s + prefix + '  for (i=0; ' + arg.name + "_c[i]!='\\0' && i<" + str(arg.type.str_len+1) + '; i++); // Find string end\n'
