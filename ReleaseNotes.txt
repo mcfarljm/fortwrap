@@ -1,3 +1,7 @@
+FortWrap 1.0.3 summary:
+- Added support for assumed length strings (intent(in) and
+  intent(out))
+
 FortWrap 1.0.2 summary:
 - Added support for INTEGER(8)
 - Added option to specify name of constants class

@@ -20,7 +20,7 @@ import os
 import traceback
 
 
-VERSION = '1.0.2'
+VERSION = '1.0.3'
 
 
 # SETTINGS ==========================================
@@ -1150,16 +1150,20 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
                     str_len = arg.name+'_len'
                 else:
                     str_len = str(arg.type.str_len.val)
-                str_len_1 = str_len + '+1'
+                str_len_p1 = str_len + '+1'
+                str_len_m1 = str_len + '-1'
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
+                if arg.type.str_len.assumed:
+                    s = s + prefix + 'int ' + arg.name + '_len;\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len = '+ arg.name + '->length();\n'
                 s = s + prefix + '// Declare memory to store output character data\n'
-                s = s + prefix + 'char ' + arg.name + '_c[' + str_len_1 + '];\n'
+                s = s + prefix + 'char ' + arg.name + '_c[' + str_len_p1 + '];\n'
                 s = s + prefix + arg.name + '_c[' + str_len + "] = '\\0';\n"
             elif arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='in':
                 s = s + prefix + 'int ' + arg.name + '_len;\n'
                 s = s + prefix + 'if (' + arg.name + ') '+ arg.name+ '_len = strlen('+arg.name+'); // Protect Optional args\n'
                 s = s + prefix + '// Create C array for Fortran input string data\n'
-                s = s + prefix + 'char ' + arg.name + '_c[' + str_len_1 + '];\n'
+                s = s + prefix + 'char ' + arg.name + '_c[' + str_len_p1 + '];\n'
                 s = s + prefix + 'if (' + arg.name + ') {\n'
                 s = s + prefix + '  int i;\n'
                 if arg.type.str_len.assumed:
@@ -1167,8 +1171,8 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
                     s = s + prefix + '  // No need to pad with whitespace b/c Fortran hidden length arg\n'
                     s = s + prefix + '  // will signal actual length\n'
                 else:
-                    s = s + prefix + '  strncpy(' + arg.name + '_c, ' + arg.name + ', ' + str_len_1 + '); ' +arg.name+'_c['+str_len_1+'] = 0; // strncpy protects in case '+arg.name+' is too long\n'
-                    s = s + prefix + '  for (i=strlen('+arg.name+'_c); i<'+str_len_1+'; i++) '+arg.name+"_c[i] = ' '; // Add whitespace for Fortran\n"
+                    s = s + prefix + '  strncpy(' + arg.name + '_c, ' + arg.name + ', ' + str_len_p1 + '); ' +arg.name+'_c['+str_len_p1+'] = 0; // strncpy protects in case '+arg.name+' is too long\n'
+                    s = s + prefix + '  for (i=strlen('+arg.name+'_c); i<'+str_len_p1+'; i++) '+arg.name+"_c[i] = ' '; // Add whitespace for Fortran\n"
                 s = s + prefix + '}\n'
     # Add wrapper code for array size values
     if call:
@@ -1213,7 +1217,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
                 s = s + '\n'
                 s = s + prefix + 'if ('+arg.name+') {\n'
                 s = s + prefix + '  // Trim trailing whitespace and assign character array to string:\n'
-                s = s + prefix + '  for (int i=' + str(arg.type.str_len.val-1) + '; ' + arg.name + "_c[i]==' '; i--) " + arg.name + "_c[i] = '\\0';\n"
+                s = s + prefix + '  for (int i=' + str_len_m1 + '; ' + arg.name + "_c[i]==' '; i--) " + arg.name + "_c[i] = '\\0';\n"
                 s = s + prefix + '  ' + arg.name + '->assign(' + arg.name + '_c);\n  }'
         if proc.retval and proc.has_post_call_wrapper_code():
             s = s + '\n' + prefix + 'return __retval;'

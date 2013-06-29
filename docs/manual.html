@@ -96,9 +96,10 @@ o.process();
     two-dimensional Fortran arrays (matrices).  This class takes care
     to store data internally in Fortran order.</li>
 
-  <li> <a href="#details-strings"><b>Strings</b></a> with <tt>INTENT(IN)</tt>
-    or <tt>INTENT(OUT)</tt> and explicit length parameter are wrapped
-    using C++ strings or character arrays.</li>
+  <li> <a href="#details-strings"><b>Strings</b></a>
+    with <tt>INTENT(IN)</tt> or <tt>INTENT(OUT)</tt> are wrapped using
+    C++ strings or character arrays.  The string length may be assumed
+    (<tt>len=*</tt>) or a literal or named constant.</li>
 
   <li> <b>Enumerations</b>: equivalent <tt>enum</tt> definitions are
     generated in the C++ wrapper code.</li>
@@ -656,16 +657,25 @@ X(0,1) = 10;
 
   <h3><a name="details-strings">Strings</a></h3>
 
-  <p>Currently only limited support for processing strings is provided.
-    In fact, this is a difficult language feature to handle well, and the
-    Fortran standard for interoperating with strings is no help.</p>
+  <p>FortWrap provides powerful support for processing strings.  This
+  is a difficult language feature to handle well, and the Fortran
+  standard for string interoperability is no help.</p>
 
-  <p>FortWrap can only wrap scalar string arguments that are
-    either <tt>INTENT(IN)</tt> or <tt>INTENT(OUT)</tt> and have an
-    explicitly declared length with <tt>len=</tt>.  Integer literals
-    or named integer parameters can be used as the length parameter,
-    provided that the declaration of the parameter name is somewhere
-    in a file that FortWrap parsed.</p>
+  <p>FortWrap can wrap any scalar string arguments that are
+    either <tt>INTENT(IN)</tt> or <tt>INTENT(OUT)</tt>.  The string
+    length may be assumed (<tt>len=*</tt>), a literal constant, or a
+    named constant from an <tt>INTEGER, PARAMETER</tt> declaration
+    that FortWrap has already parsed.</p>
+
+  <p>Strings that are <tt>INTENT(IN)</tt> are wrapped as <tt>const
+    char*</tt>: this allows for string literals to be passed directly
+    from the C code (see the examples in the <tt>tests</tt>
+    directory).  Strings that are <tt>INTENT(OUT)</tt> are wrapped as
+    C++ <tt>std::string</tt>.  In all cases, the wrapper code declares
+    a statically allocated temporary character array, which is passed
+    to Fortran.  Conversion between the C null terminator and
+    Fortran's trailing whitespace, as well as passing the hidden
+    string length argument, are all handled automatically.</p>
 
   <h3><a name="details-comments">Doxygen Comments</a></h3>
 

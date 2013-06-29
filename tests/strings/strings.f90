@@ -37,6 +37,13 @@ CONTAINS
     s4 = 'String D'
   END SUBROUTINE string_out_param_len2
 
+  SUBROUTINE string_out_assumed_len(s1,x,s2)
+    CHARACTER(len=* ), INTENT(out) :: s1,s2
+    INTEGER, INTENT(in) :: x ! Dummy
+    s1 = 'String A'
+    s2 = 'String B'
+  END SUBROUTINE string_out_assumed_len
+
   FUNCTION string_in_test(s) RESULT(t)
     CHARACTER(len=20), INTENT(in) :: s
     LOGICAL :: t
