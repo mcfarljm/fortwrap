@@ -7,20 +7,20 @@ int main(void)
 
   std::string s, s2, s3, s4;
 
-  FortFuncs::string_literal_len(&s);
+  FortFuncs::string_out_literal_len(&s);
   if (s.compare("String A") != 0)
     return 1;
 
-  FortFuncs::string_literal_len2(&s);
+  FortFuncs::string_out_literal_len2(&s);
   if (s.compare("String A") != 0)
     return 2;
 
-  FortFuncs::string_param_len(&s, &s2, &s3, &s4);
+  FortFuncs::string_out_param_len(&s, &s2, &s3, &s4);
   if (s.compare("String A") != 0 || s2.compare("String B") != 0 ||
       s3.compare("String C") != 0 || s4.compare("String D") != 0)
     return 3;
 
- FortFuncs::string_param_len2(&s, &s2, &s3, &s4);
+  FortFuncs::string_out_param_len2(&s, &s2, &s3, &s4);
   if (s.compare("String A") != 0 || s2.compare("String B") != 0 ||
       s3.compare("String C") != 0 || s4.compare("String D") != 0)
     return 3;  

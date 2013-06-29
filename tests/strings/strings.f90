@@ -8,17 +8,17 @@ MODULE strings
 
 CONTAINS
 
-  SUBROUTINE string_literal_len(s)
+  SUBROUTINE string_out_literal_len(s)
     CHARACTER(len=20 ), INTENT(out) :: s
     s = 'String A'
-  END SUBROUTINE string_literal_len
+  END SUBROUTINE string_out_literal_len
 
-  SUBROUTINE string_literal_len2(s)
+  SUBROUTINE string_out_literal_len2(s)
     CHARACTER*20, INTENT(out) :: s
     s = 'String A'
-  END SUBROUTINE string_literal_len2
+  END SUBROUTINE string_out_literal_len2
   
-  SUBROUTINE string_param_len(s1,s2,s3, s4)
+  SUBROUTINE string_out_param_len(s1,s2,s3, s4)
     CHARACTER( len=STRING_LEN), INTENT(out) :: s1
     character(len =STRING_LEN2), INTENT(out) :: s2
     CHARACTER(LEN= STRING_LEN3), INTENT(out) :: s3
@@ -27,15 +27,15 @@ CONTAINS
     s2 = 'String B'
     s3 = 'String C'
     s4 = 'String D'
-  END SUBROUTINE string_param_len
+  END SUBROUTINE string_out_param_len
 
-  SUBROUTINE string_param_len2(s1,s2,s3, s4)
+  SUBROUTINE string_out_param_len2(s1,s2,s3, s4)
     CHARACTER(len=STRING_LEN), INTENT(out) :: s1, s2, s3, s4
     s1 = 'String A'
     s2 = 'String B'
     s3 = 'String C'
     s4 = 'String D'
-  END SUBROUTINE string_param_len2
+  END SUBROUTINE string_out_param_len2
 
   FUNCTION string_in_test(s) RESULT(t)
     CHARACTER(len=20), INTENT(in) :: s
