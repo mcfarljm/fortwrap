@@ -9,7 +9,7 @@ MODULE strings
 CONTAINS
 
   SUBROUTINE string_literal_len(s)
-    CHARACTER(len=20), INTENT(out) :: s
+    CHARACTER(len=20 ), INTENT(out) :: s
     s = 'String A'
   END SUBROUTINE string_literal_len
 
@@ -19,9 +19,9 @@ CONTAINS
   END SUBROUTINE string_literal_len2
   
   SUBROUTINE string_param_len(s1,s2,s3, s4)
-    CHARACTER(len=STRING_LEN), INTENT(out) :: s1
-    character(len=STRING_LEN2), INTENT(out) :: s2
-    CHARACTER(LEN=STRING_LEN3), INTENT(out) :: s3
+    CHARACTER( len=STRING_LEN), INTENT(out) :: s1
+    character(len =STRING_LEN2), INTENT(out) :: s2
+    CHARACTER(LEN= STRING_LEN3), INTENT(out) :: s3
     CHARACTER(len=STRING_LEN4), INTENT(out) :: s4
     s1 = 'String A'
     s2 = 'String B'
@@ -43,7 +43,7 @@ CONTAINS
   ! interspersed arguments
   SUBROUTINE multiple_args(dumint,s1,dumfloat,s2)
     INTEGER, INTENT(in) :: dumint
-    CHARACTER(len=STRING_LEN), INTENT(in) :: s1
+    CHARACTER(20), INTENT(in) :: s1
     REAL, INTENT(in) :: dumfloat
     CHARACTER(len=STRING_LEN), INTENT(out) :: s2
     IF (LEN_TRIM(s1) < 13) THEN

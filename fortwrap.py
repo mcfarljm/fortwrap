@@ -61,7 +61,7 @@ fort_end_interface = re.compile(r'\s*END\s*INTERFACE', re.IGNORECASE)
 fort_comment = re.compile('\s*!')
 
 # Data types
-primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER(?P<char_spec>\s*\([^,]*\))?|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*(KIND\s*=)?\s*(?P<kind_spec>\w+)\s*\)))?'
+primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>\w+)\s*\)))?'
 primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
 fort_data_str = r'\s*(' + primitive_data_str + '|TYPE\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
@@ -320,10 +320,7 @@ class Argument:
             elif self.intent=='out':
                 return True
         elif self.type.type=='CHARACTER':
-            # Note: optional strings could be handled, but need
-            # protect wrapper code with if(name) statements and make
-            # sure name_c is set to NULL before sent to Fortran
-            if not self.intent=='inout' and self.type.str_len>0 and not self.type.array:
+            if not self.intent=='inout' and self.type.str_len and not self.type.array:
                 return False
             else:
                 return True
@@ -602,22 +599,25 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
     type_string = m.group(1)
 
     # Process character length
-    char_len=-1
+    char_len = None
     if type_string.upper().startswith('CHARACTER'):
         type_string = 'CHARACTER'
         if m.group('old_kind_spec'):
             char_len = int( m.group('old_kind_spec') )
-        else:
-            try:
-                len_spec = m.group('char_spec').split('=')[1].split(')')[0].strip()
+        elif m.group('kind_spec'):
+            spec = m.group('kind_spec')
+            if spec == '*': 
+                char_len = '*'
+            else:
                 try:
-                    char_len = int(len_spec)
+                    char_len = int(spec)
                 except ValueError:
                     # Check for string in Fortran parameter dictionary
-                    char_len = fort_integer_params[len_spec.upper()]
-            except:
-                # char_len remains =-1
-                pass
+                    char_len = fort_integer_params.get(spec.upper(), None)
+        else:
+            # No char length spec found.  Could use this to wrap
+            # scalar CHARACTER
+            char_len = None     # Redundant
 
     # Get name(s)
     arg_string = line.split('::')[1].split('!')[0]
