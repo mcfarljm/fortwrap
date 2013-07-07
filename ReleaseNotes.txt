@@ -1,3 +1,6 @@
+FortWrap 1.0.4 summary:
+- Fixing bug for optional assumed length strings
+
 FortWrap 1.0.3 summary:
 - Added support for assumed length strings (intent(in) and
   intent(out))

@@ -20,7 +20,7 @@ import os
 import traceback
 
 
-VERSION = '1.0.3'
+VERSION = '1.0.4'
 
 
 # SETTINGS ==========================================
@@ -447,7 +447,7 @@ class Procedure:
         pos = nargs + 1
         for arg in self.args_by_pos.itervalues():
             if arg.type.type=='CHARACTER' and not arg.fort_only():
-                str_length_arg = Argument(arg.name + '_len', pos, DataType('INT', str_len=arg.type.str_len ,hidden=True))
+                str_length_arg = Argument(arg.name + '_len__', pos, DataType('INT', str_len=arg.type.str_len ,hidden=True))
                 self.args[ str_length_arg.name ] = str_length_arg
                 pos = pos + 1
         for arg in self.args.itervalues():
@@ -1031,8 +1031,8 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                     if arg.type.str_len.assumed:
                         # val stores the arg name of the string
                         # itself.  In wrapper code, length variable is
-                        # declared as name+'_len'
-                        string = string + arg.type.str_len.val + '_len'
+                        # declared as name+'_len__'
+                        string = string + arg.type.str_len.val + '_len__'
                     else:
                         string = string + str(arg.type.str_len.val)
                 elif arg.type.is_array_size or arg.type.is_matrix_size:
@@ -1105,7 +1105,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             # array pointer)
             if not (arg.intent=='in' and arg.type.str_len.assumed):
                 # Pass NULL if optional arg not present
-                string = string + ' ? ' + arg.name + '_c : NULL'
+                string = string + ' ? ' + arg.name + '_c__ : NULL'
         # Special handling for matrix arguments
         if call and arg.type.matrix and not opts.no_fmat:
             if arg.optional:
@@ -1151,7 +1151,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
         for arg in proc.args.itervalues():
             if arg.type.type=='CHARACTER' and not arg.fort_only():
                 if arg.type.str_len.assumed:
-                    str_len = arg.name+'_len'
+                    str_len = arg.name+'_len__'
                 else:
                     str_len = str(arg.type.str_len.val)
                 str_len_p1 = str_len + '+1'
@@ -1164,22 +1164,22 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
                     # length, even if the arg is not present (testing
                     # with gfortran indicates that in case of not
                     # present it passes 0 for the length)
-                    s = s + prefix + 'int ' + arg.name + '_len = 0;\n'
-                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len = '+ arg.name + '->length();\n'
+                    s = s + prefix + 'int ' + arg.name + '_len__ = 0;\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = '+ arg.name + '->length();\n'
                 s = s + prefix + '// Declare memory to store output character data\n'
-                s = s + prefix + 'char ' + arg.name + '_c[' + str_len_p1 + '];\n'
-                s = s + prefix + arg.name + '_c[' + str_len + "] = '\\0';\n"
+                s = s + prefix + 'char ' + arg.name + '_c__[' + str_len_p1 + '];\n'
+                s = s + prefix + arg.name + '_c__[' + str_len + "] = '\\0';\n"
             elif arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='in':
                 if arg.type.str_len.assumed:
-                    s = s + prefix + 'int ' + arg.name + '_len = 0;\n'
-                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name+ '_len = strlen('+arg.name+'); // Protect Optional args\n'
+                    s = s + prefix + 'int ' + arg.name + '_len__ = 0;\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name+ '_len__ = strlen('+arg.name+'); // Protect Optional args\n'
                 else:
                     s = s + prefix + '// Create C array for Fortran input string data\n'
-                    s = s + prefix + 'char ' + arg.name + '_c[' + str_len_p1 + '];\n'
+                    s = s + prefix + 'char ' + arg.name + '_c__[' + str_len_p1 + '];\n'
                     s = s + prefix + 'if (' + arg.name + ') {\n'
                     s = s + prefix + '  int i;\n'
-                    s = s + prefix + '  strncpy(' + arg.name + '_c, ' + arg.name + ', ' + str_len_p1 + '); ' +arg.name+'_c['+str_len_p1+'] = 0; // strncpy protects in case '+arg.name+' is too long\n'
-                    s = s + prefix + '  for (i=strlen('+arg.name+'_c); i<'+str_len_p1+'; i++) '+arg.name+"_c[i] = ' '; // Add whitespace for Fortran\n"
+                    s = s + prefix + '  strncpy(' + arg.name + '_c__, ' + arg.name + ', ' + str_len_p1 + '); ' +arg.name+'_c__['+str_len_p1+'] = 0; // strncpy protects in case '+arg.name+' is too long\n'
+                    s = s + prefix + '  for (i=strlen('+arg.name+'_c__); i<'+str_len_p1+'; i++) '+arg.name+"_c__[i] = ' '; // Add whitespace for Fortran\n"
                     s = s + prefix + '}\n'
     # Add wrapper code for array size values
     if call:
@@ -1224,8 +1224,8 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
                 s = s + '\n'
                 s = s + prefix + 'if ('+arg.name+') {\n'
                 s = s + prefix + '  // Trim trailing whitespace and assign character array to string:\n'
-                s = s + prefix + '  for (int i=' + str_len_m1 + '; ' + arg.name + "_c[i]==' '; i--) " + arg.name + "_c[i] = '\\0';\n"
-                s = s + prefix + '  ' + arg.name + '->assign(' + arg.name + '_c);\n  }'
+                s = s + prefix + '  for (int i=' + str_len_m1 + '; ' + arg.name + "_c__[i]==' '; i--) " + arg.name + "_c__[i] = '\\0';\n"
+                s = s + prefix + '  ' + arg.name + '->assign(' + arg.name + '_c__);\n  }'
         if proc.retval and proc.has_post_call_wrapper_code():
             s = s + '\n' + prefix + 'return __retval;'
     return s
