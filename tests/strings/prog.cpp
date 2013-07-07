@@ -69,6 +69,16 @@ int main(void)
     return 13;
   if (s.compare("Test String") != 0)
     return 14;
+  if (FortFuncs::optional_out() != 0) // Not present
+    return 15;
+
+  sa1.resize(11);
+  if (FortFuncs::optional_out_assumed(&sa1) != 1) // Present
+    return 16;
+  if (sa1.compare("Test String") != 0)
+    return 17;
+  if (FortFuncs::optional_out_assumed() != 0) // Not present
+    return 18;
 
   return 0;
 }

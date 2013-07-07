@@ -1100,8 +1100,12 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # -------------------------------------------
         # Special string handling
         if call and arg.type.type=='CHARACTER' and not arg.intent=='inout':
-            # Pass NULL if optional arg not present
-            string = string + ' ? ' + arg.name + '_c : NULL'
+            # For assumed-length intent(in) strings, no special
+            # treatment needed here (we just pass along the character
+            # array pointer)
+            if not (arg.intent=='in' and arg.type.str_len.assumed):
+                # Pass NULL if optional arg not present
+                string = string + ' ? ' + arg.name + '_c : NULL'
         # Special handling for matrix arguments
         if call and arg.type.matrix and not opts.no_fmat:
             if arg.optional:
@@ -1154,26 +1158,29 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
                 str_len_m1 = str_len + '-1'
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
                 if arg.type.str_len.assumed:
-                    s = s + prefix + 'int ' + arg.name + '_len;\n'
+                    # Make sure to initialize the str_length arg to 0,
+                    # in case of a not-present optional, since a
+                    # character array is statically declared with this
+                    # length, even if the arg is not present (testing
+                    # with gfortran indicates that in case of not
+                    # present it passes 0 for the length)
+                    s = s + prefix + 'int ' + arg.name + '_len = 0;\n'
                     s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len = '+ arg.name + '->length();\n'
                 s = s + prefix + '// Declare memory to store output character data\n'
                 s = s + prefix + 'char ' + arg.name + '_c[' + str_len_p1 + '];\n'
                 s = s + prefix + arg.name + '_c[' + str_len + "] = '\\0';\n"
             elif arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='in':
-                s = s + prefix + 'int ' + arg.name + '_len;\n'
-                s = s + prefix + 'if (' + arg.name + ') '+ arg.name+ '_len = strlen('+arg.name+'); // Protect Optional args\n'
-                s = s + prefix + '// Create C array for Fortran input string data\n'
-                s = s + prefix + 'char ' + arg.name + '_c[' + str_len_p1 + '];\n'
-                s = s + prefix + 'if (' + arg.name + ') {\n'
-                s = s + prefix + '  int i;\n'
                 if arg.type.str_len.assumed:
-                    s = s + prefix + '  strcpy('+arg.name+'_c, '+arg.name+');\n'
-                    s = s + prefix + '  // No need to pad with whitespace b/c Fortran hidden length arg\n'
-                    s = s + prefix + '  // will signal actual length\n'
+                    s = s + prefix + 'int ' + arg.name + '_len = 0;\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name+ '_len = strlen('+arg.name+'); // Protect Optional args\n'
                 else:
+                    s = s + prefix + '// Create C array for Fortran input string data\n'
+                    s = s + prefix + 'char ' + arg.name + '_c[' + str_len_p1 + '];\n'
+                    s = s + prefix + 'if (' + arg.name + ') {\n'
+                    s = s + prefix + '  int i;\n'
                     s = s + prefix + '  strncpy(' + arg.name + '_c, ' + arg.name + ', ' + str_len_p1 + '); ' +arg.name+'_c['+str_len_p1+'] = 0; // strncpy protects in case '+arg.name+' is too long\n'
                     s = s + prefix + '  for (i=strlen('+arg.name+'_c); i<'+str_len_p1+'; i++) '+arg.name+"_c[i] = ' '; // Add whitespace for Fortran\n"
-                s = s + prefix + '}\n'
+                    s = s + prefix + '}\n'
     # Add wrapper code for array size values
     if call:
         for arg in proc.args.itervalues():

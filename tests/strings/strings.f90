@@ -125,5 +125,16 @@ CONTAINS
     END IF
   END FUNCTION optional_out
 
+  FUNCTION optional_out_assumed(s) RESULT(res)
+    CHARACTER(len=*), OPTIONAL, INTENT(out) :: s
+    INTEGER :: res ! 1=present, 0=not present
+    
+    res = 0
+    IF (PRESENT(s)) THEN
+      res = 1
+      s = 'Test String'
+    END IF
+  END FUNCTION optional_out_assumed
+
 
 END MODULE strings
