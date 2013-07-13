@@ -54,7 +54,8 @@ SWIG = True  # Whether or not to include preprocessor defs that will
 
 # REGULAR EXPRESSIONS ===============================
 
-fort_type_def = re.compile(r'\s*TYPE\s+[a-zA-Z]', re.IGNORECASE)
+fort_type_def = re.compile(r'\s*TYPE(\s+(?P<name0>[a-z]\w*)|.*::\s*(?P<name1>[a-z]\w*))', re.IGNORECASE)
+fort_type_extends_def = re.compile(r'EXTENDS\s*\(\s*([a-z]\w*)\s*\)', re.IGNORECASE)
 fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(', re.IGNORECASE)
 fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)', re.IGNORECASE)
 fort_end_interface = re.compile(r'\s*END\s*INTERFACE', re.IGNORECASE)
@@ -498,6 +499,11 @@ class DerivedType:
         self.procs = []
         self.mod = current_module
         self.comment = comment
+
+        self.is_class = False
+        self.abstract = False
+        self.extends = None
+
     def ctor_list(self):
         """Return list of associated ctors"""
         ctors = []
@@ -774,8 +780,19 @@ def parse_abstract_interface(file,line):
             dox_comments = []
 
 def parse_type(file,line):
-    typename = line.split()[1]
+    print 'parsing type'
+    m = fort_type_def.match(line)
+    typename = m.group('name0') or m.group('name1')
     add_type(typename)
+    if 'ABSTRACT' in line.upper():
+        print "Abstract type:", typename
+        objects[typename].abstract = True
+        objects[typename].is_class = True
+    extends_match = fort_type_extends_def.search(line)
+    if extends_match:
+        objects[typename].extends = extends_match.group(1)
+        objects[typename].is_class = True
+    print "{} extends: {}".format(typename, objects[typename].extends)
     # Move to end of type, so don't catch PUBLIC/PRIVATE
     while True:
         line = readline(file)
