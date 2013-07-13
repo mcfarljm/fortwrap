@@ -66,7 +66,7 @@ fort_comment = re.compile('\s*!')
 # Data types
 primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>(\w+|\*))\s*\)))?'
 primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
-fort_data_str = r'\s*(' + primitive_data_str + '|TYPE\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
+fort_data_str = r'\s*(' + primitive_data_str + '|(?P<dt_mode>TYPE|CLASS)\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_str + '.*::',re.IGNORECASE)
 optional_def = re.compile('OPTIONAL.*::', re.IGNORECASE)
@@ -212,7 +212,7 @@ class DataType:
         self.array = array
         self.str_len = str_len
         self.proc_pointer = False
-        self.dt = False
+        self.dt = False      # False, 'TYPE', or 'CLASS'
         self.hidden = hidden # hidden name length arg
         # For array, name of argument used to pass the array length:
         self.is_array_size = False # integer defining an array size
@@ -254,12 +254,13 @@ class DataType:
                 m = fort_data.match(type)
                 self.type = m.group('proc_spec')
                 proc_pointer_used = True
-            elif 'TYPE' in type.upper():
-                self.dt = True
-                m = fort_data.match(type)
-                self.type = m.group('dt_spec')
             else:
-                raise FWTypeException(type)
+                m = fort_data.match(type)
+                if m.group('dt_mode'):
+                    self.dt = m.group('dt_mode').upper()
+                    self.type = m.group('dt_spec')
+                else:
+                    raise FWTypeException(type)
 
         # Properties queried by the wrapper generator:
         # vec=vector: 1-d array
@@ -393,7 +394,7 @@ class Procedure:
         self.nargs = len(args)
         self.mod = current_module
         self.comment = comment
-        self.method = method
+        self.method = method # None, 't' (TYPE), 'c' (CLASS)
         self.num = module_proc_num
         self.ctor = False
         self.dtor = False
@@ -1272,7 +1273,7 @@ def write_constructor(file,object,fort_ctor=None):
     """Write the c++ code for the constructor, possibly including a
     call to a Fortran ctor"""
     # Not used for dummy class with orphan functions
-    if object.name==orphan_classname:
+    if object.name==orphan_classname or object.abstract:
         return
     file.write('// Constructor:\n')
     file.write(object.name + '::' + object.name)# + '() {\n')
@@ -1295,7 +1296,7 @@ def write_constructor(file,object,fort_ctor=None):
 
 def write_destructor(file,object):
     """Write code for destructor"""
-    if object.name==orphan_classname:
+    if object.name==orphan_classname or object.abstract:
         return
     file.write('// Destructor:\n')
     file.write(object.name + '::~' + object.name + '() {\n')
@@ -1339,7 +1340,7 @@ def write_class(object):
     # C Bindings
     file.write('\nextern "C" {\n')
     # Write bindings for allocate/deallocate funcs
-    if object.name!=orphan_classname:
+    if object.name!=orphan_classname and not object.abstract:
         file.write('  void ' + mangle_name(fort_wrap_file, 'allocate_'+object.name) + '(ADDRESS *caddr);\n')
         file.write('  void ' + mangle_name(fort_wrap_file, 'deallocate_'+object.name) + '(ADDRESS caddr);\n')
     for proc in object.procs:
@@ -1352,7 +1353,12 @@ def write_class(object):
     
     if not opts.global_orphans:
         write_cpp_dox_comments(file,object.comment)
-        file.write('class ' + object.name + ' {\n\n')
+        file.write('class ' + object.name + ' ')
+        if object.extends:
+            file.write(': public ' + object.extends + ' ')
+        file.write('{\n\n')
+        if object.abstract:
+            file.write('protected:\n  // {0} can not be instantiated\n  {0}() {{}}\n\n'.format(object.name))
         file.write('public:\n')
     # Constructor:
     fort_ctors = object.ctor_list()
@@ -1360,13 +1366,16 @@ def write_class(object):
         for fort_ctor in fort_ctors:
             write_cpp_dox_comments(file,fort_ctor.comment,fort_ctor.args_by_pos)
             file.write('  ' + object.name + '(' + c_arg_list(fort_ctor,bind=False,call=False,definition=False) + ');\n')
-    elif not object.name==orphan_classname:
+    elif not object.name==orphan_classname and not object.abstract:
         # Don't declare default constructor (or destructor, below) for
         # the dummy class
         file.write('  ' + object.name + '();\n')
     # Desctructor:
     if not object.name==orphan_classname:
-        file.write('  ~' + object.name + '();\n\n')
+        if object.abstract:
+            file.write('  virtual ~' + object.name + '() {}\n\n')
+        else:
+            file.write('  ~' + object.name + '();\n\n')
     # Method declarations
     for proc in object.procs:
         if proc.ctor or (proc.dtor and not is_public(proc.name)):
@@ -1376,8 +1385,11 @@ def write_class(object):
     #file.write('\nprivate:\n')
     if object.name!=orphan_classname:
         file.write('  ADDRESS data_ptr;\n')
-        file.write('\nprivate:\n')
-        file.write('  bool initialized;\n')
+        if object.is_class:
+            file.write('  FClassContainer class_data;\n')
+        else:
+            file.write('\nprivate:\n')
+            file.write('  bool initialized;\n')
     if not opts.global_orphans:
         file.write('};\n\n')
     if object.name == orphan_classname:
@@ -1434,6 +1446,8 @@ def get_native_includes(object):
     """
     After method association, check which native types an object uses
     and return a corresponding string list of include file
+
+    This will also add the include needed for inheritance
     """
     includes = set()
     for proc in object.procs:
@@ -1442,6 +1456,9 @@ def get_native_includes(object):
                 includes.add(arg.type.type)
             if arg.type.matrix and not opts.no_fmat:
                 includes.add(matrix_classname)
+    # For inheritance:
+    if object.extends:
+        includes.add(object.extends)
     return includes
 
 def write_global_header_file():
