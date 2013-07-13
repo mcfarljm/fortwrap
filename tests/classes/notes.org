@@ -1,0 +1,20 @@
+* Basic ideas
+** C++ classes and inheritance structure matches the Fortran
+This way, C++ takes care of some of the dispatching
+** Fortran routines that accept CLASS require different pointer
+Must send pointer to a struct that itself contains two pointers
+** Constructors
+First calls Fortran "allocator" which receives a pointer to a newly allocated derived type (Fortran won't let you get a pointer to a class instance).  Then simply assign a pointer to the appropriate vtab entry, which is stored as part of the class data.
+
+Parser should flag whether any derived type is a "class", so that it then knows how to write out the wrapper code.
+
+* FortWrap parsing
+** During parsing, flag derived types as "class"
+If any procedure are encountered that accept it as a CLASS, or if it EXTENDS another derived type.  I believe type bound procedures also require the argument to be declared CLASS.
+** Type Bound Procedures
+Each derived type contains a list of tpb data structures.  Each tpb structure contains:
+- method name
+- proc name
+- is deferred
+- is NOPASS
+- PASS(arg): flag for not supported (yet)
