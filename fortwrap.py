@@ -56,6 +56,8 @@ SWIG = True  # Whether or not to include preprocessor defs that will
 
 fort_type_def = re.compile(r'\s*TYPE(\s+(?P<name0>[a-z]\w*)|.*::\s*(?P<name1>[a-z]\w*))', re.IGNORECASE)
 fort_type_extends_def = re.compile(r'EXTENDS\s*\(\s*([a-z]\w*)\s*\)', re.IGNORECASE)
+fort_tpb_def = re.compile(r'\s*PROCEDURE.*::\s*(?P<name>[a-z]\w*)\s*(=>\s*(?P<proc>[a-z]\w*))?', re.IGNORECASE)
+
 fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(', re.IGNORECASE)
 fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)', re.IGNORECASE)
 fort_end_interface = re.compile(r'\s*END\s*INTERFACE', re.IGNORECASE)
@@ -503,6 +505,10 @@ class DerivedType:
         self.is_class = False
         self.abstract = False
         self.extends = None
+        self.tpbs = {} # proc => tpb instance
+
+    def add_tpb(self, tpb):
+        self.tpbs[tpb.proc] = tpb
 
     def ctor_list(self):
         """Return list of associated ctors"""
@@ -511,6 +517,12 @@ class DerivedType:
             if proc.ctor:
                 ctors.append(proc)
         return ctors
+
+class TypeBoundProcedure:
+    def __init__(self,line,re_match):
+        self.name = re_match.group('name')
+        self.proc = re_match.group('proc') or self.name
+        self.deferred = 'DEFERRED' in line.upper()
 
 
 def mangle_name(mod,func):
@@ -793,14 +805,23 @@ def parse_type(file,line):
         objects[typename].extends = extends_match.group(1)
         objects[typename].is_class = True
     print "{} extends: {}".format(typename, objects[typename].extends)
-    # Move to end of type, so don't catch PUBLIC/PRIVATE
+    # Move to end of type and parse type bound procedure definitions
     while True:
         line = readline(file)
+        tpb_match = fort_tpb_def.match(line)
         if line == '':
             error("Unexpected end of file in TYPE " + typename)
             return
-        if line.upper().strip().startswith('END TYPE'):
+        elif line.upper().strip().startswith('END TYPE'):
             return
+        elif tpb_match:
+            if 'POINTER' in line.upper():
+                pass # Not a TPB
+            elif 'PASS' in line.upper():
+                warning('PASS and NOPASS not yet supported for type bound procedures')
+            else:
+                tpb = TypeBoundProcedure(line, tpb_match)
+                objects[typename].add_tpb(tpb)
 
 def parse_comments(file,line):
     """
