@@ -25,8 +25,6 @@ int main(void)
   if (s2->get_area() != 3)
     return 5;
   
-  delete s1, s2;
-
   Polygon *p1;
   p1 = new Square(5);
   if (p1->get_area() != 25)
@@ -34,7 +32,10 @@ int main(void)
   if (p1->num_sides() != 4)
     return 7;
 
-  delete p1;
+  if (s2->add_area(p1) != 28)
+    return 8;
+
+  delete s1, s2, p1;
 
   return 0;
 }

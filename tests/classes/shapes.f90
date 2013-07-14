@@ -48,7 +48,7 @@ CONTAINS
     INTEGER, INTENT(in) :: radius
     s%radius = radius
 !!$    PRINT*, 'cloc in Circle_ctor:', c_loc(s)
-    PRINT*, 'Shape num in ctor:', s%num
+    !PRINT*, 'Shape num in ctor:', s%num
   END SUBROUTINE Circle_ctor
 
   SUBROUTINE Square_ctor(s, side)
@@ -57,7 +57,7 @@ CONTAINS
     s%side = side
     s%nsides = 4
 !!$    PRINT*, 'in Square ctor'
-    PRINT*, 'Shape num in ctor:', s%num
+    !PRINT*, 'Shape num in ctor:', s%num
   END SUBROUTINE Square_ctor
 
   !> Compute area of a circle

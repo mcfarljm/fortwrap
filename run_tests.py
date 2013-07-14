@@ -18,7 +18,7 @@ custom_opts = { 'c_arrays' : OPTS + ' --no-vector',
                 'multidim_arrays' : OPTS + ' --no-vector --no-fmat'}
 
 # Tests for demonstration purposes only:
-excludes = [ 'comments', 'classes' ]
+excludes = [ 'comments' ]
 
 os.chdir('tests')
 tests = glob.glob('*')
