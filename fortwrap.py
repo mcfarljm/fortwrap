@@ -1048,9 +1048,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     # handle orphan functions in the dummy class correctly
     if bind and call and proc.nargs>0 and proc.args_by_pos[1].type.dt:
         if proc.nargs==1:
-            return 'data_ptr'
+            return 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'
         else:
-            string = 'data_ptr, '
+            string = 'data_ptr, ' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data, '
     # Add argument names and possibly types
     for pos,arg in proc.args_by_pos.iteritems():
         if (call or not bind) and pos == 1 and proc.args_by_pos[1].type.dt:
@@ -1123,6 +1123,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # Change pass-by-value to reference for Fortran
         if call and bind and arg.pass_by_val():
             string = string + '&'
+        # Native class arguments that are not optional need & before arg name
+        if arg.type.dt=='CLASS' and call and arg.native and not (arg.optional and arg.cpp_optional):
+            string = string + '&'
         # Add argument name -------------------------
         if arg.type.proc_pointer and not bind:
             # Arg name is already part of the C function pointer definition
@@ -1157,9 +1160,15 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # Special native handling of certain types:
         if call and arg.native:
             if arg.optional and arg.cpp_optional:
-                string = string + ' ? ' + arg.name + '->data_ptr : NULL'
+                if arg.type.dt == 'TYPE':
+                    string = string + ' ? ' + arg.name + '->data_ptr : NULL'
+                else:
+                    string = string + ' ? &' + arg.name + '->class_data : NULL'
             else:
-                string = string + '->data_ptr'
+                if arg.type.dt == 'TYPE':
+                    string = string + '->data_ptr'
+                else:
+                    string = string + '->class_data'
         elif not call and not bind and not definition and arg.cpp_optional:
             string = string + '=NULL'
         if proc.has_args_past_pos(pos,bind):

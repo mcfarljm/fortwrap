@@ -14,4 +14,6 @@ PROGRAM prog
 
   PRINT*, 'circle num:', c%get_num()
 
+  PRINT*, 'total area:', add_area(c, sq)
+
 END PROGRAM prog

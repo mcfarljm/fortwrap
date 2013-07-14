@@ -60,6 +60,7 @@ CONTAINS
     PRINT*, 'Shape num in ctor:', s%num
   END SUBROUTINE Square_ctor
 
+  !> Compute area of a circle
   FUNCTION Circle_area(s) RESULT(a)
     USE ISO_C_BINDING
     CLASS(Circle), TARGET :: s
@@ -110,5 +111,11 @@ CONTAINS
       PRINT*, 'Square'
     END SELECT
   END SUBROUTINE what_am_i
+
+  FUNCTION add_area(s1, s2) RESULT(a)
+    CLASS(Shape), INTENT(in) :: s1, s2
+    INTEGER :: a
+    a = s1%get_area() + s2%get_area()
+  END FUNCTION add_area
 
 END MODULE shapes
