@@ -1315,6 +1315,11 @@ def write_constructor(file,object,fort_ctor=None):
     file.write('  data_ptr = NULL;\n')
     # Allocate storage for Fortran derived type
     file.write('  ' + mangle_name(fort_wrap_file, 'allocate_' + object.name) + '(&data_ptr); // Allocate Fortran derived type\n')
+    if object.is_class:
+        # Class data must be set up before calling constructor, in
+        # case constructor uses CLASS argument
+        file.write('  class_data.vptr = &__{0}_MOD___vtab_{0}_{1}; // Get pointer to vtab\n'.format(object.mod, object.name))
+        file.write('  class_data.data = data_ptr;\n')
     # If present, call Fortran ctor
     if fort_ctor:
         file.write(function_def_str(fort_ctor,bind=True,call=True) )
@@ -1322,10 +1327,6 @@ def write_constructor(file,object,fort_ctor=None):
         file.write('  initialized = true;\n')
     else:
         file.write('  initialized = false;\n')
-    if object.is_class:
-        file.write('  class_data.vptr = &__{0}_MOD___vtab_{0}_{1};'.format(object.mod, object.name))
-        file.write('  // Get pointer to vtab\n')
-        file.write('  class_data.data = data_ptr;\n')
     file.write('}\n\n')    
 
 def write_destructor(file,object):
@@ -1434,13 +1435,12 @@ def write_class(object):
             else:
                 file.write('  virtual ' + function_def_str(abstract_interfaces[tbp.interface], dfrd_tbp=tbp, prefix='')[:-1] + ' = 0;\n\n')
     #file.write('\nprivate:\n')
-    if object.name!=orphan_classname:
+    if object.name!=orphan_classname and not object.extends:
         file.write('  ADDRESS data_ptr;\n')
         if object.is_class:
             file.write('  FClassContainer class_data;\n')
-        if not object.abstract:
-            file.write('\nprivate:\n')
-            file.write('  bool initialized;\n')
+        file.write('\nprotected:\n')
+        file.write('  bool initialized;\n')
     if not opts.global_orphans:
         file.write('};\n\n')
     if object.name == orphan_classname:
