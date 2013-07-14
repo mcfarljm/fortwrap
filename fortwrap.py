@@ -56,7 +56,7 @@ SWIG = True  # Whether or not to include preprocessor defs that will
 
 fort_type_def = re.compile(r'\s*TYPE(\s+(?P<name0>[a-z]\w*)|.*::\s*(?P<name1>[a-z]\w*))', re.IGNORECASE)
 fort_type_extends_def = re.compile(r'EXTENDS\s*\(\s*([a-z]\w*)\s*\)', re.IGNORECASE)
-fort_tpb_def = re.compile(r'\s*PROCEDURE.*::\s*(?P<name>[a-z]\w*)\s*(=>\s*(?P<proc>[a-z]\w*))?', re.IGNORECASE)
+fort_tbp_def = re.compile(r'\s*PROCEDURE\s*(\(\s*(?P<interface>[a-z]\w*)\))?.*::\s*(?P<name>[a-z]\w*)\s*(=>\s*(?P<proc>[a-z]\w*))?', re.IGNORECASE)
 
 fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(', re.IGNORECASE)
 fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)', re.IGNORECASE)
@@ -506,10 +506,10 @@ class DerivedType:
         self.is_class = False
         self.abstract = False
         self.extends = None
-        self.tpbs = {} # proc => tpb instance
+        self.tbps = {} # proc => tbp instance
 
-    def add_tpb(self, tpb):
-        self.tpbs[tpb.proc] = tpb
+    def add_tbp(self, tbp):
+        self.tbps[tbp.proc] = tbp
 
     def ctor_list(self):
         """Return list of associated ctors"""
@@ -524,6 +524,9 @@ class TypeBoundProcedure:
         self.name = re_match.group('name')
         self.proc = re_match.group('proc') or self.name
         self.deferred = 'DEFERRED' in line.upper()
+        # Initially False or a string, but the string gets changed to
+        # a procedure instance in associate_procedures
+        self.interface = re_match.group('interface')
 
 
 def mangle_name(mod,func):
@@ -809,20 +812,20 @@ def parse_type(file,line):
     # Move to end of type and parse type bound procedure definitions
     while True:
         line = readline(file)
-        tpb_match = fort_tpb_def.match(line)
+        tbp_match = fort_tbp_def.match(line)
         if line == '':
             error("Unexpected end of file in TYPE " + typename)
             return
         elif line.upper().strip().startswith('END TYPE'):
             return
-        elif tpb_match:
+        elif tbp_match:
             if 'POINTER' in line.upper():
-                pass # Not a TPB
+                pass # Not a TBP
             elif 'PASS' in line.upper():
                 warning('PASS and NOPASS not yet supported for type bound procedures')
             else:
-                tpb = TypeBoundProcedure(line, tpb_match)
-                objects[typename].add_tpb(tpb)
+                tbp = TypeBoundProcedure(line, tbp_match)
+                objects[typename].add_tbp(tbp)
 
 def parse_comments(file,line):
     """
@@ -1164,7 +1167,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     return string
     
 # TODO: clean up indent prefix: confusing for proc_pointer special treatment
-def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
+def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix='  '):
     """
     Return a string for a function declaration/definition/call.  There
     are four cases:
@@ -1172,6 +1175,11 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
     -- Method declaration:      none
     -- Method definition:       obj
     -- C binding call:          bind, call
+
+    dfrd_tbp points to corresponding deffered type bound procedure, if
+    applicable.  This is needed because one abstract interface could
+    be used for multiple TBP's, so can't identify the TBP just from
+    the (abstract) procedure itself
     """
     s = ''
     # Add wrapper code for function pointers
@@ -1252,7 +1260,15 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
     elif obj and not opts.global_orphans:
         s = s + obj.name + '::' + translate_name(proc.name)
     else:
-        s = s + translate_name(proc.name)
+        if proc.args_by_pos[1].type.dt == 'CLASS' and proc.name in objects[proc.args_by_pos[1].type.type].tbps:
+            # This is a type bound procedure, so name may different
+            # from procedure name
+            s = s + objects[proc.args_by_pos[1].type.type].tbps[proc.name].name
+        elif dfrd_tbp:
+            # proc is the abstract interface for a deferred tbp
+            s = s + dfrd_tbp.name
+        else:
+            s = s + translate_name(proc.name)
     s = s + '(' + c_arg_list(proc,bind,call,obj!=None) + ')'
     if not obj:
         s = s + ';'
@@ -1292,6 +1308,10 @@ def write_constructor(file,object,fort_ctor=None):
         file.write('  initialized = true;\n')
     else:
         file.write('  initialized = false;\n')
+    if object.is_class:
+        file.write('  class_data.vptr = &__{0}_MOD___vtab_{0}_{1};'.format(object.mod, object.name))
+        file.write('  // Get pointer to vtab\n')
+        file.write('  class_data.data = data_ptr;\n')
     file.write('}\n\n')    
 
 def write_destructor(file,object):
@@ -1337,6 +1357,10 @@ def write_class(object):
         includes.remove(object.name) # Remove self
     for include in includes:
         file.write('#include "' + include + '.h"\n')
+    # Declare external vtab data
+    if object.is_class:
+        file.write('\n// Declare external vtab data:\n')
+        file.write('extern int __{0}_MOD___vtab_{0}_{1}; // int is dummy data type\n'.format(object.mod, object.name))
     # C Bindings
     file.write('\nextern "C" {\n')
     # Write bindings for allocate/deallocate funcs
@@ -1382,6 +1406,19 @@ def write_class(object):
             continue
         write_cpp_dox_comments(file,proc.comment,proc.args_by_pos)
         file.write(function_def_str(proc) + '\n\n')
+    # Check for pure virtual methods (which have no directly
+    # associated procedure)
+    for tbp in object.tbps.itervalues():
+        if tbp.deferred:
+            # Note: this lookup doesn't respect the module USE
+            # hierarchy and could potentially point to wrong
+            # abstract_interfaces if the project contains multiple
+            # abstract_interfaces with different names, in different
+            # modules
+            if tbp.interface not in abstract_interfaces:
+                error('abstract interface {0} for type bound procedure {1} not found'.format(tbp.interface, tbp.name))
+            else:
+                file.write('  virtual ' + function_def_str(abstract_interfaces[tbp.interface], dfrd_tbp=tbp, prefix='')[:-1] + ' = 0;\n\n')
     #file.write('\nprivate:\n')
     if object.name!=orphan_classname:
         file.write('  ADDRESS data_ptr;\n')
