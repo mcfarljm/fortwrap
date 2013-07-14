@@ -139,6 +139,7 @@ proc_pointer_used = False
 # Whether or not matrices are used
 matrix_used = False
 stringh_used = False            # Whether "string.h" is used (needed for strcpy)
+fort_class_used = False
 
 not_wrapped = [] # List of procedures that weren't wrapped
 
@@ -796,18 +797,19 @@ def parse_abstract_interface(file,line):
             dox_comments = []
 
 def parse_type(file,line):
-    print 'parsing type'
+    global fort_class_used
     m = fort_type_def.match(line)
     typename = m.group('name0') or m.group('name1')
     add_type(typename)
     if 'ABSTRACT' in line.upper():
-        print "Abstract type:", typename
         objects[typename].abstract = True
         objects[typename].is_class = True
+        fort_class_used = True
     extends_match = fort_type_extends_def.search(line)
     if extends_match:
         objects[typename].extends = extends_match.group(1)
         objects[typename].is_class = True
+        fort_class_used = True
     print "{} extends: {}".format(typename, objects[typename].extends)
     # Move to end of type and parse type bound procedure definitions
     while True:
@@ -1264,20 +1266,23 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     elif not call:
         s = s + 'void '
     # Definition/declaration:
-    if bind:
-        s = s + mangle_name(proc.mod,proc.name)
-    elif obj and not opts.global_orphans:
-        s = s + obj.name + '::' + translate_name(proc.name)
-    else:
+    if not bind:
+        # Determine what the C++ method name will be
         if proc.args_by_pos[1].type.dt == 'CLASS' and proc.name in objects[proc.args_by_pos[1].type.type].tbps:
             # This is a type bound procedure, so name may different
             # from procedure name
-            s = s + objects[proc.args_by_pos[1].type.type].tbps[proc.name].name
+            method_name= objects[proc.args_by_pos[1].type.type].tbps[proc.name].name
         elif dfrd_tbp:
             # proc is the abstract interface for a deferred tbp
-            s = s + dfrd_tbp.name
+            method_name = dfrd_tbp.name
         else:
-            s = s + translate_name(proc.name)
+            method_name= translate_name(proc.name)        
+    if bind:
+        s = s + mangle_name(proc.mod,proc.name)
+    elif obj and not opts.global_orphans:
+        s = s + obj.name + '::' + method_name
+    else:
+        s = s + method_name
     s = s + '(' + c_arg_list(proc,bind,call,obj!=None) + ')'
     if not obj:
         s = s + ';'
@@ -1433,7 +1438,7 @@ def write_class(object):
         file.write('  ADDRESS data_ptr;\n')
         if object.is_class:
             file.write('  FClassContainer class_data;\n')
-        else:
+        if not object.abstract:
             file.write('\nprivate:\n')
             file.write('  bool initialized;\n')
     if not opts.global_orphans:
@@ -1525,6 +1530,8 @@ def write_misc_defs():
     f.write('#define ' + misc_defs_filename.upper()[:-2] + '_H_\n\n')
     f.write('typedef void(*generic_fpointer)(void);\n')
     f.write('typedef void* ADDRESS;\n\n')
+    if fort_class_used:
+        f.write('struct FClassContainer {\n  ADDRESS data;\n  ADDRESS vptr;\n};\n\n')
     f.write('extern "C" {\n')
     if compiler == 'g95':
         f.write('  /* g95_runtime_start and stop are supposed to be called\n')
@@ -1607,7 +1614,7 @@ def write_fortran_wrapper():
         f.write('    CALL C_F_PROCPOINTER(cpointer,fpointer)\n')
         f.write('  END SUBROUTINE '+func_pointer_converter+'\n\n')
     for obj in objects.itervalues():
-        if obj.name == orphan_classname:
+        if obj.name == orphan_classname or obj.abstract:
             continue
         cptr = obj.name + '_cptr'
         fptr = obj.name + '_fptr'
