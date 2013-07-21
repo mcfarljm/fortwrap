@@ -1,3 +1,6 @@
+FortWrap 1.0.5 summary:
+- Fix for renaming of derived types with the interface file
+
 FortWrap 1.0.4 summary:
 - Fixing bug for optional assumed length strings
 

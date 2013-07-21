@@ -13,6 +13,11 @@ int main(void)
   if (o2.add(2) != 12)
     return 2;
 
+  // Test renamed object
+  Steve s(5);
+  if (s.val() != 5)
+    return 3;
+
   return 0;
 }
 
