@@ -803,15 +803,15 @@ def parse_type(file,line):
     typename = m.group('name0') or m.group('name1')
     add_type(typename)
     if 'ABSTRACT' in line.upper():
-        objects[typename].abstract = True
-        objects[typename].is_class = True
+        objects[typename.lower()].abstract = True
+        objects[typename.lower()].is_class = True
         fort_class_used = True
     extends_match = fort_type_extends_def.search(line)
     if extends_match:
-        objects[typename].extends = extends_match.group(1)
-        objects[typename].is_class = True
+        objects[typename.lower()].extends = extends_match.group(1)
+        objects[typename.lower()].is_class = True
         fort_class_used = True
-    print "{} extends: {}".format(typename, objects[typename].extends)
+    print "{} extends: {}".format(typename, objects[typename.lower()].extends)
     # Move to end of type and parse type bound procedure definitions
     while True:
         line = readline(file)
@@ -828,7 +828,7 @@ def parse_type(file,line):
                 warning('PASS and NOPASS not yet supported for type bound procedures')
             else:
                 tbp = TypeBoundProcedure(line, tbp_match)
-                objects[typename].add_tbp(tbp)
+                objects[typename.lower()].add_tbp(tbp)
 
 def parse_comments(file,line):
     """
@@ -1269,10 +1269,10 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     # Definition/declaration:
     if not bind:
         # Determine what the C++ method name will be
-        if proc.args_by_pos[1].type.dt == 'CLASS' and proc.name in objects[proc.args_by_pos[1].type.type].tbps:
+        if proc.args_by_pos[1].type.dt == 'CLASS' and proc.name in objects[proc.args_by_pos[1].type.type.lower()].tbps:
             # This is a type bound procedure, so name may different
             # from procedure name
-            method_name= objects[proc.args_by_pos[1].type.type].tbps[proc.name].name
+            method_name= objects[proc.args_by_pos[1].type.type.lower()].tbps[proc.name].name
         elif dfrd_tbp:
             # proc is the abstract interface for a deferred tbp
             method_name = dfrd_tbp.name
