@@ -13,3 +13,6 @@ Create a more appropriate method name for the C+ interface:
 Exclude a procedure:
 %ignore work_sub
 
+Test for renaming a derived type
+%rename Object_to_rename Steve
+%rename object2_val val

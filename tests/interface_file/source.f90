@@ -15,6 +15,11 @@ MODULE source
     MODULE PROCEDURE object_constructor_i, object_constructor_f
   END INTERFACE
 
+  ! An object that will get renamed
+  TYPE Object_to_rename
+    INTEGER :: i
+  END TYPE Object_to_rename
+
 CONTAINS
 
   ! Demonstrate use of a different regular expression for matching
@@ -46,5 +51,17 @@ CONTAINS
     INTEGER :: y
     y = o%i + INT(o%f) + i
   END FUNCTION object_add
+
+  SUBROUTINE Object2_constructor(o, i)
+    TYPE (Object_to_rename) :: o
+    INTEGER, INTENT(in) :: i
+    o%i = i
+  END SUBROUTINE Object2_constructor
+
+  FUNCTION object2_val(o) RESULT(i)
+    TYPE (Object_to_rename) :: o
+    INTEGER :: i
+    i = o%i
+  END FUNCTION object2_val
 
 END MODULE source

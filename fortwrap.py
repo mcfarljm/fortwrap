@@ -100,7 +100,7 @@ dtor_def = re.compile('.*_dtor', re.IGNORECASE)
 
 # GLOBAL VARIABLES ==================================
 
-objects = dict()
+objects = dict() # lower case object name -> DerivedType instance
 procedures = []
 abstract_interfaces = dict()
 name_substitutions = dict()
@@ -499,7 +499,8 @@ class Procedure:
         
 class DerivedType:
     def __init__(self,name,comment=None):
-        self.name = translate_name(name)
+        self.name = name
+        self.cname = translate_name(name) # Account for name renaming
         self.procs = []
         self.mod = current_module
         self.comment = comment
@@ -609,7 +610,7 @@ def args_have_comment(args):
 
 def add_type(t):
     if is_public(t):
-        objects[t] = DerivedType(t,dox_comments)
+        objects[t.lower()] = DerivedType(t,dox_comments)
 
 def parse_argument_defs(line,file,arg_list,args,retval,comments):
     count = 0
@@ -969,24 +970,24 @@ def associate_procedures():
     def flag_native_args(proc):
         # Check for arguments to pass as native classes:
         for pos,arg in proc.args_by_pos.iteritems():
-            if pos>1 and arg.type.dt and not arg.type.array and arg.type.type in objects:
+            if pos>1 and arg.type.dt and not arg.type.array and arg.type.type.lower() in objects:
                 arg.native = True
 
     for proc in procedures:
         # Associate methods
         if proc.method:
             typename = proc.args_by_pos[1].type.type
-            if typename in objects:
+            if typename.lower() in objects:
                 # print "Associating procedure:", typename +'.'+proc.name
-                objects[typename].procs.append(proc)
+                objects[typename.lower()].procs.append(proc)
                 flag_native_args(proc)
             elif typename.lower() not in name_exclusions:
                 error("Method %s declared for unknown derived type %s" % (proc.name, typename))
         # Associate orphan functions with a dummy class
         elif (not opts.no_orphans) or proc.name.lower() in name_inclusions:
-            if not orphan_classname in objects:
-                objects[orphan_classname] = DerivedType(orphan_classname,orphan_class_comments)
-            objects[orphan_classname].procs.append(proc)
+            if not orphan_classname.lower() in objects:
+                objects[orphan_classname.lower()] = DerivedType(orphan_classname,orphan_class_comments)
+            objects[orphan_classname.lower()].procs.append(proc)
             flag_native_args(proc)
             proc.in_orphan_class = True
     # Tag procedure arguments as being inside abstract interface
@@ -1280,7 +1281,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     if bind:
         s = s + mangle_name(proc.mod,proc.name)
     elif obj and not opts.global_orphans:
-        s = s + obj.name + '::' + method_name
+        s = s + obj.cname + '::' + method_name
     else:
         s = s + method_name
     s = s + '(' + c_arg_list(proc,bind,call,obj!=None) + ')'
@@ -1306,7 +1307,7 @@ def write_constructor(file,object,fort_ctor=None):
     if object.name==orphan_classname or object.abstract:
         return
     file.write('// Constructor:\n')
-    file.write(object.name + '::' + object.name)# + '() {\n')
+    file.write(object.cname + '::' + object.cname)# + '() {\n')
     if fort_ctor:
         file.write('(' + c_arg_list(fort_ctor,definition=True) + ')' )
     else:
@@ -1334,7 +1335,7 @@ def write_destructor(file,object):
     if object.name==orphan_classname or object.abstract:
         return
     file.write('// Destructor:\n')
-    file.write(object.name + '::~' + object.name + '() {\n')
+    file.write(object.cname + '::~' + object.cname + '() {\n')
     # Check for Fortran destructor
     for proc in object.procs:
         if proc.dtor:
@@ -1355,10 +1356,10 @@ def write_class(object):
         return
 
     # First write header file:
-    file = open( include_output_dir+'/' + object.name + '.h', 'w')
+    file = open( include_output_dir+'/' + object.cname + '.h', 'w')
     file.write(HEADER_STRING + '\n')
-    file.write('#ifndef ' + object.name.upper() + '_H_\n')
-    file.write('#define ' + object.name.upper() + '_H_\n\n')
+    file.write('#ifndef ' + object.cname.upper() + '_H_\n')
+    file.write('#define ' + object.cname.upper() + '_H_\n\n')
     if SWIG:
         # Needs to be before the include's in the case of swig -includeall
         file.write('\n#ifndef SWIG // Protect declarations from SWIG\n')
@@ -1371,7 +1372,7 @@ def write_class(object):
     if object.name in includes:
         includes.remove(object.name) # Remove self
     for include in includes:
-        file.write('#include "' + include + '.h"\n')
+        file.write('#include "' + translate_name(include) + '.h"\n')
     # Declare external vtab data
     if object.is_class:
         file.write('\n// Declare external vtab data:\n')
@@ -1392,29 +1393,29 @@ def write_class(object):
     
     if not opts.global_orphans:
         write_cpp_dox_comments(file,object.comment)
-        file.write('class ' + object.name + ' ')
+        file.write('class ' + object.cname + ' ')
         if object.extends:
             file.write(': public ' + object.extends + ' ')
         file.write('{\n\n')
         if object.abstract:
-            file.write('protected:\n  // {0} can not be instantiated\n  {0}() {{}}\n\n'.format(object.name))
+            file.write('protected:\n  // {0} can not be instantiated\n  {0}() {{}}\n\n'.format(object.cname))
         file.write('public:\n')
     # Constructor:
     fort_ctors = object.ctor_list()
     if fort_ctors:
         for fort_ctor in fort_ctors:
             write_cpp_dox_comments(file,fort_ctor.comment,fort_ctor.args_by_pos)
-            file.write('  ' + object.name + '(' + c_arg_list(fort_ctor,bind=False,call=False,definition=False) + ');\n')
+            file.write('  ' + object.cname + '(' + c_arg_list(fort_ctor,bind=False,call=False,definition=False) + ');\n')
     elif not object.name==orphan_classname and not object.abstract:
         # Don't declare default constructor (or destructor, below) for
         # the dummy class
-        file.write('  ' + object.name + '();\n')
+        file.write('  ' + object.cname + '();\n')
     # Desctructor:
     if not object.name==orphan_classname:
         if object.abstract:
-            file.write('  virtual ~' + object.name + '() {}\n\n')
+            file.write('  virtual ~' + object.cname + '() {}\n\n')
         else:
-            file.write('  ~' + object.name + '();\n\n')
+            file.write('  ~' + object.cname + '();\n\n')
     # Method declarations
     for proc in object.procs:
         if proc.ctor or (proc.dtor and not is_public(proc.name)):
@@ -1458,16 +1459,16 @@ def write_class(object):
                     file.write('{0}{1}'.format(enum,', ' if i+1<len(enum_set) else ''))
                 file.write(' };\n')
             file.write('};\n\n')
-    file.write('#endif /* ' + object.name.upper() + '_H_ */\n')
+    file.write('#endif /* ' + object.cname.upper() + '_H_ */\n')
     file.close()
 
 
     # Write method code to cpp file
-    file = open( code_output_dir+'/' + object.name + '.cpp', 'w')
+    file = open( code_output_dir+'/' + object.cname + '.cpp', 'w')
     file.write(HEADER_STRING + '\n')
     if stringh_used:
         file.write('#include <cstring> // For strcpy\n')
-    file.write('#include "' + object.name + '.h"\n\n')
+    file.write('#include "' + object.cname + '.h"\n\n')
     # Constructor(s):
     if fort_ctors:
         for fort_ctor in fort_ctors:
@@ -1515,8 +1516,8 @@ def get_native_includes(object):
 def write_global_header_file():
     f = open(include_output_dir+'/' + opts.main_header + '.h','w')
     f.write(HEADER_STRING + '\n')
-    for objname,obj in objects.iteritems():
-        f.write('#include "' + objname + '.h"\n')
+    for obj in objects.itervalues():
+        f.write('#include "' + translate_name(obj.name) + '.h"\n')
     if matrix_used:
         f.write('#include "' + matrix_classname + '.h"\n')
     f.write('\n')

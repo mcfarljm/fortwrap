@@ -30,7 +30,7 @@ CONTAINS
   END SUBROUTINE b_ctor
 
   FUNCTION getax(b)
-    TYPE (ObjectB) :: b
+    TYPE (objectB) :: b
     INTEGER :: getax
     getax = b%a%x
   END FUNCTION getax
