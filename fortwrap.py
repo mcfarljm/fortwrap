@@ -97,7 +97,7 @@ dtor_def = re.compile('.*_dtor', re.IGNORECASE)
 
 # GLOBAL VARIABLES ==================================
 
-objects = dict()
+objects = dict() # lower case object name -> DerivedType instance
 procedures = []
 abstract_interfaces = dict()
 name_substitutions = dict()
@@ -587,7 +587,7 @@ def args_have_comment(args):
 
 def add_type(t):
     if is_public(t):
-        objects[t] = DerivedType(t,dox_comments)
+        objects[t.lower()] = DerivedType(t,dox_comments)
 
 def parse_argument_defs(line,file,arg_list,args,retval,comments):
     count = 0
@@ -926,24 +926,24 @@ def associate_procedures():
     def flag_native_args(proc):
         # Check for arguments to pass as native classes:
         for pos,arg in proc.args_by_pos.iteritems():
-            if pos>1 and arg.type.dt and not arg.type.array and arg.type.type in objects:
+            if pos>1 and arg.type.dt and not arg.type.array and arg.type.type.lower() in objects:
                 arg.native = True
 
     for proc in procedures:
         # Associate methods
         if proc.method:
             typename = proc.args_by_pos[1].type.type
-            if typename in objects:
+            if typename.lower() in objects:
                 # print "Associating procedure:", typename +'.'+proc.name
-                objects[typename].procs.append(proc)
+                objects[typename.lower()].procs.append(proc)
                 flag_native_args(proc)
             elif typename.lower() not in name_exclusions:
                 error("Method %s declared for unknown derived type %s" % (proc.name, typename))
         # Associate orphan functions with a dummy class
         elif (not opts.no_orphans) or proc.name.lower() in name_inclusions:
-            if not orphan_classname in objects:
-                objects[orphan_classname] = DerivedType(orphan_classname,orphan_class_comments)
-            objects[orphan_classname].procs.append(proc)
+            if not orphan_classname.lower() in objects:
+                objects[orphan_classname.lower()] = DerivedType(orphan_classname,orphan_class_comments)
+            objects[orphan_classname.lower()].procs.append(proc)
             flag_native_args(proc)
             proc.in_orphan_class = True
     # Tag procedure arguments as being inside abstract interface

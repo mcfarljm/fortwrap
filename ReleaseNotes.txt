@@ -1,5 +1,6 @@
 FortWrap 1.0.5 summary:
 - Fix for renaming of derived types with the interface file
+- Fix to make derived type name matching case insensitive
 
 FortWrap 1.0.4 summary:
 - Fixing bug for optional assumed length strings
