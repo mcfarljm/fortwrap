@@ -20,7 +20,7 @@ import os
 import traceback
 
 
-VERSION = '1.0.4'
+VERSION = '1.0.5'
 
 
 # SETTINGS ==========================================
@@ -71,6 +71,8 @@ fort_data = re.compile(fort_data_str,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_str + '.*::',re.IGNORECASE)
 optional_def = re.compile('OPTIONAL.*::', re.IGNORECASE)
 byval_def = re.compile('VALUE.*::', re.IGNORECASE)
+allocatable_def = re.compile('ALLOCATABLE.*::',re.IGNORECASE)
+fort_pointer_def = re.compile('POINTER.*::',re.IGNORECASE)
 # CLASS: not yet supported, but print warnings
 fort_class_data_def = re.compile(r'\s*CLASS\s*\(\S*\).*::',re.IGNORECASE)
 
@@ -277,7 +279,7 @@ class DataType:
         return type_map and self.kind.upper() in type_map
 
 class Argument:
-    def __init__(self,name,pos,type=None,optional=False,intent='inout',byval=False,comment=[]):
+    def __init__(self,name,pos,type=None,optional=False,intent='inout',byval=False,allocatable=False,pointer=False,comment=[]):
         self.name = name
         self.pos = pos
         self.type = type
@@ -285,6 +287,8 @@ class Argument:
         self.optional=optional
         self.intent = intent
         self.byval = byval
+        self.allocatable = allocatable
+        self.pointer = pointer # (doesn't include procedure pointers)
         self.native = False # Will get defined in
                             # associate_procedures; identifies derived
                             # type arguments that will get passed in
@@ -348,6 +352,10 @@ class Argument:
             return True
         if self.byval and not self.type.type.upper()=='C_PTR':
             # This could be supported for other cases if needed
+            return True
+        if self.allocatable:
+            return True
+        if self.pointer:
             return True
         return False
     
@@ -623,6 +631,10 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
     # Attributes.
     optional = True if optional_def.search(line) else False
     byval = True if byval_def.search(line) else False
+    allocatable = True if allocatable_def.search(line) else False
+    pointer = False
+    if fort_pointer_def.search(line) and ('procedure' not in line.split('::')[0].lower()):
+        pointer = True
     # Check for DIMENSION statement
     dimension = dimension_def.search(line)
     intent = 'inout'
@@ -683,7 +695,7 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
                 # needed in the wrapper code
                 type.str_len = CharacterLength('*')
                 type.str_len.set_assumed(name)
-            args[name] = Argument(name,arg_list.index(name)+1,type,optional,intent,byval,comment=comments)
+            args[name] = Argument(name,arg_list.index(name)+1,type,optional,intent,byval,allocatable,pointer,comment=comments)
         elif retval and name==retval.name:
             retval.set_type(type)
     return count
