@@ -1191,7 +1191,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
                     s = s + prefix + 'char ' + arg.name + '_c__[' + str_len_p1 + '];\n'
                     s = s + prefix + 'if (' + arg.name + ') {\n'
                     s = s + prefix + '  int i;\n'
-                    s = s + prefix + '  strncpy(' + arg.name + '_c__, ' + arg.name + ', ' + str_len_p1 + '); ' +arg.name+'_c__['+str_len_p1+'] = 0; // strncpy protects in case '+arg.name+' is too long\n'
+                    s = s + prefix + '  strncpy(' + arg.name + '_c__, ' + arg.name + ', ' + str_len_p1 + '); ' +arg.name+'_c__['+str_len+'] = 0; // strncpy protects in case '+arg.name+' is too long\n'
                     s = s + prefix + '  for (i=strlen('+arg.name+'_c__); i<'+str_len_p1+'; i++) '+arg.name+"_c__[i] = ' '; // Add whitespace for Fortran\n"
                     s = s + prefix + '}\n'
     # Add wrapper code for array size values
