@@ -15,8 +15,7 @@ cmd = os.path.normpath('../../fortwrap.py')
 
 custom_opts = { 'c_arrays' : OPTS + ' --no-vector', 
                 'interface_file' : OPTS + ' -i interface.i',
-                'multidim_arrays' : OPTS + ' --no-vector --no-fmat',
-                'cstrings' : OPTS + ' --no-string' }
+                'multidim_arrays' : OPTS + ' --no-vector --no-fmat'}
 
 # Tests for demonstration purposes only:
 excludes = [ 'comments' ]

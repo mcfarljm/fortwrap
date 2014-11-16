@@ -192,7 +192,7 @@ class Array:
 class CharacterLength:
     """
     val may be either a number, or in the case of assumed length, a
-    string containing the argument name with suffix, which is needed in the
+    string containing the argument name, which is needed in the
     wrapper code
     """
     def __init__(self,val):
@@ -666,19 +666,12 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
         type = DataType(type_string,array,char_len)
         if name in arg_list:
             count += 1
-            if char_len and (intent!='in') and (not opts.std_string):
-                # Pass the extra user argument as the string length
-                type.str_len = CharacterLength('*')
-                # Use the "assumed" mechanism, although this case
-                # isn't really the same as an assumed-length Fortran
-                # string
-                type.str_len.set_assumed(name+'_size__')
-            elif char_len and char_len.val=='*':
+            if char_len and char_len.val=='*':
                 # Assign a new char_len instance and set it to contain
                 # a reference to the argument name, which will be
                 # needed in the wrapper code
                 type.str_len = CharacterLength('*')
-                type.str_len.set_assumed(name+'_len__')
+                type.str_len.set_assumed(name)
             args[name] = Argument(name,arg_list.index(name)+1,type,optional,intent,byval,allocatable,pointer,comment=comments)
         elif retval and name==retval.name:
             retval.set_type(type)
@@ -1050,8 +1043,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                 if arg.type.hidden:
                     if arg.type.str_len.assumed:
                         # val stores the arg name of the string
-                        # itself, with appropriate suffix
-                        string = string + arg.type.str_len.val
+                        # itself.  In wrapper code, length variable is
+                        # declared as name+'_len__'
+                        string = string + arg.type.str_len.val + '_len__'
                     else:
                         string = string + str(arg.type.str_len.val)
                 elif arg.type.is_array_size or arg.type.is_matrix_size:
@@ -1092,10 +1086,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                             # Chop of the * and add [] after the argname below
                             string = string[:-2] + ' '
                 elif arg.type.type=='CHARACTER' and not bind and not arg.intent=='in':
-                    if opts.std_string:
-                        string = string + 'std::string *' # pass by ref not compat with optional
-                    else:
-                        string = string + 'char *'
+                    string = string + 'std::string *' # pass by ref not compat with optional
                 else:
                     string = string + arg.cpp_type() + ' '
             else:
@@ -1126,9 +1117,8 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             # treatment needed here (we just pass along the character
             # array pointer)
             if not (arg.intent=='in' and arg.type.str_len.assumed):
-                if opts.std_string or arg.intent=='in':
-                    # Pass NULL if optional arg not present
-                    string = string + ' ? ' + arg.name + '_c__ : NULL'
+                # Pass NULL if optional arg not present
+                string = string + ' ? ' + arg.name + '_c__ : NULL'
         # Special handling for matrix arguments
         if call and arg.type.matrix and not opts.no_fmat:
             if arg.optional:
@@ -1143,14 +1133,6 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                 string = string + '->data_ptr'
         elif not call and not bind and not definition and arg.cpp_optional:
             string = string + '=NULL'
-        # Special handling for character outputs for !opts.std_string.
-        # Requires adding an additional length argument to the wrapper
-        # function
-        if (not opts.std_string) and (not bind) and arg.type.type=='CHARACTER' and not bind and not arg.intent=='in':
-            string = string + ', int '
-            string = string + arg.name + '_size__'
-            if not call and not bind and not definition and arg.cpp_optional:
-                string = string + '=0' # Default for char* size
         if proc.has_args_past_pos(pos,bind):
             string = string + ', '
     return string
@@ -1181,17 +1163,14 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
     if call:
         for arg in proc.args.itervalues():
             if arg.type.type=='CHARACTER' and not arg.fort_only():
-                if opts.std_string or arg.intent=='in':
-                    if arg.type.str_len.assumed:
-                        str_len = arg.type.str_len.val
-                    else:
-                        str_len = str(arg.type.str_len.val)
+                if arg.type.str_len.assumed:
+                    str_len = arg.name+'_len__'
                 else:
-                    str_len = arg.type.str_len.val
+                    str_len = str(arg.type.str_len.val)
                 str_len_p1 = str_len + '+1'
                 str_len_m1 = str_len + '-1'
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
-                if arg.type.str_len.assumed and opts.std_string:
+                if arg.type.str_len.assumed:
                     # Make sure to initialize the str_length arg to 0,
                     # in case of a not-present optional, since a
                     # character array is statically declared with this
@@ -1200,12 +1179,9 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
                     # present it passes 0 for the length)
                     s = s + prefix + 'int ' + arg.name + '_len__ = 0;\n'
                     s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = '+ arg.name + '->length();\n'
-                if opts.std_string:
-                    s = s + prefix + '// Declare memory to store output character data\n'
-                    s = s + prefix + 'char ' + arg.name + '_c__[' + str_len_p1 + '];\n'
-                    s = s + prefix + arg.name + '_c__[' + str_len + "] = '\\0';\n"
-                else:
-                    s = s + prefix + 'if (' + arg.name + ') ' + arg.name + '[' + str_len + "] = '\\0';\n"
+                s = s + prefix + '// Declare memory to store output character data\n'
+                s = s + prefix + 'char ' + arg.name + '_c__[' + str_len_p1 + '];\n'
+                s = s + prefix + arg.name + '_c__[' + str_len + "] = '\\0';\n"
             elif arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='in':
                 if arg.type.str_len.assumed:
                     s = s + prefix + 'int ' + arg.name + '_len__ = 0;\n'
@@ -1258,17 +1234,11 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
         for arg in proc.args.itervalues():
             # Special string handling for after the call
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
-                char_name = arg.name
-                if opts.std_string:
-                    char_name += '_c__'
                 s = s + '\n'
                 s = s + prefix + 'if ('+arg.name+') {\n'
-                s = s + prefix + '  // Trim trailing whitespace:\n'
-                s = s + prefix + '  for (int i=' + str_len_m1 + '; ' + char_name + "[i]==' '; i--) " + char_name + "[i] = '\\0';\n"
-                if opts.std_string:
-                    s = s + prefix + ' // Assign character array to string:\n'
-                    s = s + prefix + '  ' + arg.name + '->assign(' + char_name + ');\n'
-                s = s + '  }'
+                s = s + prefix + '  // Trim trailing whitespace and assign character array to string:\n'
+                s = s + prefix + '  for (int i=' + str_len_m1 + '; ' + arg.name + "_c__[i]==' '; i--) " + arg.name + "_c__[i] = '\\0';\n"
+                s = s + prefix + '  ' + arg.name + '->assign(' + arg.name + '_c__);\n  }'
         if proc.retval and proc.has_post_call_wrapper_code():
             s = s + '\n' + prefix + 'return __retval;'
     return s
@@ -1667,7 +1637,6 @@ class Options:
         print "--no-vector\t: Wrap 1-D array arguments as C-style arrays ('[]') instead of\n\t\t  C++ std::vector containers"
         print "--no-fmat\t: Do not wrap 2-D array arguments with the FortranMatrix type"
         print "--array-as-ptr\t: Wrap 1-D arrays with '*' instead of '[]'. Implies --no-vector"
-        print "--no-string\t: Wrap string outputs using (char*, int) argument pair as \n\t\t  opposed to C++ std::string"
         print "--dummy-class=<n>: Use <n> as the name of the dummy class used to wrap\n\t\t  non-method procedures"
         print "--global\t: Wrap non-method procedures as global functions instead of\n\t\t  static methods of a dummy class"
         print "--no-orphans\t: Do not by default wrap non-method procedures.  They can still\n\t\t  be wrapped by using %include directives"
@@ -1682,7 +1651,7 @@ class Options:
     def parse_args(self):
         global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname, file_list, constants_classname
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','array-as-ptr','no-string','dummy-class=','global','no-orphans','no-W-not-wrapped','main-header=','constants-class='])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','array-as-ptr','dummy-class=','global','no-orphans','no-W-not-wrapped','main-header=','constants-class='])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
@@ -1696,7 +1665,6 @@ class Options:
         self.dry_run = False
         self.no_vector = False
         self.no_fmat = False
-        self.std_string = True
         self.array_as_ptr = False
         self.global_orphans = False
         self.interface_file = ''
@@ -1739,8 +1707,6 @@ class Options:
             elif o=='--array-as-ptr':
                 self.array_as_ptr = True
                 self.no_vector = True
-            elif o=='--no-string':
-                self.std_string = False
             elif o=='--dummy-class':
                 orphan_classname = a
             elif o=='--global':
