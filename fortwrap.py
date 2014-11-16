@@ -40,6 +40,7 @@ func_pointer_converter = 'convert_c_funcpointer'
 
 misc_defs_filename = 'InterfaceDefs.h'
 matrix_classname = 'FortranMatrix'
+string_classname = 'FortranString'
 
 orphan_classname = 'FortFuncs'
 orphan_class_comments = ['Wrapper class for Fortran routines that do not operate on a derived type']
@@ -138,6 +139,10 @@ proc_pointer_used = False
 # Whether or not matrices are used
 matrix_used = False
 stringh_used = False            # Whether "string.h" is used (needed for strcpy)
+string_class_used = False # Whether string outputs are used, which involves wrapping using a string class (either std::string or the generated wrapper class)
+
+# Gets changed to string_classname if --no-std-string is set
+string_object_type = 'std::string'
 
 not_wrapped = [] # List of procedures that weren't wrapped
 
@@ -275,6 +280,7 @@ class DataType:
 
 class Argument:
     def __init__(self,name,pos,type=None,optional=False,intent='inout',byval=False,allocatable=False,pointer=False,comment=[]):
+        global string_class_used
         self.name = name
         self.pos = pos
         self.type = type
@@ -306,6 +312,8 @@ class Argument:
                     self.comment.append('ARRAY')
                 elif type.array.fort_only:
                     self.comment.append('FORTRAN_ONLY')
+            if type.type=='CHARACTER' and intent!='in':
+                string_class_used = True
         if comment:
             for c in comment:
                 self.comment.append(c)
@@ -1086,7 +1094,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                             # Chop of the * and add [] after the argname below
                             string = string[:-2] + ' '
                 elif arg.type.type=='CHARACTER' and not bind and not arg.intent=='in':
-                    string = string + 'std::string *' # pass by ref not compat with optional
+                    string = string + string_object_type + ' *' # pass by ref not compat with optional
                 else:
                     string = string + arg.cpp_type() + ' '
             else:
@@ -1302,7 +1310,6 @@ def write_class(object):
         # Needs to be before the include's in the case of swig -includeall
         file.write('\n#ifndef SWIG // Protect declarations from SWIG\n')
     file.write('#include <cstdlib>\n') # Needed for NULL
-    file.write('#include <string>\n') # Needed for special string handling
     if not opts.no_vector:
         file.write('#include <vector>\n')
     file.write('#include "' + misc_defs_filename + '"\n')
@@ -1310,7 +1317,10 @@ def write_class(object):
     if object.name in includes:
         includes.remove(object.name) # Remove self
     for include in includes:
-        file.write('#include "' + translate_name(include) + '.h"\n')
+        if include.startswith('<'):
+            file.write('#include ' + include + '\n')
+        else:
+            file.write('#include "' + translate_name(include) + '.h"\n')
     # C Bindings
     file.write('\nextern "C" {\n')
     # Write bindings for allocate/deallocate funcs
@@ -1417,6 +1427,13 @@ def get_native_includes(object):
                 includes.add(arg.type.type)
             if arg.type.matrix and not opts.no_fmat:
                 includes.add(matrix_classname)
+            if arg.type.type=='CHARACTER' and arg.intent!='in':
+                if opts.std_string:
+                    # The use of angle brackets is handled specially
+                    # in the output code
+                    includes.add('<string>')
+                else:
+                    includes.add(string_classname)
     return includes
 
 def write_global_header_file():
@@ -1485,6 +1502,67 @@ def write_matrix_class():
     f.write('#endif /* ' + matrix_classname.upper() + '_H_ */\n')
     f.write('\n\n// Local Variables:\n// mode: c++\n// End:\n')
     f.close()
+
+def write_string_class():
+    """When the option --no-std-string is used, create a wrapper class with similar functionality.
+    
+    The reason for doing this is it can work around some C++ library
+    conflicts on Windows when linking programs against e.g. Java or Qt
+    libraries
+    """
+    if not string_class_used:
+        return
+    comments = ['Simple wrapper class for handling dynamic allocation of string data','','Used by FortWrap to handle wrapping of character output arguments.  Emulates some of the basic functionality of std::string, but can be used as a way to remove dependency on std::string and avoid library conflicts in some cases']
+
+    f = open(include_output_dir+'/' + string_classname + '.h', 'w')
+    f.write(HEADER_STRING + '\n')
+    f.write('#ifndef ' + string_classname.upper() + '_H_\n')
+    f.write('#define ' + string_classname.upper() + '_H_\n\n')
+    
+    f.write('#include <cstdlib>\n#include <cstring>\n\n')
+    write_cpp_dox_comments(f, comments)
+    body = """\
+class FortranString{
+  size_t length_;
+  char* data_;
+  
+ public:
+
+  FortranString(size_t length=0) : data_(NULL), length_(length) {
+    if (length>0) data_ = (char*) calloc(length+1, sizeof(char));
+  }
+
+  ~FortranString() { if(data_) free(data_); }
+
+  size_t length(void) { return length_; }
+
+  void resize(size_t length) {
+    if (data_) free(data_);
+    data_ = (char*) calloc(length+1, sizeof(char));
+    length_ = length;
+  }
+
+  void assign(const char* s) {
+    length_ = strlen(s);
+    resize(length_);
+    strncpy(data_, s, length_);
+  }
+
+  int compare(const char* s) const {
+    return strncmp(data_, s, length_);
+  }
+
+  char* data(void) { return data_; }
+
+  char* c_str(void) { return data_; }
+};
+"""
+    f.write(body)
+    f.write('\n\n')
+    f.write('#endif /* ' + string_classname.upper() + '_H_ */\n')
+    f.write('\n\n// Local Variables:\n// mode: c++\n// End:\n')
+    f.close()
+    
     
 def write_fortran_wrapper():
     """
@@ -1637,6 +1715,7 @@ class Options:
         print "--no-vector\t: Wrap 1-D array arguments as C-style arrays ('[]') instead of\n\t\t  C++ std::vector containers"
         print "--no-fmat\t: Do not wrap 2-D array arguments with the FortranMatrix type"
         print "--array-as-ptr\t: Wrap 1-D arrays with '*' instead of '[]'. Implies --no-vector"
+        print "--no-std-string\t: Wrap character outputs using a wrapper class instead of\n\t\t  std::string"
         print "--dummy-class=<n>: Use <n> as the name of the dummy class used to wrap\n\t\t  non-method procedures"
         print "--global\t: Wrap non-method procedures as global functions instead of\n\t\t  static methods of a dummy class"
         print "--no-orphans\t: Do not by default wrap non-method procedures.  They can still\n\t\t  be wrapped by using %include directives"
@@ -1649,9 +1728,9 @@ class Options:
         sys.exit(exit_val)
 
     def parse_args(self):
-        global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname, file_list, constants_classname
+        global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname, file_list, constants_classname, string_object_type
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','array-as-ptr','dummy-class=','global','no-orphans','no-W-not-wrapped','main-header=','constants-class='])
+            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','array-as-ptr','no-std-string','dummy-class=','global','no-orphans','no-W-not-wrapped','main-header=','constants-class='])
         except getopt.GetoptError, err:
             print str(err)
             self.usage()
@@ -1666,6 +1745,7 @@ class Options:
         self.no_vector = False
         self.no_fmat = False
         self.array_as_ptr = False
+        self.std_string = True
         self.global_orphans = False
         self.interface_file = ''
         self.no_orphans = False
@@ -1707,6 +1787,9 @@ class Options:
             elif o=='--array-as-ptr':
                 self.array_as_ptr = True
                 self.no_vector = True
+            elif o=='--no-std-string':
+                self.std_string = False
+                string_object_type = string_classname
             elif o=='--dummy-class':
                 orphan_classname = a
             elif o=='--global':
@@ -1785,6 +1868,8 @@ if __name__ == "__main__":
         write_global_header_file()
         write_misc_defs()
         write_matrix_class()
+        if not opts.std_string:
+            write_string_class()
         write_fortran_wrapper()
 
         sys.exit(0)
