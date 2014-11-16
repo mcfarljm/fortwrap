@@ -1508,11 +1508,16 @@ def write_string_class():
     
     The reason for doing this is it can work around some C++ library
     conflicts on Windows when linking programs against e.g. Java or Qt
-    libraries
+    libraries.
+
+    Separate code and header files are used for this class, since it
+    is not a template class.
     """
     if not string_class_used:
         return
-    comments = ['Simple wrapper class for handling dynamic allocation of string data','','Used by FortWrap to handle wrapping of character output arguments.  Emulates some of the basic functionality of std::string, but can be used as a way to remove dependency on std::string and avoid library conflicts in some cases']
+
+    # Header files:
+    comments = ['Simple wrapper class for handling dynamic allocation of string data','','Used by FortWrap to handle wrapping of character output arguments.  Emulates some of the basic functionality of std::string, but can be used as a way to remove dependency on std::string and avoid C++ library conflicts in some cases']
 
     f = open(include_output_dir+'/' + string_classname + '.h', 'w')
     f.write(HEADER_STRING + '\n')
@@ -1522,47 +1527,75 @@ def write_string_class():
     f.write('#include <cstdlib>\n#include <cstring>\n\n')
     write_cpp_dox_comments(f, comments)
     body = """\
-class FortranString{
+class $CLASSNAME{
   size_t length_;
   char* data_;
   
  public:
 
-  FortranString(size_t length=0) : data_(NULL), length_(length) {
-    if (length>0) data_ = (char*) calloc(length+1, sizeof(char));
-  }
+  $CLASSNAME();
 
-  ~FortranString() { if(data_) free(data_); }
+  $CLASSNAME(size_t length);
 
-  size_t length(void) { return length_; }
+  ~$CLASSNAME();
 
-  void resize(size_t length) {
-    if (data_) free(data_);
-    data_ = (char*) calloc(length+1, sizeof(char));
-    length_ = length;
-  }
+  size_t length(void);
 
-  void assign(const char* s) {
-    length_ = strlen(s);
-    resize(length_);
-    strncpy(data_, s, length_);
-  }
+  void resize(size_t length);
 
-  int compare(const char* s) const {
-    return strncmp(data_, s, length_);
-  }
+  void assign(const char* s);
 
-  char* data(void) { return data_; }
+  int compare(const char* s) const;
 
-  char* c_str(void) { return data_; }
+  char* data(void);
+
+  char* c_str(void);
 };
-"""
+""".replace('$CLASSNAME', string_classname)
     f.write(body)
     f.write('\n\n')
     f.write('#endif /* ' + string_classname.upper() + '_H_ */\n')
     f.write('\n\n// Local Variables:\n// mode: c++\n// End:\n')
     f.close()
     
+    # Code file:
+    f = open(include_output_dir+'/' + string_classname + '.cpp', 'w')
+    f.write(HEADER_STRING + '\n')
+    
+    f.write('#include "' + string_classname + '.h"\n\n')
+    body = """\
+$CLASSNAME::$CLASSNAME() : length_(0), data_(NULL) {}
+
+$CLASSNAME::$CLASSNAME(size_t length) : length_(length), data_(NULL) {
+  if (length>0) data_ = (char*) calloc(length+1, sizeof(char));
+}
+
+$CLASSNAME::~$CLASSNAME() { if(data_) free(data_); }
+
+size_t $CLASSNAME::length(void) { return length_; }
+
+void $CLASSNAME::resize(size_t length) {
+  if (data_) free(data_);
+  data_ = (char*) calloc(length+1, sizeof(char));
+  length_ = length;
+}
+
+void $CLASSNAME::assign(const char* s) {
+  length_ = strlen(s);
+  resize(length_);
+  strncpy(data_, s, length_);
+}
+
+int $CLASSNAME::compare(const char* s) const {
+  return strncmp(data_, s, length_);
+}
+
+char* $CLASSNAME::data(void) { return data_; }
+
+char* $CLASSNAME::c_str(void) { return data_; }
+""".replace('$CLASSNAME', string_classname)
+    f.write(body)
+    f.close()
     
 def write_fortran_wrapper():
     """
