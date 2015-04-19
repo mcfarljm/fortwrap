@@ -63,7 +63,7 @@ CONTAINS
   !> Compute area of a circle
   FUNCTION Circle_area(s) RESULT(a)
     USE ISO_C_BINDING
-    CLASS(Circle), TARGET :: s
+    CLASS(Circle), INTENT(in) :: s
     INTEGER :: a
 !!$    PRINT*, 'c loc in Circle area:', c_loc(s)
 !!$    PRINT*, 'Shape number', s%num
@@ -78,7 +78,7 @@ CONTAINS
   END FUNCTION Circle_diameter
 
   FUNCTION Square_area(s) RESULT(a)
-    CLASS(Square) :: s
+    CLASS(Square), INTENT(in) :: s
     INTEGER :: a
     ! Do something with s
     a = s%side**2
