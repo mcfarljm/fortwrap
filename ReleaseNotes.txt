@@ -1,4 +1,7 @@
 FortWrap 1.0.5 summary:
+- Added option --no-std-string, which uses a wrapper class to manage
+  character output argument conversions, instead of std::string.  This
+  can eliminate C++ library conflicts in some cases.
 - Fix for renaming of derived types with the interface file
 - Fix to make derived type name matching case insensitive
 - Proper exclusion of ALLOCATABLE and POINTER arguments from wrapper
