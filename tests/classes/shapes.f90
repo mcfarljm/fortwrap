@@ -25,7 +25,12 @@ MODULE shapes
   CONTAINS
     PROCEDURE :: get_area => Circle_area
     PROCEDURE :: get_diameter => Circle_diameter
+    PROCEDURE :: ctor => Circle_ctor 
   END TYPE Circle
+
+  INTERFACE Circle
+    PROCEDURE Circle_ctor_f
+  END INTERFACE Circle
 
   TYPE, ABSTRACT, EXTENDS(Shape) :: Polygon
     INTEGER :: nsides
@@ -38,21 +43,32 @@ MODULE shapes
     INTEGER :: side
   CONTAINS
     PROCEDURE :: get_area => Square_area
+    PROCEDURE :: ctor => Square_ctor
   END TYPE Square
 
 CONTAINS
 
   SUBROUTINE Circle_ctor(s, radius)
     USE ISO_C_BINDING
-    CLASS(Circle), TARGET :: s
+    CLASS(Circle) :: s
     INTEGER, INTENT(in) :: radius
     s%radius = radius
 !!$    PRINT*, 'cloc in Circle_ctor:', c_loc(s)
     !PRINT*, 'Shape num in ctor:', s%num
   END SUBROUTINE Circle_ctor
 
+  FUNCTION Circle_ctor_f(radius) RESULT(s)
+    USE ISO_C_BINDING
+    TYPE(Circle), TARGET :: s ! TARGET is just to test address below
+    INTEGER, INTENT(in) :: radius
+    PRINT*, 'in cricle_ctor_f:', radius
+    s%radius = radius
+    PRINT*, 'cloc in Circle_ctor_f:', c_loc(s)
+    !PRINT*, 'Shape num in ctor:', s%num
+  END FUNCTION Circle_ctor_f
+
   SUBROUTINE Square_ctor(s, side)
-    TYPE(Square) :: s
+    CLASS(Square) :: s
     INTEGER, INTENT(in) :: side
     s%side = side
     s%nsides = 4
@@ -70,6 +86,14 @@ CONTAINS
 !!$    PRINT*, 'Circle radius:', s%radius
     a = 3 * s%radius**2
   END FUNCTION Circle_area
+
+  FUNCTION circle_area_dt(s) RESULT(a)
+    USE ISO_C_BINDING
+    TYPE (Circle), INTENT(in), TARGET :: s
+    INTEGER :: a
+    a = 3 * s%radius**2
+    PRINT*, 'c loc in circle_area_dt:', c_loc(s)
+  END FUNCTION circle_area_dt
 
   FUNCTION Circle_diameter(s) RESULT(d)
     CLASS(Circle) :: s
@@ -117,5 +141,16 @@ CONTAINS
     INTEGER :: a
     a = s1%get_area() + s2%get_area()
   END FUNCTION add_area
+
+  SUBROUTINE circle_ctor2(s, r)
+    CLASS(shape), INTENT(out), ALLOCATABLE :: s
+    INTEGER, INTENT(in) :: r
+    ALLOCATE(Circle::s)
+    SELECT TYPE(s)
+    TYPE is (Circle)
+      PRINT*, 'setting radius:', r
+      s%radius = r
+    END SELECT
+  END SUBROUTINE circle_ctor2
 
 END MODULE shapes

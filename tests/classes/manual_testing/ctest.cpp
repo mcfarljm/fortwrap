@@ -5,26 +5,49 @@
 
 using namespace std;
 
+void test_constructor(void);
+
+// int main(void) {
+//   Square sq1(2);
+//   cout << "sq1 area dt: " << sq1.get_area_dt() << endl;
+//   cout << "sq1 area: " << sq1.get_area() << endl;
+//   cout << "sq1 get_num: " << sq1.get_num() << endl;
+
+//   cout << "Square vtab: " << &__shapes_MOD___vtab_shapes_Square << endl;
+
+//   Shape *s;
+//   s = new Square(4);
+//   cout << "s area: " << s->get_area() << endl;
+
+//   cout << "Calling what am i\n";
+//   sq1.what_am_i();
+//   s->what_am_i();
+
+//   Polygon *p;
+//   p = new Square(6);
+//   cout << "p area: " << p->get_area() << endl;
+//   cout << "p nsides: " << p->num_sides() << endl;
+
+//   Circle c(3);
+//   cout << "Circle area:" << c.get_area() << endl;
+// }
+
 int main(void) {
-  Square sq1(2);
-  cout << "sq1 area dt: " << sq1.get_area_dt() << endl;
-  cout << "sq1 area: " << sq1.get_area() << endl;
-  cout << "sq1 get_num: " << sq1.get_num() << endl;
+  test_constructor();
+}
 
-  cout << "Square vtab: " << &__shapes_MOD___vtab_shapes_Square << endl;
-
-  Shape *s;
-  s = new Square(4);
-  cout << "s area: " << s->get_area() << endl;
-
-  cout << "Calling what am i\n";
-  sq1.what_am_i();
-  s->what_am_i();
-
-  Polygon *p;
-  p = new Square(6);
-  cout << "p area: " << p->get_area() << endl;
-  cout << "p nsides: " << p->num_sides() << endl;
+// Test how to call the Fortran constructor that returns a derived type
+void test_constructor(void) {
+  void* c_ptr = NULL;
+  int i=10;
+  __cppwrappers_MOD_allocate_circle(&c_ptr);
+  cout << "c_ptr: " << (long) c_ptr << endl;
+  __shapes_MOD_circle_ctor_f(c_ptr, &i);
+  // cout << "Circ area: " << __shapes_MOD_circle_area_dt(c_ptr) << endl;
+  // __cppwrappers_MOD_deallocate_circle(c_ptr);
+  cout << "Leaving test_constructor" << endl;
+  // Now, why does the program crash at end?  Seems to have
+  // successuflly constructed the derived type...
 }
 
 

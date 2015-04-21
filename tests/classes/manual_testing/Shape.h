@@ -6,6 +6,8 @@
 
 // vtab entries:
 extern int __shapes_MOD___vtab_shapes_Square;
+extern int __shapes_MOD___vtab_shapes_Shape;
+
 
 
 //ADDRESS square_vtab = &__shapes_MOD___vtab_shapes_Square;
@@ -17,6 +19,7 @@ extern "C" {
   void __cppwrappers_MOD_deallocate_square(ADDRESS caddr);
   void __cppwrappers_MOD_allocate_circle(ADDRESS *caddr);
   void __cppwrappers_MOD_deallocate_circle(ADDRESS caddr);
+  void __cppwrappers_MOD_allocate_shape_allocatable(ADDRESS *caddr);
   //  void __shapes_MOD_shape_of_rv(ADDRESS c, ADDRESS rv);
   int __polymorphicwrappers_MOD_shape_get_area(ADDRESS s);
   void __shapes_MOD_square_ctor(ADDRESS s, int* side);
@@ -26,9 +29,13 @@ extern "C" {
   void __shapes_MOD_circled_of_rv(ADDRESS c, ADDRESS rv);
   int __shapes_MOD_square_area(ADDRESS c);
   int __shapes_MOD_square_area_dt(ADDRESS c);
+  int __shapes_MOD_circle_area(ADDRESS c);
   int __shapes_MOD_get_num(ADDRESS c);
   void __shapes_MOD_what_am_i(ADDRESS c);
   int __shapes_MOD_num_sides(ADDRESS c);
+  void __shapes_MOD_circle_ctor2(ADDRESS s, int *r);
+  void __shapes_MOD_circle_ctor_f(ADDRESS s, int *r);
+  int __shapes_MOD_circle_area_dt(ADDRESS s);
 }
 
 class Shape {
@@ -57,6 +64,12 @@ class Square : public Polygon {
   Square(int side);
   int get_area(void);
   int get_area_dt(void);
+};
+
+class Circle : public Shape {
+ public:
+  Circle(int radius);
+  int get_area(void);
 };
 
 

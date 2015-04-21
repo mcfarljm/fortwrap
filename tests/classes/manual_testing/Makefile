@@ -1,6 +1,7 @@
 FC = gfortran
 CXX = g++
-#FFLAGS =
+CXXFLAGS = -g
+FFLAGS = -g
 
 OBJ = shapes.o
 
