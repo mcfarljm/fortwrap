@@ -6,9 +6,9 @@ FFLAGS = -g
 OBJ = shapes.o
 
 FPROGS = ftest
-CPROGS = ctest
+CXXPROGS = cpptest
 
-PROGS = $(FPROGS) $(CPROGS)
+PROGS = $(FPROGS) $(CXXPROGS)
 
 COBJ = $(OBJ) CppWrappers.o Shape.o
 
@@ -17,7 +17,7 @@ all: $(OBJ) $(PROGS)
 $(FPROGS): %: %.o $(OBJ)
 	$(FC) -o $@ $^
 
-$(CPROGS): %: %.o $(COBJ)
+$(CXXPROGS): %: %.o $(COBJ)
 	$(FC) -o $@ $^ -lstdc++
 
 %.o: %.f90
