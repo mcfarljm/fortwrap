@@ -6,6 +6,9 @@ If the actual procedure is private but used in a TBP, it should still be wrapped
 Can this happen?  In other words, the base class has constructor code which is always called, and the child classes have their own constructor code.
 
 * Constructors and inheritance
+** [2015-04-21 Tue]
+Some testing on separate work machine showed that gfortran will return derived types by value in some cases (e.g. it will do this when the DT contains only an integer).  This can be tested by trying different calls into the constructor function and printing the first argument to it in Fortran, to see when it is getting the correct value.
+
 ** Update [2015-04-19 Sun] with gfortran 4.8.2
 Appears that from Fortran the way to do this is with:
 #+BEGIN_EXAMPLE
