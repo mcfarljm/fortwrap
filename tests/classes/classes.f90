@@ -1,6 +1,11 @@
 MODULE classes
 
   IMPLICIT NONE
+  
+  PRIVATE
+  ! TODO: make robust to case where, e.g., Polygon is not public
+  PUBLIC :: Shape, Circle, Polygon, Square, Circle_ctor_sub,&
+    Square_ctor_sub
 
  !> Base shape type
   TYPE, ABSTRACT :: Shape
@@ -30,8 +35,32 @@ MODULE classes
     PROCEDURE Circle_ctor
   END INTERFACE Circle
 
+  TYPE, ABSTRACT, EXTENDS(Shape) :: Polygon
+    INTEGER :: nsides
+  CONTAINS
+    PROCEDURE :: num_sides => polygon_num_sides
+  END TYPE Polygon
+
+  TYPE, EXTENDS(Polygon) :: Square
+    INTEGER :: side_length
+  CONTAINS
+    PROCEDURE :: get_area => Square_area
+  END TYPE Square
+
+  INTERFACE Square
+    PROCEDURE Square_ctor
+  END INTERFACE Square
+
 CONTAINS
 
+  !> Constructors that return a derived type like this aren't wrapped by
+  !! FortWrap.  The user should create a subroutine version, as below,
+  !! which FortWrap can wrap. 
+  !!
+  !! One reason using this form in the Fortran is nice is because you can
+  !! write code that dynamically allocates objects, such as:
+  !! CLASS(Shape), allocatable :: s
+  !! ALLOCATE(s, source=Circle(4))
   FUNCTION Circle_ctor(radius) RESULT(s)
     INTEGER, INTENT(in) :: radius
     TYPE (Circle) :: s
@@ -46,7 +75,7 @@ CONTAINS
   SUBROUTINE Circle_ctor_sub(s, radius)
     TYPE (Circle) :: s
     INTEGER, INTENT(in) :: radius
-    s = circle_ctor(radius)
+    s = Circle(radius)
   END SUBROUTINE Circle_ctor_sub
 
   !> Compute area of a circle
@@ -62,5 +91,31 @@ CONTAINS
     INTEGER :: diameter
     diameter = 2 * s%radius
   END FUNCTION Circle_diameter
+
+  FUNCTION Square_ctor(side_length) RESULT(s)
+    INTEGER, INTENT(in) :: side_length
+    TYPE (Square) :: s
+
+    s%side_length = side_length
+    s%nsides = 4
+  END FUNCTION Square_ctor
+
+  SUBROUTINE Square_ctor_sub(s, side_length)
+    TYPE (Square) :: s
+    INTEGER, INTENT(in) :: side_length
+    s = Square(side_length)
+  END SUBROUTINE Square_ctor_sub
+
+  FUNCTION polygon_num_sides(s) RESULT(n)
+    CLASS(Polygon) :: s
+    INTEGER :: n
+    n = s%nsides
+  END FUNCTION polygon_num_sides
+
+  FUNCTION Square_area(s) RESULT(a)
+    CLASS(Square), INTENT(in) :: s
+    INTEGER :: a
+    a = s%side_length**2
+  END FUNCTION Square_area
 
 END MODULE classes

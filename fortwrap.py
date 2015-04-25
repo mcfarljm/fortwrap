@@ -628,6 +628,9 @@ def args_have_comment(args):
 def add_type(t):
     if is_public(t):
         objects[t.lower()] = DerivedType(t,dox_comments)
+        return True
+    else:
+        return False
 
 def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
     count = 0
@@ -808,8 +811,12 @@ def parse_proc(file,line,abstract=False):
         # dtor:
         is_tbp = False
         if method:
-            if proc_name in objects[proc.args_by_pos[1].type.type.lower()].tbps:
-                is_tbp = True
+            try:
+                if proc_name in objects[proc.args_by_pos[1].type.type.lower()].tbps:
+                    is_tbp = True
+            except KeyError:
+                # Should mean that the derived type is not public
+                pass
         # Note: wrap all abstract procedures (even if they are not
         # public).  This is sort of a hack, as technically we should
         # only wrap non-public abstract procedures if they are used in
@@ -844,17 +851,19 @@ def parse_type(file,line):
     global fort_class_used
     m = fort_type_def.match(line)
     typename = m.group('name0') or m.group('name1')
-    add_type(typename)
-    if 'ABSTRACT' in line.upper():
+    type_added = add_type(typename)
+    # type_added checks below prevent KeyError's in objects[]
+    if type_added and 'ABSTRACT' in line.upper():
         objects[typename.lower()].abstract = True
         objects[typename.lower()].is_class = True
         fort_class_used = True
     extends_match = fort_type_extends_def.search(line)
-    if extends_match:
+    if type_added and extends_match:
         objects[typename.lower()].extends = extends_match.group(1)
         objects[typename.lower()].is_class = True
         fort_class_used = True
-    print "{} extends: {}".format(typename, objects[typename.lower()].extends)
+    if type_added:
+        print "{} extends: {}".format(typename, objects[typename.lower()].extends)
     # Move to end of type and parse type bound procedure definitions
     while True:
         line = readline(file)
@@ -864,7 +873,7 @@ def parse_type(file,line):
             return
         elif line.upper().strip().startswith('END TYPE'):
             return
-        elif tbp_match:
+        elif type_added and tbp_match:
             if 'POINTER' in line.upper():
                 pass # Not a TBP
             elif 'PASS' in line.upper():
