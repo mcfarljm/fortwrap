@@ -3,8 +3,7 @@ MODULE shapes
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: Shape, Circle, Polygon, Square, get_area_template, add_area,&
-    square_area_dt
+  PUBLIC :: Shape, Circle, Polygon, Square, add_area, square_area_dt
 
   !> Base shape type
   TYPE, ABSTRACT :: Shape

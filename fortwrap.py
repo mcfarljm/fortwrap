@@ -795,7 +795,11 @@ def parse_proc(file,line,abstract=False):
         if method:
             if proc_name in objects[proc.args_by_pos[1].type.type.lower()].tbps:
                 is_tbp = True
-        if is_public(proc_name) or proc.dtor or is_tbp:
+        # Note: wrap all abstract procedures (even if they are not
+        # public).  This is sort of a hack, as technically we should
+        # only wrap non-public abstract procedures if they are used in
+        # TBP definitions
+        if is_public(proc_name) or proc.dtor or is_tbp or abstract:
             if not abstract:
                 procedures.append(proc)
                 module_proc_num += 1
