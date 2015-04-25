@@ -27,8 +27,8 @@ PROGRAM prog
   !CALL s%ctor(5)
   DEALLOCATE(s)
 
-  CALL circle_ctor2(s, 1)
-  PRINT*, 'circle 2 area:', s%get_area()
+!!$  CALL circle_ctor2(s, 1)
+!!$  PRINT*, 'circle 2 area:', s%get_area()
 
   c3 = Circle(5)
   PRINT*, 'c3 area:', c3%get_area()

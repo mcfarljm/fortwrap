@@ -3,7 +3,8 @@ MODULE shapes
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: Shape, Circle, Polygon, Square, add_area, square_area_dt
+  PUBLIC :: Shape, Circle, Polygon, Square, add_area, square_area_dt,&
+    circle_ctor2, circle_area_dt ! These used by manual_testing
 
   !> Base shape type
   TYPE, ABSTRACT :: Shape

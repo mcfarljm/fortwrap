@@ -34,7 +34,7 @@ extern "C" {
   void __shapes_MOD_what_am_i(ADDRESS c);
   int __shapes_MOD_num_sides(ADDRESS c);
   void __shapes_MOD_circle_ctor2(ADDRESS s, int *r);
-  void __shapes_MOD_circle_ctor_f(ADDRESS s, int *r);
+  __attribute__((stdcall)) void __shapes_MOD_circle_ctor_f(ADDRESS s, int *r);
   int __shapes_MOD_circle_area_dt(ADDRESS s);
 }
 
