@@ -791,7 +791,11 @@ def parse_proc(file,line,abstract=False):
         # dtors automatically get added.  This way we can hide them
         # with the ignores list, but they still get used in the Class
         # dtor:
-        if is_public(proc_name) or proc.dtor:
+        is_tbp = False
+        if method:
+            if proc_name in objects[proc.args_by_pos[1].type.type.lower()].tbps:
+                is_tbp = True
+        if is_public(proc_name) or proc.dtor or is_tbp:
             if not abstract:
                 procedures.append(proc)
                 module_proc_num += 1
