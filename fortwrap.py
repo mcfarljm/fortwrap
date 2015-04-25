@@ -60,6 +60,7 @@ fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(', r
 fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)', re.IGNORECASE)
 fort_end_interface = re.compile(r'\s*END\s*INTERFACE', re.IGNORECASE)
 fort_comment = re.compile('\s*!')
+fort_contains = re.compile(r'\s*CONTAINS\s*$', re.IGNORECASE)
 
 # Data types
 primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>(\w+|\*))\s*\)))?'
@@ -718,17 +719,31 @@ def parse_proc(file,line,abstract=False):
     arg_comments = []
     while True:
         line = readline(file)
-        if line=='':
+        if not line:
             error("Unexpected end of file in procedure")
             return
+        elif fort_end_proc.match(line):
+            break
+        elif fort_proc_def.match(line):
+            # This means we found a contained procedure.  We need to
+            # parse through it to the end to make sure that its
+            # arguments don't overwrite the parent's arguments, and
+            # that we don't wrap the contained procedure itself
+            while True:
+                line = readline(file)
+                if not line:
+                    error("Unexpected end of file in contained procedure")
+                    return
+                elif fort_end_proc.match(line):
+                    break                
+        elif fort_contains.match(line):
+            in_contains = True
         elif fort_dox_comments.match(line):
             arg_comments = parse_comments(file,line)
             continue
         elif fort_dox_inline.match(line):
             # Note: don't CONTINUE here b/c still need to parse this arg
             arg_comments = parse_comments(file,line)
-        elif fort_end_proc.match(line):
-            break
         elif fort_comment.match(line):
             continue
         if fort_data_def.match(line):
