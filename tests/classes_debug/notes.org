@@ -6,6 +6,7 @@ If the actual procedure is private but used in a TBP, it should still be wrapped
 This requires using a function that returns a derived type.  I did figure out how to wrap this, but gfortran creates these functions differently depending on the derived type.  Think for now, will just make it user's responsibility to also create a wrappable subroutine for fortwrap to use.
 ** TODO Multiple constructors in the inhertiance structure
 Can this happen?  In other words, the base class has constructor code which is always called, and the child classes have their own constructor code.
+** TODO support NOPASS attribute for tbp's
 
 * Constructors and inheritance
 ** [2015-04-21 Tue]
