@@ -15,6 +15,14 @@ int main(void)
   if (FortFuncs::add_ints4(a4,b4) != 300000)
     return 5;
 
+  int a5=1, b5=2;
+  if (FortFuncs::contains_arg_clash(a5,b5) != (a5+b5))
+    return 7;
+
+  int x=10;
+  if (FortFuncs::argument_case_sensitivity(x) != x)
+    return 9;
+
   return 0;
 }
 

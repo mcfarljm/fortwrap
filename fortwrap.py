@@ -63,6 +63,7 @@ fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(', r
 fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)', re.IGNORECASE)
 fort_end_interface = re.compile(r'\s*END\s*INTERFACE', re.IGNORECASE)
 fort_comment = re.compile('\s*!')
+fort_contains = re.compile(r'\s*CONTAINS\s*$', re.IGNORECASE)
 
 # Data types
 primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>(\w+|\*))\s*\)))?'
@@ -628,7 +629,7 @@ def add_type(t):
     if is_public(t):
         objects[t.lower()] = DerivedType(t,dox_comments)
 
-def parse_argument_defs(line,file,arg_list,args,retval,comments):
+def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
     count = 0
 
     line = join_lines(line,file)
@@ -695,7 +696,7 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
             array = Array(size_desc)
             name = name.split('(')[0]
         type = DataType(type_string,array,char_len)
-        if name in arg_list:
+        if name.lower() in arg_list_lower:
             count += 1
             if char_len and char_len.val=='*':
                 # Assign a new char_len instance and set it to contain
@@ -703,8 +704,8 @@ def parse_argument_defs(line,file,arg_list,args,retval,comments):
                 # needed in the wrapper code
                 type.str_len = CharacterLength('*')
                 type.str_len.set_assumed(name)
-            args[name] = Argument(name,arg_list.index(name)+1,type,optional,intent,byval,allocatable,pointer,comment=comments)
-        elif retval and name==retval.name:
+            args[name] = Argument(name,arg_list_lower.index(name.lower())+1,type,optional,intent,byval,allocatable,pointer,comment=comments)
+        elif retval and name.lower()==retval.name.lower():
             retval.set_type(type)
     return count
 
@@ -722,12 +723,12 @@ def parse_proc(file,line,abstract=False):
 
     arg_string = line.split('(')[1].split(')')[0]
     if re.search(r'\S',arg_string):
-        arg_list = arg_string.split(',')
-        arg_list = [x.strip() for x in arg_list] # Remove whitespace
+        arg_list_lower = arg_string.split(',')
+        arg_list_lower = [x.strip().lower() for x in arg_list_lower] # Remove whitespace and convert to lowercase
     else:
-        arg_list = []
+        arg_list_lower = []
     args = dict()
-    #print arg_list
+    #print arg_list_lower
     retval = None
     if re.match('^\s*function', line, re.IGNORECASE):
         m = result_name_def.match(line)
@@ -741,29 +742,43 @@ def parse_proc(file,line,abstract=False):
     arg_comments = []
     while True:
         line = readline(file)
-        if line=='':
+        if not line:
             error("Unexpected end of file in procedure")
             return
+        elif fort_end_proc.match(line):
+            break
+        elif fort_proc_def.match(line):
+            # This means we found a contained procedure.  We need to
+            # parse through it to the end to make sure that its
+            # arguments don't overwrite the parent's arguments, and
+            # that we don't wrap the contained procedure itself
+            while True:
+                line = readline(file)
+                if not line:
+                    error("Unexpected end of file in contained procedure")
+                    return
+                elif fort_end_proc.match(line):
+                    break                
+        elif fort_contains.match(line):
+            in_contains = True
         elif fort_dox_comments.match(line):
             arg_comments = parse_comments(file,line)
             continue
         elif fort_dox_inline.match(line):
             # Note: don't CONTINUE here b/c still need to parse this arg
             arg_comments = parse_comments(file,line)
-        elif fort_end_proc.match(line):
-            break
         elif fort_comment.match(line):
             continue
         if fort_data_def.match(line):
             # Could check below return value to see if in local
             # variables (assuming definitions are ordered in code)
-            parse_argument_defs(line,file,arg_list,args,retval,arg_comments)
+            parse_argument_defs(line,file,arg_list_lower,args,retval,arg_comments)
             arg_comments = []
         elif fort_class_data_def.match(line):
             warning("CLASS arguments not currently supported: " + proc_name)
     # Check args:
-    if len(args) != len(arg_list):
-        missing_args = set(arg_list).difference(set(args.keys()))
+    if len(args) != len(arg_list_lower):
+        missing_args = set(arg_list_lower).difference(set(args.keys()))
         error("Missing argument definitions in procedure %s: %s" % (proc_name, ', '.join(missing_args)))
         invalid = True
     for arg in args.itervalues():
