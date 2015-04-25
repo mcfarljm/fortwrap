@@ -19,6 +19,10 @@ int main(void)
   if (FortFuncs::contains_arg_clash(a5,b5) != (a5+b5))
     return 7;
 
+  int x=10;
+  if (FortFuncs::argument_case_sensitivity(x) != x)
+    return 9;
+
   return 0;
 }
 

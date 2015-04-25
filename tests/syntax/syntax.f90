@@ -45,4 +45,10 @@ CONTAINS
     END SUBROUTINE bar
   END FUNCTION contains_arg_clash
 
+  FUNCTION argument_case_sensitivity(x) RESULT(Y)
+    INTEGER, INTENT(in) :: X
+    INTEGER :: y
+    y = x
+  END FUNCTION argument_case_sensitivity
+
 END MODULE syntax
