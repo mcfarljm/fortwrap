@@ -35,7 +35,9 @@ int main(void)
   if (s2->add_area(p1) != 28)
     return 8;
 
-  delete s1, s2, p1;
+  delete s1;
+  delete s2;
+  delete p1;
 
   return 0;
 }
