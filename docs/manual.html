@@ -76,6 +76,10 @@ o.process();
     <li> Fortran "dtor" functions automatically called by C++ destructor</li>
   </ul>
 
+  <li> <b>Classes (experimental)</b>: Translate Fortran CLASSes and
+  type bound procedures into C++ classes.  Fortran inheritance
+    structure and polymorphism are retained in C++.</li>
+
   <li> <a href="#details-opt"><b>Optional arguments</b></a>: Fortran
     optional arguments are fully supported, with automatic NULL
     default values in C++.</li>
@@ -156,22 +160,6 @@ supported:</p>
     wrapped.</li>
 
   <li><tt>COMPLEX</tt> data type is not supported</li>
-
-  <li> <b>CLASS</b> (polymorphic) variables.  This Fortran language
-    features is not supported by g95 and is currently making its way
-    online with gfortran.  Unfortunately, the Fortran 2003 standard
-    does not allow C_LOC to be used on <tt>CLASS</tt> pointers, so
-    there is not a standard-compliant way of working with these
-    variables.  However, experimental support for FortWrap to generate
-    polymorphic C++ wrappers around Fortran <tt>CLASS</tt> constructs
-    is already underway, although it relies on gfortran-specific
-    compiler implementation details and a patched version of the
-    compiler.</li>
-
-  <li>Type bound procedures.  Those that were not declared
-    as <tt>NOPASS</tt> require that the first argument be declared
-    using <tt>CLASS</tt> instead of <tt>TYPE</tt>.  FortWrap does not
-    currently handle <tt>CLASS</tt>: see above.</li>
 </ul>
 
   <p>Note that FortWrap can still wrap procedures that use unsupported
@@ -453,6 +441,7 @@ gfortran -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/Ob
 
   <ul>
     <li><a href="#details-dt">Derived Types</a></li>
+    <li><a href="#details-class">CLASS</a></li>
     <li><a href="#details-opt">Optional Arguments</a></li>
     <li><a href="#details-orphans">Non-method procedures</a></li>
     <li><a href="#details-arrays">Arrays</a></li>
@@ -499,6 +488,52 @@ gfortran -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/Ob
     the <tt>%ctor</tt> and <tt>%dtor</tt> directives in the
     configuration file.</p>
     
+  <h3><a name="details-class">CLASS and polymorphism (experimental)</a></h3>
+
+  <p>FortWrap includes experimental support for wrapping CLASS data
+  structures, which support type bound procedures, inheritance, and
+  polymorphism.  The objective is to create a set of C++ classes and
+  methods that mirror the structure of the original Fortran code; this
+  includes inheritance and polymorphism.</p>
+
+  <p>A key distinction is the use of "type bound procedures", which
+  look like:</p>
+
+<div class="code"><pre>
+TYPE Object
+CONTAINS
+  PROCEDURE :: foo => foo_def
+END TYPE Object
+
+...
+
+SUBROUTINE foo_def(o)
+  CLASS(Object) :: o
+END SUBROUTINE foo_def
+</pre></div>
+
+  <p>Notice that the use of type bound procedures requires defining
+  the procedure dummy arguments as <tt>CLASS</tt> instead
+  of <tt>TYPE</tt>.  FortWrap will create a wrapper C++ class with
+  methods for each type bound procedure, even when the actual
+  procedures are declared private to the Fortran module (the use of
+  type bound procedures in this way allows one to reduce name
+  pollution in large Fortran projects).</p>
+
+  <p>As with basic derived type wrapping, FortWrap identifies
+  constructor and destructor procedures based on pattern matching with
+  the string "<tt>__ctor</tt>" (see <a href="#details-dt">Derived
+  Types</a>).  The latest Fortran standards allow creating more
+  natural constructors by writing a procedure that returns a derived
+  type and using an interface statement to assign that procedure to
+  the same name as the derived type.  This can also facilitate dynamic
+  instantiation of inherited types by using the constructor with
+  the <tt>SOURCE</tt> attribute inside the <tt>ALLOCATE</tt>
+  statement.  Currently, FortWrap cannot wrap procedures that return
+  derived types, but the workaround is to write a wrapper procedure
+  that is a subroutine, which calls the constructor function.  See the
+  examples in <tt>tests/classes</tt> of the FortWrap installation.</p>
+
 
   <h3><a name="details-opt">Optional Arguments</a></h3>
 

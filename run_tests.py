@@ -21,9 +21,9 @@ custom_opts = { 'c_arrays' : OPTS + ' --no-vector',
 # Tests for demonstration purposes only:
 excludes = [ 'comments' ]
 
+tests_dir = os.path.abspath('tests')
 os.chdir('tests')
 tests = glob.glob('*')
-tests.remove( glob.glob('*.mk')[0] )
 
 num_err = 0
 
@@ -33,16 +33,12 @@ if len(sys.argv) > 1:
     print "Not making clean"
     make_clean = False
 
-# Hack so can go up a directory at start of loop
-if tests:
-    os.chdir(tests[0])
-
 failed_tests = []
 
 for test in tests:
-    if test in excludes:
+    os.chdir(tests_dir)
+    if test in excludes or (not os.path.isdir(test)):
         continue
-    os.chdir('..')
     print "Running test:", test,
     os.chdir(test)
     # Run wrapper generator

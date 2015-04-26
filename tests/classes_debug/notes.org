@@ -1,0 +1,61 @@
+* Todo
+** DONE Test private declarations
+If the actual procedure is private but used in a TBP, it should still be wrapped as a method
+** DONE Test class-name constructor
+*** Resolution
+This requires using a function that returns a derived type.  I did figure out how to wrap this, but gfortran creates these functions differently depending on the derived type.  Think for now, will just make it user's responsibility to also create a wrappable subroutine for fortwrap to use.
+** TODO Multiple constructors in the inhertiance structure
+Can this happen?  In other words, the base class has constructor code which is always called, and the child classes have their own constructor code.
+** TODO support NOPASS attribute for tbp's
+
+* Constructors and inheritance
+** [2015-04-21 Tue]
+Some testing on separate work machine showed that gfortran will return derived types by value in some cases (e.g. it will do this when the DT contains only an integer).  This can be tested by trying different calls into the constructor function and printing the first argument to it in Fortran, to see when it is getting the correct value.
+
+** Update [2015-04-19 Sun] with gfortran 4.8.2
+Appears that from Fortran the way to do this is with:
+#+BEGIN_EXAMPLE
+ALLOCATE(s, source=Circle(5))
+#+END_EXAMPLE
+which will effectively run the constructor on a dynamic type.  With this, I don't think that there is any need to worry about wrapping Fortran constructors that accept allocable types...
+
+The new challenge, then, may be to wrap "function"-style constructors.
+
+** Original notes
+It looks to me like Fortran will not allow you to pass an "allocated" abstract type to a specific type's constructor (even though this works fine from my C++ wrappers!)  Thus, I think the way to write the Fortran code may be to give the abstract type constructors that use SELECT TYPE and call the appropriate specific type's constructor.  If this is the case, may require some thinking on my part about how to implement the wrapping for this.
+
+Way this may need to work is to give the base type all the constructor TBP's when writing the Fortran code.  Then what I want the wrapper code to do is to create these as constructors of the child class, not the abstract base class.
+
+On thinking about this again, I'm not sure having a way to call a constructor on a dynamically allocated type is strictly necessary.  Is it?  I guess it could be useful in writing programs that create data dynamically based on input (for example our new distribution test).
+
+*** Procedure accepts allocatable base class
+This is the approach Tobias recommends.
+**** Obtain pointer allocatable data type
+This may be the most challenging part.  The C++ constructor code will somehow need to obtain a pointer to a newly allocated data type, that is itself allocated.  I'm not sure this is possible without digging into the derived type data descriptor, since I don't think you can write a Fortran wrapper subroutine to do this.
+***** Create wrapper derived type
+I think I may be able to obtain a pointer by creating a wrapper derived type that contains the allocatable type.  Then obtain a pointer to the derived type container and use its data to obtain the necessary class pointers.
+**** Identify child class
+Since the procedure accepts as an argument the base class, fortwrap would need to inspect the code to identify what child class is actually allocated.
+**** Alternative - generate second Fortran constructor?
+As an alternative to above, what if I created a whole new procedure that is exactly like the original one except that it accepts the child class.  Then just copy the original code (minus the allocate and select type).
+
+* Basic ideas
+** C++ classes and inheritance structure matches the Fortran
+This way, C++ takes care of some of the dispatching
+** Fortran routines that accept CLASS require different pointer
+Must send pointer to a struct that itself contains two pointers
+** Constructors
+First calls Fortran "allocator" which receives a pointer to a newly allocated derived type (Fortran won't let you get a pointer to a class instance).  Then simply assign a pointer to the appropriate vtab entry, which is stored as part of the class data.
+
+Parser should flag whether any derived type is a "class", so that it then knows how to write out the wrapper code.
+
+* FortWrap parsing
+** During parsing, flag derived types as "class"
+If any procedure are encountered that accept it as a CLASS, or if it EXTENDS another derived type.  I believe type bound procedures also require the argument to be declared CLASS.
+** Type Bound Procedures
+Each derived type contains a list of tpb data structures.  Each tpb structure contains:
+- method name
+- proc name
+- is deferred
+- is NOPASS
+- PASS(arg): flag for not supported (yet)

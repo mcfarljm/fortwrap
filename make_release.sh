@@ -25,7 +25,7 @@ cd ..
 
 mkdir $dir
 cp -r docs fortwrap.py LICENSE.txt README.txt ReleaseNotes.txt run_tests.py tests $dir
-tar --exclude .svn -cvzf $dir.tar.gz $dir
+tar --exclude .svn --exclude classes_debug -cvzf $dir.tar.gz $dir
 
 # Delete temporary directory
 rm -rf $dir

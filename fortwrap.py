@@ -20,7 +20,7 @@ import os
 import traceback
 
 
-VERSION = '1.0.5'
+VERSION = '2.0.0'
 
 
 # SETTINGS ==========================================
@@ -55,7 +55,10 @@ SWIG = True  # Whether or not to include preprocessor defs that will
 
 # REGULAR EXPRESSIONS ===============================
 
-fort_type_def = re.compile(r'\s*TYPE\s+[a-zA-Z]', re.IGNORECASE)
+fort_type_def = re.compile(r'\s*TYPE(\s+(?P<name0>[a-z]\w*)|.*::\s*(?P<name1>[a-z]\w*))', re.IGNORECASE)
+fort_type_extends_def = re.compile(r'EXTENDS\s*\(\s*([a-z]\w*)\s*\)', re.IGNORECASE)
+fort_tbp_def = re.compile(r'\s*PROCEDURE\s*(\(\s*(?P<interface>[a-z]\w*)\))?.*::\s*(?P<name>[a-z]\w*)\s*(=>\s*(?P<proc>[a-z]\w*))?', re.IGNORECASE)
+
 fort_proc_def = re.compile(r'\s*(RECURSIVE)?\s*(SUBROUTINE|FUNCTION)\s+\S+\(', re.IGNORECASE)
 fort_end_proc = re.compile(r'\s*END\s*(SUBROUTINE|FUNCTION)', re.IGNORECASE)
 fort_end_interface = re.compile(r'\s*END\s*INTERFACE', re.IGNORECASE)
@@ -65,7 +68,7 @@ fort_contains = re.compile(r'\s*CONTAINS\s*$', re.IGNORECASE)
 # Data types
 primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>(\w+|\*))\s*\)))?'
 primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
-fort_data_str = r'\s*(' + primitive_data_str + '|TYPE\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
+fort_data_str = r'\s*(' + primitive_data_str + '|(?P<dt_mode>TYPE|CLASS)\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_str + '.*::',re.IGNORECASE)
 optional_def = re.compile('OPTIONAL.*::', re.IGNORECASE)
@@ -140,6 +143,7 @@ proc_pointer_used = False
 # Whether or not matrices are used
 matrix_used = False
 stringh_used = False            # Whether "string.h" is used (needed for strcpy)
+fort_class_used = False
 string_class_used = False # Whether string outputs are used, which involves wrapping using a string class (either std::string or the generated wrapper class)
 
 # Gets changed to string_classname if --no-std-string is set
@@ -217,7 +221,7 @@ class DataType:
         self.array = array
         self.str_len = str_len
         self.proc_pointer = False
-        self.dt = False
+        self.dt = False      # False, 'TYPE', or 'CLASS'
         self.hidden = hidden # hidden name length arg
         # For array, name of argument used to pass the array length:
         self.is_array_size = False # integer defining an array size
@@ -259,12 +263,13 @@ class DataType:
                 m = fort_data.match(type)
                 self.type = m.group('proc_spec')
                 proc_pointer_used = True
-            elif 'TYPE' in type.upper():
-                self.dt = True
-                m = fort_data.match(type)
-                self.type = m.group('dt_spec')
             else:
-                raise FWTypeException(type)
+                m = fort_data.match(type)
+                if m.group('dt_mode'):
+                    self.dt = m.group('dt_mode').upper()
+                    self.type = m.group('dt_spec')
+                else:
+                    raise FWTypeException(type)
 
         # Properties queried by the wrapper generator:
         # vec=vector: 1-d array
@@ -407,7 +412,7 @@ class Procedure:
         self.nargs = len(args)
         self.mod = current_module
         self.comment = comment
-        self.method = method
+        self.method = method # None, 't' (TYPE), 'c' (CLASS)
         self.num = module_proc_num
         self.ctor = False
         self.dtor = False
@@ -516,6 +521,15 @@ class DerivedType:
         self.procs = []
         self.mod = current_module
         self.comment = comment
+
+        self.is_class = False
+        self.abstract = False
+        self.extends = None
+        self.tbps = {} # proc => tbp instance
+
+    def add_tbp(self, tbp):
+        self.tbps[tbp.proc] = tbp
+
     def ctor_list(self):
         """Return list of associated ctors"""
         ctors = []
@@ -523,6 +537,15 @@ class DerivedType:
             if proc.ctor:
                 ctors.append(proc)
         return ctors
+
+class TypeBoundProcedure:
+    def __init__(self,line,re_match):
+        self.name = re_match.group('name')
+        self.proc = re_match.group('proc') or self.name
+        self.deferred = 'DEFERRED' in line.upper()
+        # Initially False or a string, but the string gets changed to
+        # a procedure instance in associate_procedures
+        self.interface = re_match.group('interface')
 
 
 def mangle_name(mod,func):
@@ -605,6 +628,9 @@ def args_have_comment(args):
 def add_type(t):
     if is_public(t):
         objects[t.lower()] = DerivedType(t,dox_comments)
+        return True
+    else:
+        return False
 
 def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
     count = 0
@@ -783,7 +809,19 @@ def parse_proc(file,line,abstract=False):
         # dtors automatically get added.  This way we can hide them
         # with the ignores list, but they still get used in the Class
         # dtor:
-        if is_public(proc_name) or proc.dtor:
+        is_tbp = False
+        if method:
+            try:
+                if proc_name in objects[proc.args_by_pos[1].type.type.lower()].tbps:
+                    is_tbp = True
+            except KeyError:
+                # Should mean that the derived type is not public
+                pass
+        # Note: wrap all abstract procedures (even if they are not
+        # public).  This is sort of a hack, as technically we should
+        # only wrap non-public abstract procedures if they are used in
+        # TBP definitions
+        if is_public(proc_name) or proc.dtor or is_tbp or abstract:
             if not abstract:
                 procedures.append(proc)
                 module_proc_num += 1
@@ -810,16 +848,39 @@ def parse_abstract_interface(file,line):
             dox_comments = []
 
 def parse_type(file,line):
-    typename = line.split()[1]
-    add_type(typename)
-    # Move to end of type, so don't catch PUBLIC/PRIVATE
+    global fort_class_used
+    m = fort_type_def.match(line)
+    typename = m.group('name0') or m.group('name1')
+    type_added = add_type(typename)
+    # type_added checks below prevent KeyError's in objects[]
+    if type_added and 'ABSTRACT' in line.upper():
+        objects[typename.lower()].abstract = True
+        objects[typename.lower()].is_class = True
+        fort_class_used = True
+    extends_match = fort_type_extends_def.search(line)
+    if type_added and extends_match:
+        objects[typename.lower()].extends = extends_match.group(1)
+        objects[typename.lower()].is_class = True
+        fort_class_used = True
+    # if type_added:
+    #     print "{} extends: {}".format(typename, objects[typename.lower()].extends)
+    # Move to end of type and parse type bound procedure definitions
     while True:
         line = readline(file)
+        tbp_match = fort_tbp_def.match(line)
         if line == '':
             error("Unexpected end of file in TYPE " + typename)
             return
-        if line.upper().strip().startswith('END TYPE'):
+        elif line.upper().strip().startswith('END TYPE'):
             return
+        elif type_added and tbp_match:
+            if 'POINTER' in line.upper():
+                pass # Not a TBP
+            elif 'PASS' in line.upper():
+                warning('PASS and NOPASS not yet supported for type bound procedures')
+            else:
+                tbp = TypeBoundProcedure(line, tbp_match)
+                objects[typename.lower()].add_tbp(tbp)
 
 def parse_comments(file,line):
     """
@@ -1042,9 +1103,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     # handle orphan functions in the dummy class correctly
     if bind and call and proc.nargs>0 and proc.args_by_pos[1].type.dt:
         if proc.nargs==1:
-            return 'data_ptr'
+            return 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'
         else:
-            string = 'data_ptr, '
+            string = 'data_ptr, ' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data, '
     # Add argument names and possibly types
     for pos,arg in proc.args_by_pos.iteritems():
         if (call or not bind) and pos == 1 and proc.args_by_pos[1].type.dt:
@@ -1117,6 +1178,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # Change pass-by-value to reference for Fortran
         if call and bind and arg.pass_by_val():
             string = string + '&'
+        # Native class arguments that are not optional need & before arg name
+        if arg.type.dt=='CLASS' and call and arg.native and not (arg.optional and arg.cpp_optional):
+            string = string + '&'
         # Add argument name -------------------------
         if arg.type.proc_pointer and not bind:
             # Arg name is already part of the C function pointer definition
@@ -1151,9 +1215,15 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # Special native handling of certain types:
         if call and arg.native:
             if arg.optional and arg.cpp_optional:
-                string = string + ' ? ' + arg.name + '->data_ptr : NULL'
+                if arg.type.dt == 'TYPE':
+                    string = string + ' ? ' + arg.name + '->data_ptr : NULL'
+                else:
+                    string = string + ' ? &' + arg.name + '->class_data : NULL'
             else:
-                string = string + '->data_ptr'
+                if arg.type.dt == 'TYPE':
+                    string = string + '->data_ptr'
+                else:
+                    string = string + '->class_data'
         elif not call and not bind and not definition and arg.cpp_optional:
             string = string + '=NULL'
         if proc.has_args_past_pos(pos,bind):
@@ -1161,7 +1231,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     return string
     
 # TODO: clean up indent prefix: confusing for proc_pointer special treatment
-def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
+def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix='  '):
     """
     Return a string for a function declaration/definition/call.  There
     are four cases:
@@ -1169,6 +1239,11 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
     -- Method declaration:      none
     -- Method definition:       obj
     -- C binding call:          bind, call
+
+    dfrd_tbp points to corresponding deffered type bound procedure, if
+    applicable.  This is needed because one abstract interface could
+    be used for multiple TBP's, so can't identify the TBP just from
+    the (abstract) procedure itself
     """
     s = ''
     # Add wrapper code for function pointers
@@ -1244,12 +1319,23 @@ def function_def_str(proc,bind=False,obj=None,call=False,prefix='  '):
     elif not call:
         s = s + 'void '
     # Definition/declaration:
+    if not bind:
+        # Determine what the C++ method name will be
+        if proc.args_by_pos[1].type.dt == 'CLASS' and proc.name in objects[proc.args_by_pos[1].type.type.lower()].tbps:
+            # This is a type bound procedure, so name may different
+            # from procedure name
+            method_name= objects[proc.args_by_pos[1].type.type.lower()].tbps[proc.name].name
+        elif dfrd_tbp:
+            # proc is the abstract interface for a deferred tbp
+            method_name = dfrd_tbp.name
+        else:
+            method_name= translate_name(proc.name)        
     if bind:
         s = s + mangle_name(proc.mod,proc.name)
     elif obj and not opts.global_orphans:
-        s = s + obj.cname + '::' + translate_name(proc.name)
+        s = s + obj.cname + '::' + method_name
     else:
-        s = s + translate_name(proc.name)
+        s = s + method_name
     s = s + '(' + c_arg_list(proc,bind,call,obj!=None) + ')'
     if not obj:
         s = s + ';'
@@ -1270,7 +1356,7 @@ def write_constructor(file,object,fort_ctor=None):
     """Write the c++ code for the constructor, possibly including a
     call to a Fortran ctor"""
     # Not used for dummy class with orphan functions
-    if object.name==orphan_classname:
+    if object.name==orphan_classname or object.abstract:
         return
     file.write('// Constructor:\n')
     file.write(object.cname + '::' + object.cname)# + '() {\n')
@@ -1282,6 +1368,11 @@ def write_constructor(file,object,fort_ctor=None):
     file.write('  data_ptr = NULL;\n')
     # Allocate storage for Fortran derived type
     file.write('  ' + mangle_name(fort_wrap_file, 'allocate_' + object.name) + '(&data_ptr); // Allocate Fortran derived type\n')
+    if object.is_class:
+        # Class data must be set up before calling constructor, in
+        # case constructor uses CLASS argument
+        file.write('  class_data.vptr = &__{0}_MOD___vtab_{0}_{1}; // Get pointer to vtab\n'.format(object.mod, object.name))
+        file.write('  class_data.data = data_ptr;\n')
     # If present, call Fortran ctor
     if fort_ctor:
         file.write(function_def_str(fort_ctor,bind=True,call=True) )
@@ -1293,7 +1384,7 @@ def write_constructor(file,object,fort_ctor=None):
 
 def write_destructor(file,object):
     """Write code for destructor"""
-    if object.name==orphan_classname:
+    if object.name==orphan_classname or object.abstract:
         return
     file.write('// Destructor:\n')
     file.write(object.cname + '::~' + object.cname + '() {\n')
@@ -1336,10 +1427,14 @@ def write_class(object):
             file.write('#include ' + include + '\n')
         else:
             file.write('#include "' + translate_name(include) + '.h"\n')
+    # Declare external vtab data
+    if object.is_class:
+        file.write('\n// Declare external vtab data:\n')
+        file.write('extern int __{0}_MOD___vtab_{0}_{1}; // int is dummy data type\n'.format(object.mod, object.name))
     # C Bindings
     file.write('\nextern "C" {\n')
     # Write bindings for allocate/deallocate funcs
-    if object.name!=orphan_classname:
+    if object.name!=orphan_classname and not object.abstract:
         file.write('  void ' + mangle_name(fort_wrap_file, 'allocate_'+object.name) + '(ADDRESS *caddr);\n')
         file.write('  void ' + mangle_name(fort_wrap_file, 'deallocate_'+object.name) + '(ADDRESS caddr);\n')
     for proc in object.procs:
@@ -1352,7 +1447,12 @@ def write_class(object):
     
     if not opts.global_orphans:
         write_cpp_dox_comments(file,object.comment)
-        file.write('class ' + object.cname + ' {\n\n')
+        file.write('class ' + object.cname + ' ')
+        if object.extends:
+            file.write(': public ' + object.extends + ' ')
+        file.write('{\n\n')
+        if object.abstract:
+            file.write('protected:\n  // {0} can not be instantiated\n  {0}() {{}}\n\n'.format(object.cname))
         file.write('public:\n')
     # Constructor:
     fort_ctors = object.ctor_list()
@@ -1360,23 +1460,41 @@ def write_class(object):
         for fort_ctor in fort_ctors:
             write_cpp_dox_comments(file,fort_ctor.comment,fort_ctor.args_by_pos)
             file.write('  ' + object.cname + '(' + c_arg_list(fort_ctor,bind=False,call=False,definition=False) + ');\n')
-    elif not object.name==orphan_classname:
+    elif not object.name==orphan_classname and not object.abstract:
         # Don't declare default constructor (or destructor, below) for
         # the dummy class
         file.write('  ' + object.cname + '();\n')
     # Desctructor:
     if not object.name==orphan_classname:
-        file.write('  ~' + object.cname + '();\n\n')
+        if object.abstract:
+            file.write('  virtual ~' + object.cname + '() {}\n\n')
+        else:
+            file.write('  ~' + object.cname + '();\n\n')
     # Method declarations
     for proc in object.procs:
         if proc.ctor or (proc.dtor and not is_public(proc.name)):
             continue
         write_cpp_dox_comments(file,proc.comment,proc.args_by_pos)
         file.write(function_def_str(proc) + '\n\n')
+    # Check for pure virtual methods (which have no directly
+    # associated procedure)
+    for tbp in object.tbps.itervalues():
+        if tbp.deferred:
+            # Note: this lookup doesn't respect the module USE
+            # hierarchy and could potentially point to wrong
+            # abstract_interfaces if the project contains multiple
+            # abstract_interfaces with different names, in different
+            # modules
+            if tbp.interface not in abstract_interfaces:
+                error('abstract interface {0} for type bound procedure {1} not found'.format(tbp.interface, tbp.name))
+            else:
+                file.write('  virtual ' + function_def_str(abstract_interfaces[tbp.interface], dfrd_tbp=tbp, prefix='')[:-1] + ' = 0;\n\n')
     #file.write('\nprivate:\n')
-    if object.name!=orphan_classname:
+    if object.name!=orphan_classname and not object.extends:
         file.write('  ADDRESS data_ptr;\n')
-        file.write('\nprivate:\n')
+        if object.is_class:
+            file.write('  FClassContainer class_data;\n')
+        file.write('\nprotected:\n')
         file.write('  bool initialized;\n')
     if not opts.global_orphans:
         file.write('};\n\n')
@@ -1434,6 +1552,8 @@ def get_native_includes(object):
     """
     After method association, check which native types an object uses
     and return a corresponding string list of include file
+
+    This will also add the include needed for inheritance
     """
     includes = set()
     for proc in object.procs:
@@ -1449,6 +1569,9 @@ def get_native_includes(object):
                     includes.add('<string>')
                 else:
                     includes.add(string_classname)
+    # For inheritance:
+    if object.extends:
+        includes.add(object.extends)
     return includes
 
 def write_global_header_file():
@@ -1469,6 +1592,8 @@ def write_misc_defs():
     f.write('#define ' + misc_defs_filename.upper()[:-2] + '_H_\n\n')
     f.write('typedef void(*generic_fpointer)(void);\n')
     f.write('typedef void* ADDRESS;\n\n')
+    if fort_class_used:
+        f.write('struct FClassContainer {\n  ADDRESS data;\n  ADDRESS vptr;\n};\n\n')
     f.write('extern "C" {\n')
     if compiler == 'g95':
         f.write('  /* g95_runtime_start and stop are supposed to be called\n')
@@ -1645,7 +1770,7 @@ def write_fortran_wrapper():
         f.write('    CALL C_F_PROCPOINTER(cpointer,fpointer)\n')
         f.write('  END SUBROUTINE '+func_pointer_converter+'\n\n')
     for obj in objects.itervalues():
-        if obj.name == orphan_classname:
+        if obj.name == orphan_classname or obj.abstract:
             continue
         cptr = obj.name + '_cptr'
         fptr = obj.name + '_fptr'
@@ -1919,6 +2044,9 @@ if __name__ == "__main__":
         if not opts.std_string:
             write_string_class()
         write_fortran_wrapper()
+
+        if fort_class_used:
+            warning("support for wrapping abstract types and type extension is experimental")
 
         sys.exit(0)
 

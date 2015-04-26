@@ -1,8 +1,15 @@
-Fortwrap 1.0.6 summary:
-- Fix to prevent argument clash when wrapping procedures that contain
-  other procedure definitions with the same argument names
-- Fix to not use case-sensitivity when matching names in the argument
-  list to their type declarations
+FortWrap 2.0 summary:
+- Experimental support for Fortran object oriented features:
+  - Wrapping of type bound procedures
+  - Fortran type extension translated into C++ classes with
+    inheritance structure
+  - Support for abstract types and deferred procedures (translated
+    into pure virtual methods in C++)
+- Minor fixes:
+  - Fix to prevent argument clash when wrapping procedures that
+    contain other procedure definitions with the same argument names
+  - Fix to not use case-sensitivity when matching names in the
+    argument list to their type declarations
 
 FortWrap 1.0.5 summary:
 - Added option --no-std-string, which uses a wrapper class to manage
