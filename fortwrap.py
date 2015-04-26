@@ -20,7 +20,7 @@ import os
 import traceback
 
 
-VERSION = '1.0.5'
+VERSION = '2.0.0'
 
 
 # SETTINGS ==========================================
@@ -862,8 +862,8 @@ def parse_type(file,line):
         objects[typename.lower()].extends = extends_match.group(1)
         objects[typename.lower()].is_class = True
         fort_class_used = True
-    if type_added:
-        print "{} extends: {}".format(typename, objects[typename.lower()].extends)
+    # if type_added:
+    #     print "{} extends: {}".format(typename, objects[typename.lower()].extends)
     # Move to end of type and parse type bound procedure definitions
     while True:
         line = readline(file)
@@ -2044,6 +2044,9 @@ if __name__ == "__main__":
         if not opts.std_string:
             write_string_class()
         write_fortran_wrapper()
+
+        if fort_class_used:
+            warning("support for wrapping abstract types and type extension is experimental")
 
         sys.exit(0)
 
