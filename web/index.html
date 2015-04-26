@@ -12,6 +12,7 @@
   <ul>
     <li><a href="#Introduction">Introduction</a></li>
     <li><a href="#Swig">Wrapping for other languages</a></li>
+    <li><a href="examples.html">Examples</a></li>
     <li><a href="#Obtaining">Obtaining FortWrap</a></li>
     <li><a href="#Features">Main Features</a></li>
     <li><a href="#Unsupported">Unsupported Features</a></li>
@@ -96,6 +97,10 @@ o.foo();
     <li> Fortran "dtor" functions automatically called by C++ destructor</li>
   </ul>
 
+  <li> <b>Classes (experimental)</b>: Translate Fortran CLASSes and
+  type bound procedures into C++ classes.  Fortran inheritance
+    structure and polymorphism are retained in C++.</li>
+
   <li> <b>Optional arguments</b>: Fortran optional arguments are fully
     supported, with automatic NULL default values in C++.</li>
 
@@ -171,16 +176,6 @@ supported:</p>
     wrapped.</li>
 
   <li><tt>COMPLEX</tt> data type is not supported</li>
-
-  <li> <b>CLASS</b> (polymorphic) variables.  Experimental support for
-    FortWrap to generate polymorphic C++ wrappers around
-    Fortran <tt>CLASS</tt> constructs is already underway
-    (see <a href="#Polymorphism">below</a>).</li>
-
-  <li>Type bound procedures.  Those that were not declared
-    as <tt>NOPASS</tt> require that the firrst argument be declared
-    using <tt>CLASS</tt> instead of <tt>TYPE</tt>.  FortWrap does not
-    currently handle <tt>CLASS</tt>: see above.</li>
 </ul>
 
   <p>Note that FortWrap can still wrap procedures that use unsupported
@@ -195,21 +190,22 @@ supported:</p>
     good introduction to these language features is
     <a href=http://www.pgroup.com/lit/articles/insider/v3n1a3.htm>here</a>.</p>
 
-  <p>I am currently working on developing support for these features
-    for use with gfortran.  The objective is to mirror the Fortran
-    class inheritance structure using C++ classes.  I believe that I
-    have identified most of the basic patterns that are needed to make
-    this wrapping work.  I am currently working to incorporate this
-    into FortWrap, and expect to have a preliminary release available
-    within the next few months.  Please contact me at <tt>mcfarljm at
-    gmail</tt> if you would like to help with testing this
-    feature.</p>
-
-  <p>-- July 2013</p>
+  <p>FortWrap version 2 introduced experimental support for wrapping
+  these features for the gfortran compiler.  The objective is to
+  mirror the Fortran class inheritance structure using C++ classes.
+  Please see the examples included with FortWrap in
+  the <tt>tests/classes</tt> directory.  Many features are currently
+  working, including wrapping type bound procedures and mirroring of
+  the inheritance structure.  Supporting these features requires more
+  assumptions about how the Fortran compiler generates code, so they
+  may be considered more fragile.</p>
 
   <h2><a name="Issues">Known Issues</a></h2>
 
   <ul>
+    <li>Scalar character arguments not wrapped correctly (generated code won't compile</li>
+  <li>Old-style dummy argument definitions that do not include <tt>::</tt> are not recognized</li>
+    <li>Enumerators are not wrapped correctly if some names within a set are made private</li>
   </ul>
 
 </body>
