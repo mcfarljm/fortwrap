@@ -1489,7 +1489,7 @@ def write_class(object):
             # abstract_interfaces with different names, in different
             # modules
             if tbp.interface not in abstract_interfaces:
-                error('abstract interface {0} for type bound procedure {1} not found'.format(tbp.interface, tbp.name))
+                error('abstract interface {0} for type bound procedure {1} not found (may not be interoperable)'.format(tbp.interface, tbp.name))
             else:
                 file.write('  virtual ' + function_def_str(abstract_interfaces[tbp.interface], dfrd_tbp=tbp, prefix='')[:-1] + ' = 0;\n\n')
     #file.write('\nprivate:\n')
