@@ -560,6 +560,9 @@ def mangle_name(mod,func):
             suffix = suffix + '_'
         return func.lower() + suffix
 
+def vtab_symbol(mod,name):
+    return '__{0}_MOD___vtab_{0}_{1}'.format(mod.lower(), name.capitalize())
+
 
 def get_proc(name):
     """Return the first procedure in the global list that matches name"""
@@ -1371,7 +1374,7 @@ def write_constructor(file,object,fort_ctor=None):
     if object.is_class:
         # Class data must be set up before calling constructor, in
         # case constructor uses CLASS argument
-        file.write('  class_data.vptr = &__{0}_MOD___vtab_{0}_{1}; // Get pointer to vtab\n'.format(object.mod, object.name))
+        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.mod, object.name)))
         file.write('  class_data.data = data_ptr;\n')
     # If present, call Fortran ctor
     if fort_ctor:
@@ -1430,7 +1433,7 @@ def write_class(object):
     # Declare external vtab data
     if object.is_class:
         file.write('\n// Declare external vtab data:\n')
-        file.write('extern int __{0}_MOD___vtab_{0}_{1}; // int is dummy data type\n'.format(object.mod, object.name))
+        file.write('extern int {0}; // int is dummy data type\n'.format(vtab_symbol(object.mod, object.name)))
     # C Bindings
     file.write('\nextern "C" {\n')
     # Write bindings for allocate/deallocate funcs
