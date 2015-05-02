@@ -45,9 +45,13 @@ MODULE shapes
   !> An object with sharp corners
   TYPE, EXTENDS(Polygon) :: Square
     INTEGER :: side
+    ! Appears that if this is ALLOCATABLE, gfortran automatically frees
+    ! it...
+    INTEGER, POINTER :: x(:)
   CONTAINS
     PROCEDURE :: get_area => Square_area
     PROCEDURE :: ctor => Square_ctor
+    PROCEDURE :: dtor => Square_dtor
   END TYPE Square
 
 CONTAINS
@@ -76,9 +80,15 @@ CONTAINS
     INTEGER, INTENT(in) :: side
     s%side = side
     s%nsides = 4
+    ALLOCATE( s%x(10) )
 !!$    PRINT*, 'in Square ctor'
     !PRINT*, 'Shape num in ctor:', s%num
   END SUBROUTINE Square_ctor
+
+  SUBROUTINE Square_dtor(s)
+    CLASS(Square) :: s
+    DEALLOCATE( s%x )
+  END SUBROUTINE Square_dtor
 
   !> Compute area of a circle
   FUNCTION Circle_area(s) RESULT(a)

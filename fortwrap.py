@@ -1394,7 +1394,8 @@ def write_destructor(file,object):
     # Check for Fortran destructor
     for proc in object.procs:
         if proc.dtor:
-            file.write('  ' + 'if (initialized) ' + mangle_name(proc.mod,proc.name) + '(data_ptr')
+            target = 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'
+            file.write('  ' + 'if (initialized) ' + mangle_name(proc.mod,proc.name) + '(' + target)
             # Add NULL for any optional arguments (only optional
             # arguments are allowed in the destructor call)
             for i in xrange(proc.nargs-1):
