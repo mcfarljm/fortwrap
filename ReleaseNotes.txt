@@ -1,5 +1,5 @@
 FortWrap 2.0.1 summary:
-- Fix for case for vtab symbol references
+- Minor fixes for wrapping CLASS data
 
 FortWrap 2.0 summary:
 - Experimental support for Fortran object oriented features:
