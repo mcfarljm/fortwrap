@@ -1258,7 +1258,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                     s = s + prefix + 'generic_fpointer c_pointer;\n'
                     declared_c_pointer = True
                 s = s + prefix + 'c_pointer = (generic_fpointer) ' + arg.name + ';\n'
-                s = s + prefix + 'long FORT_' + arg.name + ';\n'
+                s = s + prefix + 'long long FORT_' + arg.name + ';\n'
                 s = s + prefix + 'if (' + arg.name + ') ' + mangle_name(fort_wrap_file,func_pointer_converter) + '(c_pointer' + ', &FORT_' + arg.name + ');\n'
     # Add wrapper code for strings
     if call:

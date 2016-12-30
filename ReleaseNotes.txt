@@ -1,3 +1,6 @@
+FortWrap 2.0.2 summary:
+- Minor fix for procedure pointer storage size on 64-bit platforms
+
 FortWrap 2.0.1 summary:
 - Minor fixes for wrapping CLASS data
 
