@@ -1340,7 +1340,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     # Definition/declaration:
     if not bind:
         # Determine what the C++ method name will be
-        if proc.args_by_pos[1].type.dt == 'CLASS' and proc.name in objects[proc.args_by_pos[1].type.type.lower()].tbps:
+        if len(proc.args_by_pos)>=1 and proc.args_by_pos[1].type.dt == 'CLASS' and proc.name in objects[proc.args_by_pos[1].type.type.lower()].tbps:
             # This is a type bound procedure, so name may different
             # from procedure name
             method_name= objects[proc.args_by_pos[1].type.type.lower()].tbps[proc.name].name
