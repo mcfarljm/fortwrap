@@ -11,6 +11,7 @@
 
 # Run fortwrap.py -h for usage information
 
+from __future__ import print_function
 import argparse
 import re
 import glob
@@ -836,7 +837,7 @@ def parse_abstract_interface(file,line):
     while True:
         line = readline(file)
         if line=='':
-            print "Unexpected end of file in abstract interface"
+            print("Unexpected end of file in abstract interface")
             return
         elif fort_dox_comments.match(line):
             # Grab comments and ignore them
@@ -925,7 +926,7 @@ def parse_enum(file,line):
     while True:
         line = readline(file)
         if line == '':
-            print "Unexpected end of file in ENUM"
+            print("Unexpected end of file in ENUM")
             return
         if line.strip().upper().startswith('END'):
             break
@@ -935,14 +936,14 @@ def parse_enum(file,line):
                 try:
                     s = line.split('::')[1].split('!')[0]
                     if s.find('=')>=0:
-                        print "Non-default enum values not supported"
+                        print("Non-default enum values not supported")
                         enums = []
                         break
                     for enum in s.split(','):
                         if is_public(enum.strip()):
                             enums.append(enum.strip())
                 except:
-                    print "Problem parsing ENUMERATOR:", line
+                    print("Problem parsing ENUMERATOR:", line)
     if len(enums) > 0:
         #print "Adding enum:", enums
         enumerations.append(enums)
@@ -1975,7 +1976,7 @@ if __name__ == "__main__":
                 if not line.strip().startswith('#') and re.search('\w', line):
                     file_list.append( line.strip() )
             f.close()
-            print "LOADED", len(file_list), 'FILES FROM LIST'
+            print("LOADED", len(file_list), 'FILES FROM LIST')
 
         if opts.glob:
             file_list += glob.glob('*.[fF]90')
