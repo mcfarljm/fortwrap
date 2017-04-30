@@ -11,7 +11,7 @@
 
 # Run fortwrap.py -h for usage information
 
-import getopt
+import argparse
 import re
 import glob
 from datetime import date
@@ -1877,112 +1877,77 @@ class ConfigurationFile:
 class Options:
     def __init__(self):
         self.parse_args()
-
-    def usage(self,exit_val=2):
-        print "Usage:", sys.argv[0], "[options] [filenames]\n"
-        print "Source files to be wrapped can be specified on the command line ([filenames]),\nby globbing the current directory (-g), or listed in a file (--file-list)\n"
-        print "-v, --version\t: Print version information and exit"
-        print "-h, --help\t: Print this usage information"
-        print "-n\t\t: Run parser but do not generate any wrapper code (dry run)"
-        print "-c <FC>\t\t: Use name mangling for Fortran compiler <FC>.  Only supports\n\t\t  g95 and gfortran.  Default: FC="+compiler
-        print "-g\t\t: Wrap source files found in current directory (glob)"
-        print "-d <dir>\t: Output generated wrapper code to <dir>"
-        print "--file-list=<f>\t: Read list of Fortran source files to parse from file <f>.\n\t\t  The format is a newline-separated list of filenames with full\n\t\t  or relative paths"
-        print "-i <f>\t\t: Read interface configuration file <f>"
-        print "--no-vector\t: Wrap 1-D array arguments as C-style arrays ('[]') instead of\n\t\t  C++ std::vector containers"
-        print "--no-fmat\t: Do not wrap 2-D array arguments with the FortranMatrix type"
-        print "--array-as-ptr\t: Wrap 1-D arrays with '*' instead of '[]'. Implies --no-vector"
-        print "--no-std-string\t: Wrap character outputs using a wrapper class instead of\n\t\t  std::string"
-        print "--dummy-class=<n>: Use <n> as the name of the dummy class used to wrap\n\t\t  non-method procedures"
-        print "--global\t: Wrap non-method procedures as global functions instead of\n\t\t  static methods of a dummy class"
-        print "--no-orphans\t: Do not by default wrap non-method procedures.  They can still\n\t\t  be wrapped by using %include directives"
-        print "--no-W-not-wrapped: Do not warn about procedures that were not wrapped"
-        print "--main-header=<n>: Use <n> as name of the main header file (default FortWrap.h)"
-        print "--constants-class=<n>: Use <n> as name of the class for wrapping enumerations\n\t\t  (default: {0})".format(constants_classname)
-        # Not documenting, as this option could be dangerous, although
-        # it is protected from "-d .":
-        #print "--clean\t\t: Remove all wrapper-related files from wrapper code directory\n\t\t  before generating new code.  Requires -d.  Warning: this\n\t\t  deletes files.  Use with caution and assume it will delete\n\t\t  everything in the wrapper directory"
-        sys.exit(exit_val)
-
+        self.check_args()
+        self.assign_globals()
+    
     def parse_args(self):
-        global code_output_dir, include_output_dir, fort_output_dir, compiler, orphan_classname, file_list, constants_classname, string_object_type
-        try:
-            opts, args = getopt.getopt(sys.argv[1:], 'hvc:gnd:i:', ['file-list=','clean','help','version','no-vector','no-fmat','array-as-ptr','no-std-string','dummy-class=','global','no-orphans','no-W-not-wrapped','main-header=','constants-class='])
-        except getopt.GetoptError, err:
-            print str(err)
-            self.usage()
+        """Use argparse to parse command arguments"""
 
-        for f in args:
-            file_list.append(f)
+        parser = argparse.ArgumentParser(prog='fortwrap')
+        parser.add_argument('-v','--version', action='version', version='%(prog)s '+VERSION)
+        parser.add_argument('files', nargs='*', help='files to process')
+        parser.add_argument('-n', '--dry-run', action='store_true', help='run parser but do not generate any wrapper code (dry run)')
+        parser.add_argument('-c', '--compiler', default=compiler, choices=['gfortran','g95'], help='use name mangling for Fortran compiler COMPILER.  Only supports g95 and gfortran (Default=%(default)s)')
+        parser.add_argument('-g','--glob', action='store_true', help='wrap source files found in current directory')
+        parser.add_argument('-d','--directory', default='.', help='output generated wrapper code to DIRECTORY')
+        parser.add_argument('--file-list', help='Read list of Fortran source files to parser from file FILE_LIST.  The format is a newline-separated list of filenames with full or relative paths.')
+        parser.add_argument('-i', '--config_file', help='read interface configuration file CONFIG_FILE')
+        parser.add_argument('--no-vector', action='store_true', help='wrap 1-D array arguments as C-style arrays instead of C++ std::vector containers')
+        parser.add_argument('--no-fmat', action='store_true', help='do not wrap 2-D array arguments with the FortranMatrix type')
+        parser.add_argument('--array-as-ptr', action='store_true', help="wrap 1-D arrays with '*' instead of '[]'.  Implies --no-vector")
+        parser.add_argument('--no-std-string', action='store_true', help='wrap character outputs using a wrapper class instead of std::string')
+        parser.add_argument('--dummy-class', default='FortFuncs', help='use DUMMY_CLASS as the name of the dummy class used to wrap non-method procedures')
+        parser.add_argument('--global-funcs', action='store_true', help='wrap non-method procedures as global functions instead of static methods of a dummy class')
+        parser.add_argument('--no-orphans', action='store_true', help='do not by default wrap non-method procedures.  They can still be wrapped by using %%include directives')
+        parser.add_argument('--no-W-not_wrapped', action='store_true', help='do not warn about procedures that were not wrapped')
+        parser.add_argument('--main-header', default='FortWrap', help='Use MAIN_HEADER as name of the main header file (default=%(default)s)')
+        parser.add_argument('--constants-class', default='FortConstants', help='use CONSTANTS_CLASS as name of the class for wrapping enumerations (default=%(default)s)')
+        # Not documenting, as this option could be dangerous, although it is
+        # protected from -d.  help='remove all wrapper-related files from
+        # wrapper code directory before generating new code.  Requires -d.
+        # Warning: this deletes files.  Use with caution and assume it will
+        # delete everything in the wrapper directory'
+        parser.add_argument('--clean', action='store_true', help=argparse.SUPPRESS)
 
-        self.inputs_file = ''
-        self.glob_files = False
-        self.clean_code = False
-        self.dry_run = False
-        self.no_vector = False
-        self.no_fmat = False
-        self.array_as_ptr = False
-        self.std_string = True
-        self.global_orphans = False
-        self.interface_file = ''
-        self.no_orphans = False
-        self.warn_not_wrapped = True
-        self.main_header = 'FortWrap'
+        parser.parse_args(namespace=self)
 
-        if ('-h','') in opts or ('--help','') in opts:
-            self.usage(0)
-        elif ('-v','') in opts or ('--version','') in opts:
-            print "FortWrap version", VERSION
-            sys.exit(0)
-        elif ('-g','') in opts:
-            self.glob_files = True
-        for o,a in opts:
-            if o=='--file-list':
-                self.inputs_file = a
-            elif o=='-d':
-                if not os.path.isdir(a):
-                    error("Directory does not exist: " + a)
-                    sys.exit(2)
-                code_output_dir = a
-                include_output_dir = a
-                fort_output_dir = a
-            elif o=='-c':
-                compiler = a
-                if a!='g95' and a!='gfortran':
-                    error("Only g95 and gfortran name mangling supported")
-                    sys.exit(2)
-            elif o=='-i':
-                self.interface_file = a
-            elif o=='-n':
-                self.dry_run = True
-            elif o=='--clean':
-                self.clean_code = True
-            elif o=='--no-vector':
-                self.no_vector = True
-            elif o=='--no-fmat':
-                self.no_fmat = True
-            elif o=='--array-as-ptr':
-                self.array_as_ptr = True
-                self.no_vector = True
-            elif o=='--no-std-string':
-                self.std_string = False
-                string_object_type = string_classname
-            elif o=='--dummy-class':
-                orphan_classname = a
-            elif o=='--global':
-                self.global_orphans = True
-            elif o=='--no-orphans':
-                self.no_orphans = True
-            elif o=='--no-W-not-wrapped':
-                self.warn_not_wrapped = False
-            elif o=='--main-header':
-                self.main_header = a.split('.h')[0]
-            elif o=='--constants-class':
-                constants_classname = a
-
-        if self.clean_code and code_output_dir=='.':
-            error("Cleaning wrapper code output dir requires -d")
+    def check_args(self):
+        """Additional validity checking an value setting not done automatically by argparse"""
+        if self.directory != '.':
+            if not os.path.isdir(self.directory):
+                error('Directory does not exist: ' + self.directory)
+                sys.exit(2)
+        if self.clean and self.directory=='.':
+            error('Cleaning wrapper code output dire requires -d')
             sys.exit(2)
+
+        if self.array_as_ptr:
+            self.no_vector = True
+
+        self.global_orphans = self.global_funcs
+        self.std_string = not self.no_std_string
+        self.warn_not_wrapped = not self.no_W_not_wrapped
+        if self.main_header != 'FortWrap':
+            self.main_header = self.main_header.split('.h')[0]
+
+    def assign_globals(self):
+        """Assign certain options to global variables"""
+        global code_output_dir, include_output_dir, fort_output_dir, string_object_type, constants_classname, compiler, orphan_classname, file_list
+
+        file_list = self.files
+        compiler = self.compiler
+        orphan_classname = self.dummy_class
+
+        if self.directory != '.':
+            code_output_dir = self.directory
+            include_output_dir = self.directory
+            fort_output_dir = self.directory
+
+        if self.no_std_string:
+            string_object_type = string_classname
+
+        constants_classname = self.constants_class
+
 
 
 # COMMANDS ==========================================
@@ -1995,16 +1960,16 @@ if __name__ == "__main__":
 
         opts = Options()
 
-        configs = ConfigurationFile(opts.interface_file)
+        configs = ConfigurationFile(opts.config_file)
 
-        if opts.clean_code:
+        if opts.clean:
             clean_directories()
 
-        if opts.inputs_file:
+        if opts.file_list:
             try:
-                f = open(opts.inputs_file)
+                f = open(opts.file_list)
             except IOError:
-                error('Unable to open file list: ' + opts.inputs_file)
+                error('Unable to open file list: ' + opts.file_list)
                 sys.exit(3)
             for line in f:
                 if not line.strip().startswith('#') and re.search('\w', line):
@@ -2012,7 +1977,7 @@ if __name__ == "__main__":
             f.close()
             print "LOADED", len(file_list), 'FILES FROM LIST'
 
-        if opts.glob_files:
+        if opts.glob:
             file_list += glob.glob('*.[fF]90')
 
         if not file_list:
