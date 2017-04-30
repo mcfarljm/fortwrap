@@ -11,7 +11,10 @@ import glob
 import subprocess
 
 OPTS = '-g --clean -d wrap'     # FortWrap options
-cmd = os.path.normpath('../../fortwrap.py')
+
+# Add the executable to the command.  This way the tests are run with
+# the chosen python instead of the default
+cmd = sys.executable + ' ' + os.path.normpath('../../fortwrap.py')
 
 custom_opts = { 'c_arrays' : OPTS + ' --no-vector', 
                 'interface_file' : OPTS + ' -i interface.i',
