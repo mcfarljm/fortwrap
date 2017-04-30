@@ -5,6 +5,7 @@
 # necessary, add "-c gfortran" to OPTS below (gfortran name mangling
 # is currently the default)
 
+from __future__ import print_function
 import sys
 import os
 import glob
@@ -33,7 +34,7 @@ num_err = 0
 # Use a command arg to prevent making clean
 make_clean = True
 if len(sys.argv) > 1:
-    print "Not making clean"
+    print("Not making clean")
     make_clean = False
 
 failed_tests = []
@@ -42,7 +43,7 @@ for test in tests:
     os.chdir(tests_dir)
     if test in excludes or (not os.path.isdir(test)):
         continue
-    print "Running test:", test,
+    print("Running test:", test, end=' ')
     os.chdir(test)
     # Run wrapper generator
     if test in custom_opts:
@@ -55,14 +56,14 @@ for test in tests:
     if stat!=0:
         num_err += 1
         failed_tests.append((test,'wrapper'))
-        print "[FAIL: wrapper]"
+        print("[FAIL: wrapper]")
         continue
     # Build test program
     stat = os.system('make > ' + os.devnull)
     if stat!=0:
         num_err += 1
         failed_tests.append((test,'build'))
-        print "[FAIL: build]"
+        print("[FAIL: build]")
         continue
     # Run test program
     #
@@ -74,11 +75,11 @@ for test in tests:
     if stat!=0:
         num_err += 1
         failed_tests.append((test,'run'))
-        print "[FAIL: run]"
+        print("[FAIL: run]")
         continue
-    print "[PASS]"
+    print("[PASS]")
 
 if num_err == 0:
-    print "Tests successful"
+    print("Tests successful")
 else:
-    print num_err, "error(s):", failed_tests
+    print(num_err, "error(s):", failed_tests)
