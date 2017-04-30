@@ -36,7 +36,7 @@ import os
 import traceback
 
 
-VERSION = '2.1.0'
+VERSION = '2.1.1'
 
 
 # SETTINGS ==========================================
@@ -1907,7 +1907,7 @@ class Options(object):
         parser.add_argument('-g','--glob', action='store_true', help='wrap source files found in current directory')
         parser.add_argument('-d','--directory', default='.', help='output generated wrapper code to DIRECTORY')
         parser.add_argument('--file-list', help='Read list of Fortran source files to parser from file FILE_LIST.  The format is a newline-separated list of filenames with full or relative paths.')
-        parser.add_argument('-i', '--config_file', help='read interface configuration file CONFIG_FILE')
+        parser.add_argument('-i', '--config-file', help='read interface configuration file CONFIG_FILE')
         parser.add_argument('--no-vector', action='store_true', help='wrap 1-D array arguments as C-style arrays instead of C++ std::vector containers')
         parser.add_argument('--no-fmat', action='store_true', help='do not wrap 2-D array arguments with the FortranMatrix type')
         parser.add_argument('--array-as-ptr', action='store_true', help="wrap 1-D arrays with '*' instead of '[]'.  Implies --no-vector")
@@ -1915,7 +1915,7 @@ class Options(object):
         parser.add_argument('--dummy-class', default='FortFuncs', help='use DUMMY_CLASS as the name of the dummy class used to wrap non-method procedures')
         parser.add_argument('--global-funcs', action='store_true', help='wrap non-method procedures as global functions instead of static methods of a dummy class')
         parser.add_argument('--no-orphans', action='store_true', help='do not by default wrap non-method procedures.  They can still be wrapped by using %%include directives')
-        parser.add_argument('--no-W-not_wrapped', action='store_true', help='do not warn about procedures that were not wrapped')
+        parser.add_argument('--no-W-not-wrapped', action='store_true', help='do not warn about procedures that were not wrapped')
         parser.add_argument('--main-header', default='FortWrap', help='Use MAIN_HEADER as name of the main header file (default=%(default)s)')
         parser.add_argument('--constants-class', default='FortConstants', help='use CONSTANTS_CLASS as name of the class for wrapping enumerations (default=%(default)s)')
         # Not documenting, as this option could be dangerous, although it is
