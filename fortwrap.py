@@ -973,7 +973,7 @@ def parse_file(fname):
         if line == '':
             break
         elif fort_dox_comments.match(line):
-            dox_comments = parse_comments(file,line)
+            dox_comments = parse_comments(f,line)
             continue
         elif fort_comment.match(line):
             continue
@@ -1000,16 +1000,16 @@ def parse_file(fname):
             if '::' not in line:
                 default_protection = PRIVATE
             else:
-                line = join_lines(line,file)
+                line = join_lines(line,f)
                 for name in line.split('::')[1].split(','):
                     private_names.add(name.strip().lower())
         elif line.strip().upper().startswith('PUBLIC'):
             if '::' in line:
-                line = join_lines(line,file)
+                line = join_lines(line,f)
                 for name in line.split('::')[1].split(','):
                     public_names.add(name.strip().lower())
         elif integer_param_def.match(line):
-            line = join_lines(line,file).split('!')[0]
+            line = join_lines(line,f).split('!')[0]
             for param in line.split('::')[1].split(','):
                 name,val = param.split('=')
                 fort_integer_params[name.strip().upper()] = int( val.strip() )
