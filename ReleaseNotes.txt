@@ -1,3 +1,8 @@
+FortWrap 2.1.0 summary:
+- Upgraded code to be compatible with Python 2 and 3.  Should work on
+  Python 2 even if the "future" package is not available.
+- Updated argument parsing to use argparse instead of getopt
+
 FortWrap 2.0.2 summary:
 - Minor fix for procedure pointer storage size on 64-bit platforms
 
