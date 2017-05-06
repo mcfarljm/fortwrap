@@ -8,6 +8,9 @@ int main(void)
   if (o1.add(2) != 7)
     return 1;
 
+  if (o1.multiply(3) != 15)
+    return 1;
+
   // Use float constructor
   Object o2((float) 10.0);
   if (o2.add(2) != 12)

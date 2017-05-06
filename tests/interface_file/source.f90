@@ -52,6 +52,15 @@ CONTAINS
     y = o%i + INT(o%f) + i
   END FUNCTION object_add
 
+  ! Patterns can be used to facilitate renaming multiple methods.  Pattern
+  ! matching is case insensitive, so "^object" will also match here:
+  FUNCTION Object_multiply(o,i) RESULT(y)
+    TYPE (Object) :: o
+    INTEGER, INTENT(in) :: i
+    INTEGER :: y
+    y = o%i * i
+  END FUNCTION Object_multiply
+
   SUBROUTINE Object2_constructor(o, i)
     TYPE (Object_to_rename) :: o
     INTEGER, INTENT(in) :: i

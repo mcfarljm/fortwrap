@@ -1,3 +1,6 @@
+FortWrap 2.1.2 summary:
+- Added %pattern keyword to interface file to facilitate bulk renaming
+
 FortWrap 2.1.1 summary:
 - Minor fixes to command option names
 

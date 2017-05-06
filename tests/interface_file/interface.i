@@ -7,8 +7,9 @@ Add some routines that are defined as PRIVATE in the Fortran code:
 Use different regular expressions for matching constructor:
 %ctor .*_constructor
 
-Create a more appropriate method name for the C+ interface:
-%rename object_add add
+Create a more appropriate method names for the C+ interface.
+Leave the second argument blank to use empty replacement text:
+%pattern ^object_
 
 Exclude a procedure:
 %ignore work_sub

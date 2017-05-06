@@ -124,6 +124,7 @@ objects = dict() # lower case object name -> DerivedType instance
 procedures = []
 abstract_interfaces = dict()
 name_substitutions = dict()
+pattern_substitutions = [] # List of (regex,replace) tuples
 name_exclusions = set()
 name_inclusions = set()
 proc_arg_exclusions = set()
@@ -600,6 +601,8 @@ def translate_name(name):
     if name.lower() in name_substitutions:
         return name_substitutions[name.lower()]
     else:
+        for pattern,replacement in pattern_substitutions:
+            name = pattern.sub(replacement,name)
         return name
 
 def readline(f):
@@ -1877,6 +1880,18 @@ class ConfigurationFile(object):
                     # Note: want new C++ name to preserve case
                     new_name = line.split()[2]
                     name_substitutions[words[1]] = new_name
+                else:
+                    self.bad_decl(line_num+1)
+                    continue
+            elif words[0] == '%pattern':
+                if len(words) == 2 or len(words) == 3:
+                    if len(words) == 2:
+                        replace_pattern = ''
+                    else:
+                        # Note: want new C++ name to preserve case
+                        replace_pattern = line.split()[2]
+                    match_pattern = words[1]
+                    pattern_substitutions.append((re.compile(match_pattern, re.IGNORECASE), replace_pattern))
                 else:
                     self.bad_decl(line_num+1)
                     continue
