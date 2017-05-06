@@ -36,7 +36,7 @@ import os
 import traceback
 
 
-VERSION = '2.1.1'
+VERSION = '2.1.2'
 
 
 # SETTINGS ==========================================
@@ -596,8 +596,7 @@ def remove_const(argtype):
 
 
 def translate_name(name):
-    """Use substitution dictionary to translate, or return given name
-    if not present"""
+    """Use a substitution dictionary followed by a list of replacement patterns to translate the provided name, or return the input unchanged if no matches are found"""
     if name.lower() in name_substitutions:
         return name_substitutions[name.lower()]
     else:
