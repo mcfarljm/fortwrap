@@ -312,6 +312,7 @@ gfortran -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/Ob
     <li><tt>%hide &lt;procedure&gt; &lt;argument&gt;</tt></li>
     <li><tt>%include &lt;name&gt;</tt></li>
     <li><tt>%rename &lt;old&gt; &lt;new&gt;</tt></li>
+    <li><tt>%pattern &lt;pattern&gt; [replacement]</tt></li>
     <li><tt>%ctor &lt;regex&gt;</tt></li>
     <li><tt>%dtor &lt;regex&gt;</tt></li>
   </ul>
@@ -353,6 +354,14 @@ gfortran -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/Ob
     procedure.  The name <tt>&lt;old&gt;</tt> found in the Fortran
     source is replaced by the name <tt>&lt;new&gt;</tt> in the
     generated wrapper code.</p>
+
+  <h3>Pattern directive</h3>
+
+  <p>The pattern directive can be used to perform "bulk renames" based
+  on a regular expression pattern matching.  The first argument is a
+  regular expression to be matched, and the second argument is
+  optional replacement text.  The second argument can be omitted, in
+  which case the replacement text is empty.</p>
 
   <h3>Constructor and destructor directives</h3>
   
