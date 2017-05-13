@@ -62,7 +62,7 @@ o.process();
   main objective of FortWrap.
   * Translation of Fortran "ctor" functions into C++ constructors</li>
   * Fortran "dtor" functions automatically called by C++ destructor
-* **Classes (experimental)**: Translate Fortran CLASSes and
+* [**Classes (experimental)**](#class-and-polymorphism-experimental): Translate Fortran CLASSes and
 	type bound procedures into C++ classes.  Fortran inheritance
     structure and polymorphism are retained in C++.
 * [**Optional arguments**](#optional-arguments): Fortran
