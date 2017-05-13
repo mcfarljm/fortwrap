@@ -443,7 +443,9 @@ FortWrap includes experimental support for wrapping CLASS data
 structures, which support type bound procedures, inheritance, and
 polymorphism.  The objective is to create a set of C++ classes and
 methods that mirror the structure of the original Fortran code; this
-includes inheritance and polymorphism.
+includes inheritance and polymorphism.  (Supporting these features requires 
+more assumptions about how the Fortran compiler generates code, so they may 
+be considered more fragile.)
 
 A key distinction is the use of "type bound procedures", which
 look like:
