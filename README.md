@@ -1,6 +1,6 @@
 # FortWrap
 
-FortWrap is a script that parses Fortran 90/95/200X source files and
+FortWrap is a python script that parses Fortran 90/95/200X source files and
 generates wrapper code for interfacing with the original Fortran code
 from C++. FortWrap is intended to be used with Fortran code that takes
 an object oriented approach and makes use of Fortran derived
@@ -11,11 +11,23 @@ Currently, FortWrap is targetted at the gfortran compiler,
 but the generated C++ code should work with any C++ compiler,
 including g++.
 
+## Features
+
+* Fortran derived types wrapped in C++ proxy classes
+* Experimental support for polymorphism (CLASS variables)
+* Arrays wrapped with C++ vectors
+* Support for optional arguments
+* Support for wrapping procedure pointers
+* Support for string arguments
+* Fortran doxygen comments transferred to C++ header files
+* Name mangling support for gfortran compiler
+* Wrappers respect Fortran public/private statements
+* Generated code can be re-wrapped with swig -c++
+
 ## Running FortWrap
 
-*fortwrap.py* is an executable python script that may be run using
-either `python fortwrap.py [args]` or `fortwrap.py [args]`.  The
-latter requires that the execute permission be set.  Use `fortwrap.py
+`fortwrap.py` is a standalone executable python script that may be run using
+either `python fortwrap.py [args]` or `fortwrap.py [args]`.  Use `fortwrap.py
 -h` to print usage information.
 
 ## Documentation
