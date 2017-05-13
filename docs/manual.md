@@ -1,17 +1,14 @@
 # FortWrap Manual
 
-<ul>
-  <li><a href="#Introduction">Introduction</a></li>
-  <li><a href="#Features">Main Features</a></li>
-  <li><a href="#Unsupported">Unsupported Features</a></li>
-  <li><a href="#GetStarted">Getting Started</a></li>
-  <li><a href="#Walkthrough">Walkthrough</a></li>
-  <li><a href="#ConfigFile">The Configuration File</a></li>
-  <li><a href="#Swig">Swig Tips (or "How to use with other languages")</a></li>
-  <li><a href="#Details">Wrapper Details</a></li>
-  <li><a href="#Files">Generated Files</a></li>
-  <li><a href="#Support">Support</a></li>
-</ul>
+* [Introduction](#introduction)
+* [Main Features](#main-features)
+* [Unsupported Features](#unsupported-features)
+* [Getting Started](#getting-started)
+* [Walkthrough](#walkthrough)
+* [The Configuration File](#the-configuration-file)
+* [Swig Tips](#swig-tips)
+* [Wrapper Details](#wrapper-details)
+* [Generated Files](#generated-files)
 
 ## Introduction
 
