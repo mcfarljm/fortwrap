@@ -390,8 +390,8 @@ Here are some tips:
   
 ## Wrapper Details
 
-* [Derived Types](#derived-ypes)
-* [CLASS](#class)
+* [Derived Types](#derived-types)
+* [CLASS](#class-and-polymorphism-experimental)
 * [Optional Arguments](#optional-arguments)
 * [Non-method procedures](#non-method-procedures)
 * [Arrays](#arrays)
