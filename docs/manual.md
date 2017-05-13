@@ -49,7 +49,7 @@ After wrapping with FortWrap, these routines can be utilized in a
 natural way from C++:
 
 ```C++
-std::vector&lt;float&gt; x(10);
+std::vector<float> x(10);
 ... // Define values for x
 Object o(&x); // Automatically calls object_ctor
 o.process();
