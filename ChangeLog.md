@@ -1,21 +1,23 @@
-FortWrap 2.1.2 summary:
-- Added %pattern keyword to interface file to facilitate bulk renaming
+# Changes
 
-FortWrap 2.1.1 summary:
+## 2.1.2
+- Added `%pattern` keyword to interface file to facilitate bulk renaming
+
+## 2.1.1
 - Minor fixes to command option names
 
-FortWrap 2.1.0 summary:
+## 2.1.0
 - Upgraded code to be compatible with Python 2 and 3.  Should work on
   Python 2 even if the "future" package is not available.
 - Updated argument parsing to use argparse instead of getopt
 
-FortWrap 2.0.2 summary:
+## 2.0.2
 - Minor fix for procedure pointer storage size on 64-bit platforms
 
-FortWrap 2.0.1 summary:
+## 2.0.1
 - Minor fixes for wrapping CLASS data
 
-FortWrap 2.0 summary:
+## 2.0
 - Experimental support for Fortran object oriented features:
   - Wrapping of type bound procedures
   - Fortran type extension translated into C++ classes with
@@ -28,70 +30,70 @@ FortWrap 2.0 summary:
   - Fix to not use case-sensitivity when matching names in the
     argument list to their type declarations
 
-FortWrap 1.0.5 summary:
-- Added option --no-std-string, which uses a wrapper class to manage
-  character output argument conversions, instead of std::string.  This
+## 1.0.5
+- Added option `--no-std-string`, which uses a wrapper class to manage
+  character output argument conversions, instead of `std::string`.  This
   can eliminate C++ library conflicts in some cases.
 - Fix for renaming of derived types with the interface file
 - Fix to make derived type name matching case insensitive
 - Proper exclusion of ALLOCATABLE and POINTER arguments from wrapper
   code
 
-FortWrap 1.0.4 summary:
+## 1.0.4
 - Fixing bug for optional assumed length strings
 
-FortWrap 1.0.3 summary:
+## 1.0.3
 - Added support for assumed length strings (intent(in) and
   intent(out))
 
-FortWrap 1.0.2 summary:
+## 1.0.2
 - Added support for INTEGER(8)
 - Added option to specify name of constants class
 
-FortWrap 1.0.1 summary:
+## 1.0.1
 - Added support for enumerations
 
-FortWrap 1.0 summary:
+## 1.0
 - Added option to disable wrapping non-method procedures
 - Added option to suppress warnings for procedures not wrapped
 - Added option to change name of main header file
 - Added support for KIND spec's without KIND keyword (e.g. REAL(8)).
-- Added support for C_INT, C_FLOAT, and C_DOUBLE KIND spec's
+- Added support for `C_INT`, `C_FLOAT`, and `C_DOUBLE` KIND spec's
 - Added support for use of named PARAMETER in KIND spec
 - Added capability to customize regular expressions used for
   identifying constructors and destructors
 - Better handling of ABSTRACT INTERFACE
 - Better handling of comments
 
-FortWrap 0.9.17 summary:
-- Minor fix for newline before #include <stdlib.h>
+## 0.9.17
+- Minor fix for newline before ##include <stdlib.h>
 - Changing <stdlib.h> to <cstdlib>
 
-FortWrap 0.9.16 summary:
-- New option --array-as-ptr for wrapping 1-D arrays with '*' instead
+## 0.9.16
+- New option `--array-as-ptr` for wrapping 1-D arrays with '*' instead
   of '[]'
 - Minor tweak to support re-wrapping with swig -includeall
 - Fix for return codes
 
-FortWrap 0.9.15 summary:
+## 0.9.15
 - Added support for higher dimensional (>2) arrays
 - Added option to turn off use of FortranMatrix wrapper class
-- Changed --c-arrays option to --no-vector
+- Changed `--c-arrays` option to `--no-vector`
 
-FortWrap 0.9.14 summary:
+## 0.9.14
 - Fixes for parsing lower case type definitions, such as 'real'
 
-FortWrap 0.9.13 summary:
+## 0.9.13
 - Changed default compiler from g95 to gfortran
 
-FortWrap 0.9.12 summary:
+## 0.9.12
 - Added support for integer kinds 1,2,4
 - Added support for character length specification via '*':
   CHARACTER*20
 - Improved robustness for processing Fortran integer parameter
   declarations, which might be used in string length definitions
 
-FortWrap 0.9.11 summary:
+## 0.9.11
 - Added capability to wrap non-module (top-level) procedures
 - Added exception handler to gracefully handle FortWrap internal
   errors
@@ -103,11 +105,11 @@ FortWrap 0.9.11 summary:
 - Added support for DOUBLE PRECISION statement
 - Added error handling for COMPLEX types (which are not supported)
 
-FortWrap 0.9.10 summary:
+## 0.9.10
 - Fixed bug parsing functions with array return values
 - Fixed bug handling DIMENSION when it is followed by INTENT
 
-FortWrap 0.9.9 summary:
+## 0.9.9
 - Added support for string arguments that are optional
 - Changed interface for intent(in) strings to use character arrays,
   which makes it easier to pass string literals
@@ -115,11 +117,11 @@ FortWrap 0.9.9 summary:
 - Made run_tests.py script more portable: should now work on Windows
   under msys and cygwin (and possibly cmd.exe)
 
-FortWrap 0.9.8 summary:
+## 0.9.8
 - Added a brief walkthrough to the manual
 - Added support for intent(in) strings
 
-FortWrap 0.9.7 summary:
+## 0.9.7
 - Fixed issues parsing high-dimensional arrays and certain
   declarations with DIMENSION
 - Fix for makefile (had CPPFLAGS and CXXFLAGS mixed up, and it was
@@ -129,35 +131,35 @@ FortWrap 0.9.7 summary:
 - Correction to manual: FortWrap actually does support assumed size
   arrays
 
-FortWrap 0.9.6 summary:
+## 0.9.6
 - Added support for a configuration file (-i command option), which
   allows more control over the wrapping process (renaming or ignoring
   objects/procedures, etc.)
 - More additions to documentation
 
-FortWrap 0.9.5 summary:
+## 0.9.5
 - Fixed bug for processing compiler specification with -c
 
-FortWrap 0.9.4 summary:
+## 0.9.4
 - Added capability to list files to wrap on the command line
-- Added option --global to wrap non-method procedures as global
+- Added option `--global` to wrap non-method procedures as global
   functions instead of static members of dummy class
-- Added option --dummy-class for specifying the name of the class used
+- Added option `--dummy-class` for specifying the name of the class used
   to wrap non-method procedures
 - Improved error checking for invalid source files
 - Exit without generating any files if there is nothing to wrap
 
-FortWrap 0.9.3 summary:
-- Added option --c-arrays to generate C-style array wrappers instead
+## 0.9.3
+- Added option `--c-arrays` to generate C-style array wrappers instead
   of C++ vector containers
 
-FortWrap 0.9.2 summary: 
+## 0.9.2 
 - Added proper handling for top-level procedures (print warning) and
   multi-module files
 - Expanded documentation
 
-FortWrap 0.9.1 summary: 
+## 0.9.1 
 - Added support for lowercase Fortran keywords
 
-FortWrap 0.9 summary: 
+## 0.9 
 - Initial release
