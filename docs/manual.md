@@ -57,7 +57,7 @@ o.process();
 
 ## Main Features
 
-* <a href="#details-dt">**Derived Types**</a>: Transparent
+* [**Derived Types**](#derived-types): Transparent
   translation of Fortran derived types into C++ classes.  This is the
   main objective of FortWrap.
   * Translation of Fortran "ctor" functions into C++ constructors</li>
@@ -65,22 +65,22 @@ o.process();
 * **Classes (experimental)**: Translate Fortran CLASSes and
 	type bound procedures into C++ classes.  Fortran inheritance
     structure and polymorphism are retained in C++.
-* <a href="#details-opt">**Optional arguments**</a>: Fortran
+* [**Optional arguments**](#optional-arguments): Fortran
     optional arguments are fully supported, with automatic NULL
     default values in C++.
-* <a href="#details-procpointers">**Procedure pointers**</a>:
+* [**Procedure pointers**](#procedure-pointers):
     C++ function pointers may be passed natively where Fortran expects
     a procedure pointer.  Right now this requires that the Fortran
     procedure pointer have an explicit `ABSTRACT INTERFACE`
-* <a href="#details-arrays">**Arrays**</a>: By default,
+* [**Arrays**](#arrays): By default,
     one-dimensional arrays are translated into C++ vector containers.
     Subroutine arguments used to define the Fortran array size are
     automatically calculated based on the C++ vector.
-* <a href="#details-matrices">**Matrices**</a>: A
+* [**Matrices**](#matrices): A
     "FortranMatrix" C++ class is provided for interfacing with
     two-dimensional Fortran arrays (matrices).  This class takes care
     to store data internally in Fortran order.
-* <a href="#details-strings">**Strings**</a>
+* [**Strings**](#strings)
     with `INTENT(IN)` or `INTENT(OUT)` are wrapped using
     C++ strings or character arrays.  The string length may be assumed
     (`len=*`) or a literal or named constant.
@@ -137,7 +137,7 @@ code.
 * See `README.md`
 * Run "`fortwrap.py -h`" for usage information
 * Look in the tests directory at examples
-* See <a href="#Walkthrough">Walkthrough</a> below
+* See [Walkthrough](#walkthrough) below
 
 Any one or more of three mechanisms can be used to specify the
 Fortran source file(s) to be wrapped:
@@ -202,7 +202,7 @@ CppWrappers.f90  InterfaceDefs.h  ObjectA.h    ObjectB.h
 FortWrap.h       ObjectA.cpp      ObjectB.cpp
 ```
 
-These files are explained more <a href="#Files">here</a>.  The
+These files are explained more [here](#generated-files).  The
 main things to note are that the classes FortWrap created are
 defined in the header files `ObjectA.h`
 and `ObjectB.h` (if wrapping non-method procedures, a dummy
@@ -361,7 +361,7 @@ Here are some tips:
   language.  This limitation can be worked around by creating a
   custom typemap.
 * Be careful with using
-  Swig's <a href="http://www.swig.org/Doc1.3/Library.html#Library_nn15">`std_vector.i`</a>
+  Swig's [http://www.swig.org/Doc1.3/Library.html#Library_nn15](`std_vector.i`)
   library.  This drastically increases the size of the wrapper
   code and is not compatible with keyword arguments.  I am also
   not aware of a way to use this library
@@ -373,32 +373,32 @@ Here are some tips:
   non-`const` `vector` arguments.  If you would
   rather have Swig handle C-style arrays, use FortWrap
   with `--no-vector`
-* To wrap string outputs, you may <tt>%include
-  "<a href="http://www.swig.org/Doc1.3/Library.html#Library_nn14">std_string.i</a>"</tt>,
+* To wrap string outputs, you may `%include`
+  [http://www.swig.org/Doc1.3/Library.html#Library_nn14](`std_string.i`),
   but you will need to write an `argout` typemap to
   handle the string pointer as an output.
 * There are a couple different ways to work with function
   pointers in the target language (in Python, at least).  See
-  the <a href="http://www.swig.org/Doc1.3/SWIG.html#SWIG_nn30">Swig
-  documentation</a>.  The simplest is to use Swig directives to
+  the [http://www.swig.org/Doc1.3/SWIG.html#SWIG_nn30](Swig documentation).  
+  The simplest is to use Swig directives to
   wrap an existing C/C++ function as a `%constant` that can
   be passed as an argument in the target language.  With Python,
   it is also possible to define the callback function in the
   target language; this is
-  explained <a href="http://docs.python.org/release/2.5.2/ext/callingPython.html">here</a>
+  explained [http://docs.python.org/release/2.5.2/ext/callingPython.html](here)
   in the Python documentation.
   
 ## Wrapper Details
 
-* <a href="#details-dt">Derived Types</a>
-* <a href="#details-class">CLASS</a>
-* <a href="#details-opt">Optional Arguments</a>
-* <a href="#details-orphans">Non-method procedures</a>
-* <a href="#details-arrays">Arrays</a>
-* <a href="#details-matrices">Matrices</a>
-* <a href="#details-procpointers">Procedure Pointers</a>
-* <a href="#details-strings">Strings</a>
-* <a href="#details-comments">Doxygen comments</a>
+* [Derived Types](#derived-ypes)
+* [CLASS](#class)
+* [Optional Arguments](#optional-arguments)
+* [Non-method procedures](#non-method-procedures)
+* [Arrays](#arrays)
+* [Matrices](#matrices)
+* [Procedure Pointers](#procedure-pointers)
+* [Strings](#strings)
+* [Doxygen comments](#doxygen-comments)
 
 ### Derived Types
 
@@ -471,8 +471,7 @@ pollution in large Fortran projects).
 
 As with basic derived type wrapping, FortWrap identifies
 constructor and destructor procedures based on pattern matching with
-the string "`__ctor`" (see <a href="#details-dt">Derived
-Types</a>).  The latest Fortran standards allow creating more
+the string "`__ctor`" (see [Derived Types](#derived-types)).  The latest Fortran standards allow creating more
 natural constructors by writing a procedure that returns a derived
 type and using an interface statement to assign that procedure to
 the same name as the derived type.  This can also facilitate dynamic
@@ -505,7 +504,7 @@ optional arguments is that they may not be passed by value from
 C++.  Normally FortWrap will wrap primitive scalar types
 with `INTENT(IN)` as pass-by-value arguments from C++, but
 FortWrap must resort to pass-by-reference for optional arguments
-(however, see the<a href="#Swig">Swig notes</a>; if re-wrapping
+(however, see the [Swig tips](#swig-tips); if re-wrapping
 with Swig, this is not an issue).
 
 Consider the following Fortran subroutine:
