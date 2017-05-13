@@ -47,7 +47,7 @@
   intent(out))
 
 ## 1.0.2
-- Added support for INTEGER(8)
+- Added support for `INTEGER(8)`
 - Added option to specify name of constants class
 
 ## 1.0.1
@@ -66,8 +66,8 @@
 - Better handling of comments
 
 ## 0.9.17
-- Minor fix for newline before ##include <stdlib.h>
-- Changing <stdlib.h> to <cstdlib>
+- Minor fix for newline before `#include <stdlib.h>`
+- Changing `<stdlib.h>` to `<cstdlib>`
 
 ## 0.9.16
 - New option `--array-as-ptr` for wrapping 1-D arrays with '*' instead
@@ -89,7 +89,7 @@
 ## 0.9.12
 - Added support for integer kinds 1,2,4
 - Added support for character length specification via '*':
-  CHARACTER*20
+  `CHARACTER*20`
 - Improved robustness for processing Fortran integer parameter
   declarations, which might be used in string length definitions
 
@@ -99,10 +99,10 @@
   errors
 - Improved error and warning messages
 - Fixes to handle data statements with * and KIND; however, wrapper
-  generation is currently only supported for REAL*8, REAL(KIND=4), and
-  REAL(KIND=8)
+  generation is currently only supported for `REAL*8`, `REAL(KIND=4)`, and
+  `REAL(KIND=8)`
 - Fixed bug parsing assumed shape arrays
-- Added support for DOUBLE PRECISION statement
+- Added support for `DOUBLE PRECISION` statement
 - Added error handling for COMPLEX types (which are not supported)
 
 ## 0.9.10
