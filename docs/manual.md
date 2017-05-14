@@ -151,18 +151,18 @@ Fortran source file(s) to be wrapped:
 
 ### Notes about the Fortran compiler
 
-FortWrap only supports name mangling for g95 and gfortran.  If
-using the Makefile `tests/Tests.mk`, edit `FC` to
-specify your Fortran compiler.  When running FortWrap, use
-the `-c` option to specify the name mangling you want.
-Currently the default wrapping is for gfortran, but this can be changed
-by editing the `compiler = 'gfortran'` line near the beginning
-of `fortwrap.py`
-
+Currently, FortWrap only supports the gfortran compiler.  The wrapper code 
+depends on the name-mangling and character argument conventions used by 
+gfortran.  To add support for other compilers, it may be as simple as 
+updating FortWrap to use the appropriate conventions.  The experimental 
+support for wrapping CLASS and polymorphic constructs is more dependent 
+on the type of code created by gfortran.  Extending support for this 
+functionality to other compilers is expected to require more effort.
 
 ## Walkthrough
 
-Change directory to `tests/derived_types`.  The first step
+Change directory to `tests/derived_types`.  If it doesn't already exist,
+create a directory named `wrap`.  The next step
 is to run FortWrap to generate wrapper code from the Fortran
 source code.  In this case the code to be wrapped
 is `DerivedTypes.f90`.  Use the following command to run
@@ -170,18 +170,12 @@ FortWrap ("`[derived_types]$`" will represent the command
 prompt):
 
 ```
-[derived_types]$ ../../fortwrap.py -c gfortran -g -d wrap
+[derived_types]$ ../../fortwrap.py -g -d wrap
 ```
 This should not produce any output on the command line, which
 means that FortWrap thinks it found something to wrap and did not
 run into any problems.
 
-* The `-c` option tells FortWrap which Fortran compiler
-  will be used once you get around to compiling (running FortWrap
-  does not actually compile anything).  Substitute g95 for
-  gfortran if necessary.  A default Fortran compiler is specified near
-  the beginning of `fortwrap.py`, via the line `compiler
-  = 'gfortran'`; feel free to change this.
 * The `-g` option stands for "glob" and tells FortWrap to
   try and wrap all files in the current directory that
   match `*.f90` or `*.F90`.  This is just for
@@ -189,8 +183,8 @@ run into any problems.
   by adding "`DerivedTypes.f90`" to the end of the command
   line.
 * The `-d wrap` option tells FortWrap to put the
-  generated wrapper files in the `wrap` directory (which
-  should already exist).  Without this option, the files will be
+  generated wrapper files in the `wrap` directory.  
+  Without this option, the files will be
   generated in the working directory.
     
 After running FortWrap, you should have a set of wrapper files in
@@ -488,13 +482,11 @@ examples in `tests/classes` of the FortWrap installation.
 ### Optional Arguments
 
 Fortran 90 provides for optional procedure arguments that may be
-passed by position or keyword from Fortran.  Although
-interoperating with optional arguments is not explicitly provided
-for by the Fortran standard, FortWrap takes advantage of the fact
-that both the g95 and gfortran compilers implement optional
-arguments in a simple manner that is easy to mimic from C code.
-Specifically, these compilers use null pointers to indicate
-optional arguments that are not present.
+passed by position or keyword from Fortran.  FortWrap takes advantage of the fact
+that gfortran implements optional
+arguments by passing a null pointer to indicate that the argument is not present.
+(it appears that as of Technical Specification ISO/IEC TS 29113:2012, this behavior
+is part of the Fortran standard for C interoperability).
 
 FortWrap exploits this by allowing the arguments to be optional
 from C++.  The usage is not quite as friendly as it would be from
