@@ -1,5 +1,9 @@
 # Changes
 
+## 2.1.3
+- Fix use of ordered dictionaries causing problems on some newer
+  versions of Python
+
 ## 2.1.2
 - Added `%pattern` keyword to interface file to facilitate bulk renaming
 
