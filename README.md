@@ -40,8 +40,8 @@ provides working examples of most of the main FortWrap features.
 The easiest way to get started is to look at the simple test programs
 in the tests directory.
 
-To run the tests, edit the makefile `tests/Tests.mk` to specify your
-Fortran compiler (currently only tested with gfortran).  The root directory contains a python script
+Before running the tests, make sure that gfortran is installed.  
+The root directory contains a python script
 `run_tests.py` to execute all tests.  For each test, the script will
 change to the individual test directory, execute fortwrap.py to
 generate wrapper code, execute make to compile and link a simple test
