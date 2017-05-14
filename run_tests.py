@@ -45,6 +45,9 @@ for test in tests:
         continue
     print("Running test:", test, end=' ')
     os.chdir(test)
+    # Create "wrap" directory if doesn't exist:
+    if not os.path.exists('wrap'):
+        os.makedirs('wrap')
     # Run wrapper generator
     if test in custom_opts:
         opts = custom_opts[test]
