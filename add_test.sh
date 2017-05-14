@@ -12,21 +12,14 @@ else
 fi
 
 cd tests
-svn mkdir $testdir
+mkdir $testdir
 cd $testdir
-# Set svn props
-echo -e '*.mod\nprog' > tmp
-svn ps svn:ignore --file tmp .
-'rm' tmp
-# Create wrap dir
-svn mkdir wrap
-svn ps svn:ignore '*' wrap
 # Add Makefile
 cp ../orphans/Makefile .
-svn add Makefile
+git add Makefile
 # Set up Fortran source file
 echo -e "MODULE $fortfile\n\n  IMPLICIT NONE\n\nCONTAINS\n\n\nEND MODULE $fortfile" > $fortfile.f90
-svn add $fortfile.f90
+git add $fortfile.f90
 # Set up C++ test program
 echo -e "#include \"FortWrap.h\"\n\nint main(void)\n{\n\n  return 0;\n}\n" > prog.cpp
-svn add prog.cpp
+git add prog.cpp
