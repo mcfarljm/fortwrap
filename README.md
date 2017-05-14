@@ -171,3 +171,9 @@ provided.
 These wrappers are particularly powerful when using swig
 with `-c++ -keyword`, since the optional parameters can
 then be passed by keyword in the target language
+
+## Known Issues
+
+* Scalar character arguments not wrapped correctly (generated code won't compile)
+* Old-style dummy argument definitions that do not include `::` are not recognized
+* Enumerators are not wrapped correctly if some names within a set are made private
