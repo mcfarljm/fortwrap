@@ -34,9 +34,10 @@ from datetime import date
 import sys
 import os
 import traceback
+import collections
 
 
-VERSION = '2.1.2'
+VERSION = '2.1.3'
 
 
 # SETTINGS ==========================================
@@ -424,8 +425,7 @@ class Procedure(object):
         self.name = name
         self.retval = retval
         self.args = args # By name
-        # TODO: this is a dict but using it as if it is sorted:
-        self.args_by_pos = dict()
+        self.args_by_pos = collections.OrderedDict()
         self.nargs = len(args)
         self.mod = current_module
         self.comment = comment
@@ -449,6 +449,7 @@ class Procedure(object):
         # Make position map
         for arg in self.args.values():
             self.args_by_pos[arg.pos] = arg
+        self.args_by_pos = collections.OrderedDict(sorted(self.args_by_pos.items(), key=lambda item: item[1].pos))
         # Check for arguments that can have default values of NULL in C++
         for arg in reversed(list(self.args_by_pos.values())):
             # (Assumes the dictionary iteration order is sorted by key)
@@ -484,14 +485,15 @@ class Procedure(object):
         """Add Fortran-only string length arguments to end of argument list"""
         nargs = len(self.args)
         pos = nargs + 1
+        args_by_pos_new = collections.OrderedDict() # Track hidden str-len args
         for arg in self.args_by_pos.values():
             if arg.type.type=='CHARACTER' and not arg.fort_only():
                 str_length_arg = Argument(arg.name + '_len__', pos, DataType('INT', str_len=arg.type.str_len ,hidden=True))
                 self.args[ str_length_arg.name ] = str_length_arg
+                args_by_pos_new[pos] = str_length_arg # Ordered add is correct since self.args_by_pos is ordered
                 pos = pos + 1
-        for arg in self.args.values():
-            if arg.pos > nargs:
-                self.args_by_pos[arg.pos] = arg
+        # Have to add to self.args_by_pos outside of above loop b/c can't mutate dict during iteration
+        self.args_by_pos.update(args_by_pos_new)
 
     def get_vec_size_parent(self,argname):
         """Get the first 1d array argument that uses the argument argname to
