@@ -49,7 +49,7 @@ After wrapping with FortWrap, these routines can be utilized in a
 natural way from C++:
 
 ```C++
-std::vector&lt;float&gt; x(10);
+std::vector<float> x(10);
 ... // Define values for x
 Object o(&x); // Automatically calls object_ctor
 o.process();
@@ -62,7 +62,7 @@ o.process();
   main objective of FortWrap.
   * Translation of Fortran "ctor" functions into C++ constructors</li>
   * Fortran "dtor" functions automatically called by C++ destructor
-* **Classes (experimental)**: Translate Fortran CLASSes and
+* [**Classes (experimental)**](#class-and-polymorphism-experimental): Translate Fortran CLASSes and
 	type bound procedures into C++ classes.  Fortran inheritance
     structure and polymorphism are retained in C++.
 * [**Optional arguments**](#optional-arguments): Fortran
@@ -390,8 +390,8 @@ Here are some tips:
   
 ## Wrapper Details
 
-* [Derived Types](#derived-ypes)
-* [CLASS](#class)
+* [Derived Types](#derived-types)
+* [CLASS](#class-and-polymorphism-experimental)
 * [Optional Arguments](#optional-arguments)
 * [Non-method procedures](#non-method-procedures)
 * [Arrays](#arrays)
@@ -443,7 +443,9 @@ FortWrap includes experimental support for wrapping CLASS data
 structures, which support type bound procedures, inheritance, and
 polymorphism.  The objective is to create a set of C++ classes and
 methods that mirror the structure of the original Fortran code; this
-includes inheritance and polymorphism.
+includes inheritance and polymorphism.  (Supporting these features requires 
+more assumptions about how the Fortran compiler generates code, so they may 
+be considered more fragile.)
 
 A key distinction is the use of "type bound procedures", which
 look like:
