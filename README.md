@@ -68,7 +68,7 @@ constructs.  In particular, FortWrap is geared towards wrapping
 derived types and procedures that operate on them.  FortWrap is not
 intended to wrap legacy code and should not be used with Fortran 77
 code.  For more details regarding the Fortran constructs that FortWrap
-is set up to wrap, refer to the html documentation and the tests
+is set up to wrap, refer to the documentation and the tests
 directory.
 
 ## Examples
