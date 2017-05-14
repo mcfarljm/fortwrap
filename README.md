@@ -66,3 +66,108 @@ intended to wrap legacy code and should not be used with Fortran 77
 code.  For more details regarding the Fortran constructs that FortWrap
 is set up to wrap, refer to the html documentation and the tests
 directory.
+
+## Examples
+
+For simplicity, some of the examples below are not
+shown with derived types.  When the first argument is not a
+derived type, FortWrap by default wraps the routine as a static
+method of the special "utility class" `FortFuncs` (this can
+be overriden with the `--global` option).
+
+
+### Derived Types
+
+"`ctor`" procedures are wrapped as C++ constructors.
+Multiple constructors are supported.  "`dtor`" procedures
+are automatically called by the C++ destructor.  For
+example:
+
+``` Fortran
+MODULE m
+
+  TYPE Object
+    REAL, ALLOCATABLE :: x(:)
+  END TYPE Object
+
+CONTAINS
+
+  SUBROUTINE default_ctor(o,n)
+    TYPE(Object) :: o
+    INTEGER, INTENT(in) :: n
+    ALLOCATE(o%x(n))
+  END SUBROUTINE default_ctor
+
+  SUBROUTINE value_ctor(o,n,val)
+    TYPE(Object) :: o
+    INTEGER, INTENT(in) :: n
+    REAL, INTENT(in) :: val
+    ALLOCATE(o%x(n))
+    o%x = val
+  END SUBROUTINE value_ctor
+
+  SUBROUTINE object_dtor(o)
+    TYPE(Object) :: o
+    IF(ALLOCATED(o%x)) DEALLOCATE(o%x)
+  END SUBROUTINE object_dtor
+
+END MODULE m
+```
+
+will generate multiple constructors for the C++
+class `Object`:
+
+``` C++
+Object(int n);
+Object(int n, float val);
+```
+
+The Fortran destructor `object_dtor` will automatically
+be called by the C++ destructor.
+
+### Arrays
+
+``` Fortran
+FUNCTION inner_prod(n,a,b) RESULT(y)
+  INTEGER, INTENT(in) :: n, a(n), b(n)
+  INTEGER :: y
+  y = DOT_PRODUCT(a,b)
+END FUNCTION inner_prod
+```
+
+generates a method of the "utility class" `FortFuncs`
+(the utility class is used to wrap functions that do not operate
+on a derived type):
+
+``` C++
+static int inner_prod(const std::vector&lt;int&gt;* a, const std::vector&lt;int&gt;* b);
+```
+
+### Optional Arguments
+
+``` Fortran
+FUNCTION add_mixed(a,b,c,d) RESULT(y)
+  INTEGER, INTENT(in) :: a,b
+  INTEGER, INTENT(in), OPTIONAL :: c,d
+  INTEGER :: y
+  y = a+b
+  IF (PRESENT(c)) y = y + c
+  IF (PRESENT(d)) y = y + d
+END FUNCTION add_mixed
+```
+
+generates the following method:
+
+``` C++
+static int add_mixed(int a, int b, const int* c=NULL, const int* d=NULL);
+```
+
+Note that `a` and `b` use pass-by-value since
+they are not optional.  The optional arguments `c`
+and `d` use pass-by-reference.  Passing `NULL`
+(which is the default) indicates that the argument is not
+provided.
+    
+These wrappers are particularly powerful when using swig
+with `-c++ -keyword`, since the optional parameters can
+then be passed by keyword in the target language
