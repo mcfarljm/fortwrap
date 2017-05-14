@@ -140,7 +140,7 @@ generates a method of the "utility class" `FortFuncs`
 on a derived type):
 
 ``` C++
-static int inner_prod(const std::vector&lt;int&gt;* a, const std::vector&lt;int&gt;* b);
+static int inner_prod(const std::vector<int>* a, const std::vector<int>* b);
 ```
 
 ### Optional Arguments
