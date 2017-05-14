@@ -24,6 +24,10 @@ including g++.
 * Wrappers respect Fortran public/private statements
 * Generated code can be re-wrapped with swig -c++
 
+## Installation
+
+Download `fortwrap.py`.  Optionally, make it executable and place it in your PATH.
+
 ## Running FortWrap
 
 `fortwrap.py` is a standalone executable python script that may be run using
@@ -32,7 +36,7 @@ either `python fortwrap.py [args]` or `fortwrap.py [args]`.  Use `fortwrap.py
 
 ## Documentation
 
-Refer to the html documentation at `docs/manual.html`.  The `tests` directory
+Refer to the documentation at `docs/manual.md`.  The `tests` directory
 provides working examples of most of the main FortWrap features.
 
 ## Running the tests
