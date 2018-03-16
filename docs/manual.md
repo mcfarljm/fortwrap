@@ -355,7 +355,7 @@ Here are some tips:
   language.  This limitation can be worked around by creating a
   custom typemap.
 * Be careful with using
-  Swig's [http://www.swig.org/Doc1.3/Library.html#Library_nn15](`std_vector.i`)
+  Swig's [`std_vector.i`](http://www.swig.org/Doc1.3/Library.html#Library_nn15)
   library.  This drastically increases the size of the wrapper
   code and is not compatible with keyword arguments.  I am also
   not aware of a way to use this library
@@ -368,18 +368,18 @@ Here are some tips:
   rather have Swig handle C-style arrays, use FortWrap
   with `--no-vector`
 * To wrap string outputs, you may `%include`
-  [http://www.swig.org/Doc1.3/Library.html#Library_nn14](`std_string.i`),
+  [`std_string.i`](http://www.swig.org/Doc1.3/Library.html#Library_nn14),
   but you will need to write an `argout` typemap to
   handle the string pointer as an output.
 * There are a couple different ways to work with function
   pointers in the target language (in Python, at least).  See
-  the [http://www.swig.org/Doc1.3/SWIG.html#SWIG_nn30](Swig documentation).  
+  the [Swig documentation](http://www.swig.org/Doc1.3/SWIG.html#SWIG_nn30).  
   The simplest is to use Swig directives to
   wrap an existing C/C++ function as a `%constant` that can
   be passed as an argument in the target language.  With Python,
   it is also possible to define the callback function in the
   target language; this is
-  explained [http://docs.python.org/release/2.5.2/ext/callingPython.html](here)
+  explained [here](http://docs.python.org/release/2.5.2/ext/callingPython.html)
   in the Python documentation.
   
 ## Wrapper Details
