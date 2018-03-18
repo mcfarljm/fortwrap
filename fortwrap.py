@@ -544,10 +544,10 @@ class DerivedType(object):
         self.is_class = False
         self.abstract = False
         self.extends = None
-        self.tbps = dict() # proc => tbp instance
+        self.tbps = dict() # lowercase procname => tbp instance
 
     def add_tbp(self, tbp):
-        self.tbps[tbp.proc] = tbp
+        self.tbps[tbp.proc.lower()] = tbp
 
     def ctor_list(self):
         """Return list of associated ctors"""
@@ -835,7 +835,7 @@ def parse_proc(file,line,abstract=False):
         is_tbp = False
         if method:
             try:
-                if proc_name in objects[proc.args_by_pos[1].type.type.lower()].tbps:
+                if proc_name.lower() in objects[proc.args_by_pos[1].type.type.lower()].tbps:
                     is_tbp = True
             except KeyError:
                 # Should mean that the derived type is not public
@@ -1349,10 +1349,10 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     # Definition/declaration:
     if not bind:
         # Determine what the C++ method name will be
-        if len(proc.args_by_pos)>=1 and proc.args_by_pos[1].type.dt == 'CLASS' and proc.name in objects[proc.args_by_pos[1].type.type.lower()].tbps:
+        if len(proc.args_by_pos)>=1 and proc.args_by_pos[1].type.dt == 'CLASS' and proc.name.lower() in objects[proc.args_by_pos[1].type.type.lower()].tbps:
             # This is a type bound procedure, so name may different
             # from procedure name
-            method_name= objects[proc.args_by_pos[1].type.type.lower()].tbps[proc.name].name
+            method_name= objects[proc.args_by_pos[1].type.type.lower()].tbps[proc.name.lower()].name
         elif dfrd_tbp:
             # proc is the abstract interface for a deferred tbp
             method_name = dfrd_tbp.name

@@ -27,8 +27,9 @@ MODULE classes
   TYPE, EXTENDS(Shape) :: Circle
     INTEGER :: radius
   CONTAINS
-    ! Verify that two procedures on same line get parsed correctly
-    PROCEDURE :: get_area => Circle_area, get_diameter => Circle_diameter
+    ! Verify that two procedures on same line get parsed correctly.  Also
+    ! verify use of different case (circle_diameter vs Circle_diameter)
+    PROCEDURE :: get_area => Circle_area, get_diameter => circle_diameter
   END TYPE Circle
 
   INTERFACE Circle
