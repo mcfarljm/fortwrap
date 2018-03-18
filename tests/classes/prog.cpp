@@ -8,6 +8,8 @@ int main(void)
   Circle c1(1);
   if (c1.get_area() != 3)
     return 1;
+  if (c1.get_diameter() != 2)
+    return 2;
 
   s = new Circle(2);
   if (s->get_area() != 12)
