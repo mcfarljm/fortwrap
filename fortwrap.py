@@ -897,18 +897,19 @@ def parse_type(file,line):
             return
         tbp_match = fort_tbp_def.match(line)
         if type_added and tbp_match:
-            if 'POINTER' in line.upper():
-                pass # Not a TBP
-            elif 'PASS' in line.upper():
+            attr_str = line.split('::')[0].upper()
+            if 'POINTER' in attr_str:
+                continue # Not a TBP
+            if 'PASS' in attr_str:
                 warning('PASS and NOPASS not yet supported for type bound procedures')
-            else:
-                interface = tbp_match.group('interface')
-                deferred = 'DEFERRED' in line.upper()
-                for tbp_def in line.split('::')[1].split(','):
-                    name = tbp_def.split('=>')[0].strip()
-                    proc = tbp_def.split('=>')[1].strip() if '=>' in tbp_def else name
-                    tbp = TypeBoundProcedure(name, proc, interface, deferred)
-                    objects[typename.lower()].add_tbp(tbp)
+                continue
+            interface = tbp_match.group('interface')
+            deferred = 'DEFERRED' in attr_str
+            for tbp_def in line.split('::')[1].split(','):
+                name = tbp_def.split('=>')[0].strip()
+                proc = tbp_def.split('=>')[1].strip() if '=>' in tbp_def else name
+                tbp = TypeBoundProcedure(name, proc, interface, deferred)
+                objects[typename.lower()].add_tbp(tbp)
 
 def parse_comments(file,line):
     """
