@@ -12,6 +12,9 @@ MODULE classes
     INTEGER :: num = 101
   CONTAINS
     PROCEDURE (get_area_template), DEFERRED :: get_area
+    ! Fortran will allow this, but C++ cannot use static virtual methods,
+    ! so a virtual method for Shape will not get created
+    PROCEDURE(is_round_template), DEFERRED, NOPASS :: is_round
   END TYPE Shape
   
   ABSTRACT INTERFACE
@@ -21,6 +24,12 @@ MODULE classes
       CLASS(Shape), INTENT(in) :: s
       INTEGER :: a
     END FUNCTION get_area_template
+
+    !> Whether shape is round
+    FUNCTION is_round_template()
+      IMPORT :: Shape
+      LOGICAL :: is_round_template
+    END FUNCTION is_round_template
   END INTERFACE
 
  !> A round object
@@ -30,6 +39,7 @@ MODULE classes
     ! Verify that two procedures on same line get parsed correctly.  Also
     ! verify use of different case (circle_diameter vs Circle_diameter)
     PROCEDURE :: get_area => Circle_area, get_diameter => circle_diameter
+    PROCEDURE, NOPASS :: is_round => Circle_is_round
   END TYPE Circle
 
   INTERFACE Circle
@@ -46,6 +56,8 @@ MODULE classes
     INTEGER :: side_length
   CONTAINS
     PROCEDURE :: get_area => Square_area
+    PROCEDURE, NOPASS :: is_round => Square_is_round
+    PROCEDURE, NOPASS :: get_area_static => Square_area_static
   END TYPE Square
 
   INTERFACE Square
@@ -86,6 +98,12 @@ CONTAINS
     a = 3 * s%radius**2 ! Keep things simple and round pi to 3
   END FUNCTION Circle_area
 
+  !> Whether circle is round
+  FUNCTION Circle_is_round()
+    LOGICAL :: Circle_is_round
+    Circle_is_round = .TRUE.
+  END FUNCTION Circle_is_round
+
   !> Compute area of a circle
   FUNCTION Circle_diameter(s) RESULT(diameter)
     CLASS(Circle), INTENT(in) :: s
@@ -118,5 +136,18 @@ CONTAINS
     INTEGER :: a
     a = s%side_length**2
   END FUNCTION Square_area
+
+  FUNCTION Square_is_round()
+    LOGICAL :: Square_is_round
+    Square_is_round = .FALSE.
+  END FUNCTION Square_is_round
+
+  ! Test NOPASS TBP with argument.  Also tests use of different case in
+  ! procedure and TBP definitions
+  FUNCTION square_area_static(side) RESULT(area)
+    INTEGER, INTENT(in) :: side
+    INTEGER :: area
+    area = side**2
+  END FUNCTION square_area_static
 
 END MODULE classes
