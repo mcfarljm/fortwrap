@@ -467,7 +467,7 @@ pollution in large Fortran projects).
 
 As with basic derived type wrapping, FortWrap identifies
 constructor and destructor procedures based on pattern matching with
-the string "`__ctor`" (see [Derived Types](#derived-types)).  The latest Fortran standards allow creating more
+the string "`_ctor`" (see [Derived Types](#derived-types)).  The latest Fortran standards allow creating more
 natural constructors by writing a procedure that returns a derived
 type and using an interface statement to assign that procedure to
 the same name as the derived type.  This can also facilitate dynamic
