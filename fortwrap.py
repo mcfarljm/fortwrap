@@ -85,7 +85,7 @@ fort_contains = re.compile(r'\s*CONTAINS\s*$', re.IGNORECASE)
 # Data types
 primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>(\w+|\*))\s*\)))?'
 primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
-fort_data_str = r'\s*(' + primitive_data_str + '|(?P<dt_mode>TYPE|CLASS)\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
+fort_data_str = r'\s*(' + primitive_data_str + '|(?P<dt_mode>TYPE|CLASS)\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)(\s*,\s*POINTER)?)'
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_str + '.*::',re.IGNORECASE)
 optional_def = re.compile('OPTIONAL.*::', re.IGNORECASE)
@@ -239,6 +239,7 @@ class DataType(object):
         self.array = array
         self.str_len = str_len
         self.proc_pointer = False
+        self.proc = False # PROCEDURE without POINTER attribute
         self.dt = False      # False, 'TYPE', or 'CLASS'
         self.hidden = hidden # hidden name length arg
         # For array, name of argument used to pass the array length:
@@ -276,11 +277,14 @@ class DataType(object):
             # (INT is used to represent the hidden length arguments,
             # passed by value)
             if 'PROCEDURE' in type.upper():
-                self.proc_pointer = True
                 # Matching broken b/c of "::'
                 m = fort_data.match(type)
                 self.type = m.group('proc_spec')
-                proc_pointer_used = True
+                if 'POINTER' in type.upper():
+                    self.proc_pointer = True
+                    proc_pointer_used = True
+                else:
+                    self.proc = True
             else:
                 m = fort_data.match(type)
                 if m.group('dt_mode'):
@@ -368,6 +372,9 @@ class Argument(object):
                 return True
             elif self.intent=='out':
                 return True
+        elif self.type.proc:
+            # PROCEDURE (without POINTER attribute) does not seem to be compatible with current wrapping approach (with gfortran)
+            return True    
         elif self.type.type=='CHARACTER':
             if not self.intent=='inout' and self.type.str_len and not self.type.array:
                 return False
