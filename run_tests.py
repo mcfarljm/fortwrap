@@ -31,6 +31,8 @@ tests = glob.glob('*')
 
 num_err = 0
 
+FNULL = open(os.devnull, 'w')
+
 # Use a command arg to prevent making clean
 make_clean = True
 if len(sys.argv) > 1:
@@ -54,15 +56,16 @@ for test in tests:
     else:
         opts = OPTS
     if make_clean:
-        os.system('make clean > ' + os.devnull)
-    stat = os.system(cmd + ' ' + opts + ' > ' + os.devnull)
-    if stat!=0:
+        subprocess.call('make clean', stdout=FNULL, shell=True)
+    p = subprocess.Popen(cmd + ' ' + opts, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    stdout, stderr = p.communicate()
+    if p.returncode != 0 or 'Error:' in stderr:
         num_err += 1
         failed_tests.append((test,'wrapper'))
         print("[FAIL: wrapper]")
         continue
     # Build test program
-    stat = os.system('make > ' + os.devnull)
+    stat = subprocess.call('make', stdout=FNULL)
     if stat!=0:
         num_err += 1
         failed_tests.append((test,'build'))
