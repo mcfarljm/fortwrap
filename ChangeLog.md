@@ -1,5 +1,15 @@
 # Changes
 
+## 2.2.0
+- Changed convention for dtor wrapper code.  Dtors are no longer
+  included by default as separate C++ functions.  They can be included
+  separately by using %include.  Previous configuration files that
+  %ignore dtors to hide them from the API should be updated (%ignore
+  will now cause the dtor to not be wrapped at all).
+- Minor improvements for type bound procedure parsing
+- Recognize arguments declared as PROCEDURE (without POINTER
+  attribute) but do not wrap
+	
 ## 2.1.3
 - Fix use of ordered dictionaries causing problems on some newer
   versions of Python
