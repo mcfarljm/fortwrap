@@ -635,20 +635,16 @@ def join_lines(line,file):
     return line
 
 
-def is_public(name, ignore_exclusions=False):
+def is_public(name):
     """Check whether a name is public and not excluded
 
-    ignore_exclusions: Currently for use with dtors.  If the dtor is
-    %ignore'd, it is not written as a separate C++ function, but a
-    call to the dtor still gets included in the C++ destructor
-    
     The private/public parts of this check rely on global variables
     that are updated while the Fortran source is processed, so this
     function should only be called during the parsing portion (not
     during code generation, after parsing is finished)
 
     """
-    if (not ignore_exclusions) and name.lower() in name_exclusions:
+    if name.lower() in name_exclusions:
         return False
     elif name.lower() in name_inclusions:
         return True
@@ -847,9 +843,6 @@ def parse_proc(file,line,abstract=False):
         not_wrapped.append(proc_name)
     else:
         proc = Procedure(proc_name,args,method,retval,proc_comments)
-        # dtors automatically get added.  This way we can hide them
-        # with the ignores list, but they still get used in the Class
-        # dtor:
         is_tbp = False
         if method:
             try:
@@ -862,7 +855,7 @@ def parse_proc(file,line,abstract=False):
         # public).  This is sort of a hack, as technically we should
         # only wrap non-public abstract procedures if they are used in
         # TBP definitions
-        if is_public(proc_name,ignore_exclusions=proc.dtor) or is_tbp or abstract:
+        if is_public(proc_name) or is_tbp or abstract:
             if not abstract:
                 procedures.append(proc)
                 module_proc_num += 1
@@ -1520,9 +1513,10 @@ def write_class(object):
             file.write('  ~' + object.cname + '();\n\n')
     # Method declarations
     for proc in object.procs:
-        # Allow %ignore'd dtors to be in the procedure list without
-        # getting written as separate functions in the wrapper code
-        if proc.ctor or (proc.dtor and proc.name.lower() in name_exclusions):
+        # dtors are automatically called by C++ destructor.  A
+        # separate function is not created by default, but can be
+        # enabled by adding an %include for the dtor
+        if proc.ctor or (proc.dtor and not proc.name.lower() in name_inclusions):
             continue
         write_cpp_dox_comments(file,proc.comment,proc.args_by_pos)
         file.write(function_def_str(proc) + '\n\n')
@@ -1584,7 +1578,7 @@ def write_class(object):
     
     # Other methods:
     for proc in object.procs:
-        if proc.ctor or (proc.dtor and proc.name.lower() in name_exclusions):
+        if proc.ctor or (proc.dtor and not proc.name.lower() in name_inclusions):
             continue
         file.write(function_def_str(proc,obj=object,prefix='') + ' {\n')
         if proc.dtor:
