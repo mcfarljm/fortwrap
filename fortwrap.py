@@ -1316,27 +1316,26 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                     # with gfortran indicates that in case of not
                     # present it passes 0 for the length)
                     s = s + prefix + 'int ' + arg.name + '_len__ = 0;\n'
-                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = '+ arg.name + '->length();\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = static_cast<int>('+ arg.name + '->length());\n'
                 s = s + prefix + '// Declare memory to store output character data\n'
                 s = s + prefix + 'char ' + arg.name + '_c__[' + str_len_p1 + '];\n'
                 s = s + prefix + arg.name + '_c__[' + str_len + "] = '\\0';\n"
             elif arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='in':
                 if arg.type.str_len.assumed:
                     s = s + prefix + 'int ' + arg.name + '_len__ = 0;\n'
-                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name+ '_len__ = strlen('+arg.name+'); // Protect Optional args\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name+ '_len__ = static_cast<int>(strlen('+arg.name+')); // Protect Optional args\n'
                 else:
                     s = s + prefix + '// Create C array for Fortran input string data\n'
                     s = s + prefix + 'char ' + arg.name + '_c__[' + str_len_p1 + '];\n'
                     s = s + prefix + 'if (' + arg.name + ') {\n'
-                    s = s + prefix + '  int i;\n'
                     s = s + prefix + '  strncpy(' + arg.name + '_c__, ' + arg.name + ', ' + str_len_p1 + '); ' +arg.name+'_c__['+str_len+'] = 0; // strncpy protects in case '+arg.name+' is too long\n'
-                    s = s + prefix + '  for (i=strlen('+arg.name+'_c__); i<'+str_len_p1+'; i++) '+arg.name+"_c__[i] = ' '; // Add whitespace for Fortran\n"
+                    s = s + prefix + '  for (size_t i=strlen('+arg.name+'_c__); i<'+str_len_p1+'; i++) '+arg.name+"_c__[i] = ' '; // Add whitespace for Fortran\n"
                     s = s + prefix + '}\n'
     # Add wrapper code for array size values
     if call:
         for arg in proc.args.values():
             if arg.type.is_array_size:
-                s = s + prefix + 'int ' + arg.name + ' = ' + proc.get_vec_size_parent(arg.name) + '->size();\n'
+                s = s + prefix + 'int ' + arg.name + ' = static_cast<int>(' + proc.get_vec_size_parent(arg.name) + '->size());\n'
             elif arg.type.is_matrix_size:
                 matrix_name, i = proc.get_matrix_size_parent(arg.name)
                 size_method = ('num_rows()','num_cols()')[i]

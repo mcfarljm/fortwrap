@@ -1,5 +1,5 @@
 FC = gfortran
-CXXFLAGS = -g -I $(WRAP)
+CXXFLAGS = -Wall -g -I $(WRAP)
 FFLAGS = -g -I $(WRAP)
 
 # Directory for wrapper code
