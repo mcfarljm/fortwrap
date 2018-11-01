@@ -1,5 +1,8 @@
 # Changes
 
+## 2.2.1
+- Added DLLEXPORT macro so that wrapper code can be compiled with MSC
+	
 ## 2.2.0
 - Changed convention for dtor wrapper code.  Dtors are no longer
   included by default as separate C++ functions.  They can be included
