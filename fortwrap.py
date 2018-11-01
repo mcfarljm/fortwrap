@@ -67,6 +67,13 @@ fort_wrap_file = 'CppWrappers'
 SWIG = True  # Whether or not to include preprocessor defs that will
              # be used by swig
 
+# Macros to define DLLEXPORT, needed with MSC compiler
+DLLEXPORT_MACRO = """#ifdef _MSC_VER
+#define DLLEXPORT __declspec(dllexport)
+#else
+#define DLLEXPORT
+#endif"""
+
 # ===================================================
 
 
@@ -1452,6 +1459,10 @@ def write_class(object):
     file.write(HEADER_STRING + '\n')
     file.write('#ifndef ' + object.cname.upper() + '_H_\n')
     file.write('#define ' + object.cname.upper() + '_H_\n\n')
+
+    # Write the DLLEXPORT macro into each individual header instead of putting it in a top-level header, since this makes it easier to process with Swig
+    file.write(DLLEXPORT_MACRO + '\n\n')
+    
     if SWIG:
         # Needs to be before the include's in the case of swig -includeall
         file.write('\n#ifndef SWIG // Protect declarations from SWIG\n')
@@ -1487,7 +1498,7 @@ def write_class(object):
     
     if not opts.global_orphans:
         write_cpp_dox_comments(file,object.comment)
-        file.write('class ' + object.cname + ' ')
+        file.write('class DLLEXPORT ' + object.cname + ' ')
         if object.extends:
             file.write(': public ' + object.extends + ' ')
         file.write('{\n\n')
@@ -1633,6 +1644,7 @@ def write_misc_defs():
     f.write(HEADER_STRING + '\n')
     f.write('#ifndef ' + misc_defs_filename.upper()[:-2] + '_H_\n')
     f.write('#define ' + misc_defs_filename.upper()[:-2] + '_H_\n\n')
+
     f.write('typedef void(*generic_fpointer)(void);\n')
     f.write('typedef void* ADDRESS;\n\n')
     if fort_class_used:
@@ -1706,11 +1718,13 @@ def write_string_class():
     f.write(HEADER_STRING + '\n')
     f.write('#ifndef ' + string_classname.upper() + '_H_\n')
     f.write('#define ' + string_classname.upper() + '_H_\n\n')
+
+    f.write(DLLEXPORT_MACRO + '\n\n')
     
     f.write('#include <cstdlib>\n#include <cstring>\n\n')
     write_cpp_dox_comments(f, comments)
     body = """\
-class $CLASSNAME{
+class DLLEXPORT $CLASSNAME{
   size_t length_;
   char* data_;
   
