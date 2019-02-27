@@ -10,6 +10,8 @@ int main(void)
     return 1;
   if (c1.get_diameter() != 2)
     return 2;
+  if (! c1.is_circle())
+    return 20;
 
   s = new Circle(2);
   if (s->get_area() != 12)
@@ -21,6 +23,8 @@ int main(void)
     return 5;
   if (sq1.num_sides() != 4)
     return 6;
+  if (! sq1.is_square())
+    return 21;
 
   s = new Square(3);
   if (s->get_area() != 9)

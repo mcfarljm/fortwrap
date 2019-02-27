@@ -12,6 +12,7 @@ MODULE classes
     INTEGER :: num = 101
   CONTAINS
     PROCEDURE (get_area_template), DEFERRED :: get_area
+    PROCEDURE :: is_circle, is_square
   END TYPE Shape
   
   ABSTRACT INTERFACE
@@ -118,5 +119,27 @@ CONTAINS
     INTEGER :: a
     a = s%side_length**2
   END FUNCTION Square_area
+
+  FUNCTION is_circle(s)
+    CLASS(shape), INTENT(in) :: s
+    LOGICAL :: is_circle
+    SELECT TYPE(s)
+    TYPE is(circle)
+      is_circle = .TRUE.
+    CLASS DEFAULT
+      is_circle = .FALSE.
+    END SELECT
+  END FUNCTION is_circle
+
+  FUNCTION is_square(s)
+    CLASS(shape), INTENT(in) :: s
+    LOGICAL :: is_square
+    SELECT TYPE(s)
+    TYPE is(square)
+      is_square = .TRUE.
+    CLASS DEFAULT
+      is_square = .FALSE.
+    END SELECT
+  END FUNCTION is_square
 
 END MODULE classes
