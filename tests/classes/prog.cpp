@@ -37,6 +37,8 @@ int main(void)
   if (p->num_sides() != 4)
     return 10;
 
+  p->dummy();
+
   delete p;
   
   return 0;

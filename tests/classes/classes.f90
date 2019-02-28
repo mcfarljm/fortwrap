@@ -41,12 +41,23 @@ MODULE classes
     INTEGER :: nsides
   CONTAINS
     PROCEDURE :: num_sides => polygon_num_sides
+    ! Test line continuation
+    PROCEDURE (dummy_template), DEFERRED :: &
+      dummy
   END TYPE Polygon
+
+  ABSTRACT INTERFACE
+    SUBROUTINE dummy_template(s)
+      IMPORT Polygon
+      CLASS (Polygon), INTENT(in) :: s
+    END SUBROUTINE dummy_template
+  END INTERFACE
 
   TYPE, EXTENDS(Polygon) :: Square
     INTEGER :: side_length
   CONTAINS
     PROCEDURE :: get_area => Square_area
+    PROCEDURE :: dummy => square_dummy
   END TYPE Square
 
   INTERFACE Square
@@ -141,5 +152,9 @@ CONTAINS
       is_square = .FALSE.
     END SELECT
   END FUNCTION is_square
+
+  SUBROUTINE square_dummy(s)
+    CLASS(square), INTENT(in) :: s
+  END SUBROUTINE square_dummy
 
 END MODULE classes

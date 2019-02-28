@@ -908,6 +908,7 @@ def parse_type(file,line):
     # Move to end of type and parse type bound procedure definitions
     while True:
         line = readline(file)
+        line = join_lines(line, file)
         if line == '':
             error("Unexpected end of file in TYPE " + typename)
             return
