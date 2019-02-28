@@ -1090,10 +1090,12 @@ def associate_procedures():
             objects[orphan_classname.lower()].procs.append(proc)
             flag_native_args(proc)
             proc.in_orphan_class = True
-    # Tag procedure arguments as being inside abstract interface
     for proc in abstract_interfaces.values():
+        # Tag procedure arguments as being inside abstract interface
         for arg in proc.args.values():
             arg.in_abstract = True
+        # Flag native args for abstrat interfacs, which is necessary when writing the prototypes for the virtual methods
+        flag_native_args(proc)
             
 
 def write_cpp_dox_comments(file,comments,args_by_pos=None,prefix=0):

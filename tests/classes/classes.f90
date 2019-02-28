@@ -46,6 +46,8 @@ MODULE classes
     ! Test line continuation
     PROCEDURE (dummy_template), DEFERRED :: &
       dummy
+    ! Test abstract interface with class argument
+    PROCEDURE (poly_add_template), DEFERRED :: poly_add
   END TYPE Polygon
 
   ABSTRACT INTERFACE
@@ -53,6 +55,12 @@ MODULE classes
       IMPORT Polygon
       CLASS (Polygon), INTENT(in) :: s
     END SUBROUTINE dummy_template
+
+    FUNCTION poly_add_template(s1, s2) RESULT(a)
+      IMPORT Polygon
+      CLASS (Polygon), INTENT(in) :: s1, s2
+      INTEGER :: a
+    END FUNCTION poly_add_template
   END INTERFACE
 
   TYPE, EXTENDS(Polygon) :: Square
@@ -60,6 +68,7 @@ MODULE classes
   CONTAINS
     PROCEDURE :: get_area => Square_area
     PROCEDURE :: dummy => square_dummy
+    PROCEDURE :: poly_add => square_add
   END TYPE Square
 
   INTERFACE Square
@@ -159,10 +168,17 @@ CONTAINS
     CLASS(square), INTENT(in) :: s
   END SUBROUTINE square_dummy
 
-  FUNCTION add_area(s1, s2) result(a)
+  FUNCTION add_area(s1, s2) RESULT(a)
     CLASS(Shape), INTENT(in) :: s1, s2
     INTEGER :: a
     a = s1%get_area() + s2%get_area()
   END FUNCTION add_area
+
+  FUNCTION square_add(s1, s2) RESULT(a)
+    CLASS (Square), INTENT(in) :: s1
+    CLASS (Polygon), INTENT(in) :: s2
+    INTEGER :: a
+    a = s1%get_area() + s2%get_area()
+  END FUNCTION square_add
 
 END MODULE classes

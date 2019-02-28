@@ -29,7 +29,6 @@ int main(void)
   s = new Square(3);
   if (s->get_area() != 9)
     return 7;
-  delete s;
 
   p = new Square(4);
   if (p->get_area() != 16)
@@ -42,7 +41,14 @@ int main(void)
   if (s->add_area(p) != 25)
     return 30;
 
+  Polygon *p2 = new Square(5);
+  
+  if (p->poly_add(p2) != 16 + 25)
+    return 31;
+
   delete p;
+  delete s;
+  delete p2;
   
   return 0;
 }
