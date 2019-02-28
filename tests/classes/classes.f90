@@ -13,6 +13,8 @@ MODULE classes
   CONTAINS
     PROCEDURE (get_area_template), DEFERRED :: get_area
     PROCEDURE :: is_circle, is_square
+    !> Test TBP with class argument
+    PROCEDURE :: add_area
   END TYPE Shape
   
   ABSTRACT INTERFACE
@@ -156,5 +158,11 @@ CONTAINS
   SUBROUTINE square_dummy(s)
     CLASS(square), INTENT(in) :: s
   END SUBROUTINE square_dummy
+
+  FUNCTION add_area(s1, s2) result(a)
+    CLASS(Shape), INTENT(in) :: s1, s2
+    INTEGER :: a
+    a = s1%get_area() + s2%get_area()
+  END FUNCTION add_area
 
 END MODULE classes

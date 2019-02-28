@@ -39,6 +39,9 @@ int main(void)
 
   p->dummy();
 
+  if (s->add_area(p) != 25)
+    return 30;
+
   delete p;
   
   return 0;
