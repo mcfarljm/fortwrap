@@ -37,7 +37,7 @@ import traceback
 import collections
 
 
-VERSION = '2.1.3'
+VERSION = '2.2.1'
 
 
 # SETTINGS ==========================================
@@ -67,6 +67,13 @@ fort_wrap_file = 'CppWrappers'
 SWIG = True  # Whether or not to include preprocessor defs that will
              # be used by swig
 
+# Macros to define DLLEXPORT, needed with MSC compiler
+DLLEXPORT_MACRO = """#ifdef _MSC_VER
+#define DLLEXPORT __declspec(dllexport)
+#else
+#define DLLEXPORT
+#endif"""
+
 # ===================================================
 
 
@@ -85,7 +92,7 @@ fort_contains = re.compile(r'\s*CONTAINS\s*$', re.IGNORECASE)
 # Data types
 primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>(\w+|\*))\s*\)))?'
 primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
-fort_data_str = r'\s*(' + primitive_data_str + '|(?P<dt_mode>TYPE|CLASS)\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)\s*,\s*POINTER)'
+fort_data_str = r'\s*(' + primitive_data_str + '|(?P<dt_mode>TYPE|CLASS)\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)(\s*,\s*POINTER)?)'
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
 fort_data_def = re.compile(fort_data_str + '.*::',re.IGNORECASE)
 optional_def = re.compile('OPTIONAL.*::', re.IGNORECASE)
@@ -240,6 +247,7 @@ class DataType(object):
         self.array = array
         self.str_len = str_len
         self.proc_pointer = False
+        self.proc = False # PROCEDURE without POINTER attribute
         self.dt = False      # False, 'TYPE', or 'CLASS'
         self.hidden = hidden # hidden name length arg
         # For array, name of argument used to pass the array length:
@@ -277,11 +285,14 @@ class DataType(object):
             # (INT is used to represent the hidden length arguments,
             # passed by value)
             if 'PROCEDURE' in type.upper():
-                self.proc_pointer = True
                 # Matching broken b/c of "::'
                 m = fort_data.match(type)
                 self.type = m.group('proc_spec')
-                proc_pointer_used = True
+                if 'POINTER' in type.upper():
+                    self.proc_pointer = True
+                    proc_pointer_used = True
+                else:
+                    self.proc = True
             else:
                 m = fort_data.match(type)
                 if m.group('dt_mode'):
@@ -369,6 +380,9 @@ class Argument(object):
                 return True
             elif self.intent=='out':
                 return True
+        elif self.type.proc:
+            # PROCEDURE (without POINTER attribute) does not seem to be compatible with current wrapping approach (with gfortran)
+            return True    
         elif self.type.type=='CHARACTER':
             if not self.intent=='inout' and self.type.str_len and not self.type.array:
                 return False
@@ -635,7 +649,14 @@ def join_lines(line,file):
 
 
 def is_public(name):
-    """Check whether a name is public and not excluded"""
+    """Check whether a name is public and not excluded
+
+    The private/public parts of this check rely on global variables
+    that are updated while the Fortran source is processed, so this
+    function should only be called during the parsing portion (not
+    during code generation, after parsing is finished)
+
+    """
     if name.lower() in name_exclusions:
         return False
     elif name.lower() in name_inclusions:
@@ -842,9 +863,6 @@ def parse_proc(file,line,abstract=False):
                 method = True
                 nopass = True
         proc = Procedure(proc_name,args,method,retval,proc_comments,nopass)
-        # dtors automatically get added.  This way we can hide them
-        # with the ignores list, but they still get used in the Class
-        # dtor:
         if method:
             try:
                 if proc_name.lower() in objects[proc.args_by_pos[1].type.type.lower()].tbps:
@@ -856,7 +874,7 @@ def parse_proc(file,line,abstract=False):
         # public).  This is sort of a hack, as technically we should
         # only wrap non-public abstract procedures if they are used in
         # TBP definitions
-        if is_public(proc_name) or proc.dtor or is_tbp or abstract:
+        if is_public(proc_name) or is_tbp or abstract:
             if not abstract:
                 procedures.append(proc)
                 module_proc_num += 1
@@ -902,6 +920,7 @@ def parse_type(file,line):
     # Move to end of type and parse type bound procedure definitions
     while True:
         line = readline(file)
+        line = join_lines(line, file)
         if line == '':
             error("Unexpected end of file in TYPE " + typename)
             return
@@ -1099,10 +1118,12 @@ def associate_procedures():
             objects[orphan_classname.lower()].procs.append(proc)
             flag_native_args(proc)
             proc.in_orphan_class = True
-    # Tag procedure arguments as being inside abstract interface
     for proc in abstract_interfaces.values():
+        # Tag procedure arguments as being inside abstract interface
         for arg in proc.args.values():
             arg.in_abstract = True
+        # Flag native args for abstrat interfacs, which is necessary when writing the prototypes for the virtual methods
+        flag_native_args(proc)
             
 
 def write_cpp_dox_comments(file,comments,args_by_pos=None,prefix=0):
@@ -1333,27 +1354,26 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                     # with gfortran indicates that in case of not
                     # present it passes 0 for the length)
                     s = s + prefix + 'int ' + arg.name + '_len__ = 0;\n'
-                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = '+ arg.name + '->length();\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = static_cast<int>('+ arg.name + '->length());\n'
                 s = s + prefix + '// Declare memory to store output character data\n'
                 s = s + prefix + 'char ' + arg.name + '_c__[' + str_len_p1 + '];\n'
                 s = s + prefix + arg.name + '_c__[' + str_len + "] = '\\0';\n"
             elif arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='in':
                 if arg.type.str_len.assumed:
                     s = s + prefix + 'int ' + arg.name + '_len__ = 0;\n'
-                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name+ '_len__ = strlen('+arg.name+'); // Protect Optional args\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name+ '_len__ = static_cast<int>(strlen('+arg.name+')); // Protect Optional args\n'
                 else:
                     s = s + prefix + '// Create C array for Fortran input string data\n'
                     s = s + prefix + 'char ' + arg.name + '_c__[' + str_len_p1 + '];\n'
                     s = s + prefix + 'if (' + arg.name + ') {\n'
-                    s = s + prefix + '  int i;\n'
                     s = s + prefix + '  strncpy(' + arg.name + '_c__, ' + arg.name + ', ' + str_len_p1 + '); ' +arg.name+'_c__['+str_len+'] = 0; // strncpy protects in case '+arg.name+' is too long\n'
-                    s = s + prefix + '  for (i=strlen('+arg.name+'_c__); i<'+str_len_p1+'; i++) '+arg.name+"_c__[i] = ' '; // Add whitespace for Fortran\n"
+                    s = s + prefix + '  for (size_t i=strlen('+arg.name+'_c__); i<'+str_len_p1+'; i++) '+arg.name+"_c__[i] = ' '; // Add whitespace for Fortran\n"
                     s = s + prefix + '}\n'
     # Add wrapper code for array size values
     if call:
         for arg in proc.args.values():
             if arg.type.is_array_size:
-                s = s + prefix + 'int ' + arg.name + ' = ' + proc.get_vec_size_parent(arg.name) + '->size();\n'
+                s = s + prefix + 'int ' + arg.name + ' = static_cast<int>(' + proc.get_vec_size_parent(arg.name) + '->size());\n'
             elif arg.type.is_matrix_size:
                 matrix_name, i = proc.get_matrix_size_parent(arg.name)
                 size_method = ('num_rows()','num_cols()')[i]
@@ -1472,6 +1492,10 @@ def write_class(object):
     file.write(HEADER_STRING + '\n')
     file.write('#ifndef ' + object.cname.upper() + '_H_\n')
     file.write('#define ' + object.cname.upper() + '_H_\n\n')
+
+    # Write the DLLEXPORT macro into each individual header instead of putting it in a top-level header, since this makes it easier to process with Swig
+    file.write(DLLEXPORT_MACRO + '\n\n')
+    
     if SWIG:
         # Needs to be before the include's in the case of swig -includeall
         file.write('\n#ifndef SWIG // Protect declarations from SWIG\n')
@@ -1507,7 +1531,7 @@ def write_class(object):
     
     if not opts.global_orphans:
         write_cpp_dox_comments(file,object.comment)
-        file.write('class ' + object.cname + ' ')
+        file.write('class DLLEXPORT ' + object.cname + ' ')
         if object.extends:
             file.write(': public ' + object.extends + ' ')
         file.write('{\n\n')
@@ -1532,7 +1556,10 @@ def write_class(object):
             file.write('  ~' + object.cname + '();\n\n')
     # Method declarations
     for proc in object.procs:
-        if proc.ctor or (proc.dtor and not is_public(proc.name)):
+        # dtors are automatically called by C++ destructor.  A
+        # separate function is not created by default, but can be
+        # enabled by adding an %include for the dtor
+        if proc.ctor or (proc.dtor and not proc.name.lower() in name_inclusions):
             continue
         write_cpp_dox_comments(file,proc.comment,proc.args_by_pos)
         file.write(function_def_str(proc) + '\n\n')
@@ -1595,7 +1622,7 @@ def write_class(object):
     
     # Other methods:
     for proc in object.procs:
-        if proc.ctor or (proc.dtor and not is_public(proc.name)):
+        if proc.ctor or (proc.dtor and not proc.name.lower() in name_inclusions):
             continue
         file.write(function_def_str(proc,obj=object,prefix='') + ' {\n')
         if proc.dtor:
@@ -1651,6 +1678,7 @@ def write_misc_defs():
     f.write(HEADER_STRING + '\n')
     f.write('#ifndef ' + misc_defs_filename.upper()[:-2] + '_H_\n')
     f.write('#define ' + misc_defs_filename.upper()[:-2] + '_H_\n\n')
+
     f.write('typedef void(*generic_fpointer)(void);\n')
     f.write('typedef void* ADDRESS;\n\n')
     if fort_class_used:
@@ -1724,11 +1752,13 @@ def write_string_class():
     f.write(HEADER_STRING + '\n')
     f.write('#ifndef ' + string_classname.upper() + '_H_\n')
     f.write('#define ' + string_classname.upper() + '_H_\n\n')
+
+    f.write(DLLEXPORT_MACRO + '\n\n')
     
     f.write('#include <cstdlib>\n#include <cstring>\n\n')
     write_cpp_dox_comments(f, comments)
     body = """\
-class $CLASSNAME{
+class DLLEXPORT $CLASSNAME{
   size_t length_;
   char* data_;
   

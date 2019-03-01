@@ -15,6 +15,9 @@ MODULE classes
     ! Fortran will allow this, but C++ cannot use static virtual methods,
     ! so a virtual method for Shape will not get created
     PROCEDURE(is_round_template), DEFERRED, NOPASS :: is_round
+    PROCEDURE :: is_circle, is_square
+    !> Test TBP with class argument
+    PROCEDURE :: add_area
   END TYPE Shape
   
   ABSTRACT INTERFACE
@@ -50,7 +53,25 @@ MODULE classes
     INTEGER :: nsides
   CONTAINS
     PROCEDURE :: num_sides => polygon_num_sides
+    ! Test line continuation
+    PROCEDURE (dummy_template), DEFERRED :: &
+      dummy
+    ! Test abstract interface with class argument
+    PROCEDURE (poly_add_template), DEFERRED :: poly_add
   END TYPE Polygon
+
+  ABSTRACT INTERFACE
+    SUBROUTINE dummy_template(s)
+      IMPORT Polygon
+      CLASS (Polygon), INTENT(in) :: s
+    END SUBROUTINE dummy_template
+
+    FUNCTION poly_add_template(s1, s2) RESULT(a)
+      IMPORT Polygon
+      CLASS (Polygon), INTENT(in) :: s1, s2
+      INTEGER :: a
+    END FUNCTION poly_add_template
+  END INTERFACE
 
   TYPE, EXTENDS(Polygon) :: Square
     INTEGER :: side_length
@@ -58,6 +79,8 @@ MODULE classes
     PROCEDURE :: get_area => Square_area
     PROCEDURE, NOPASS :: is_round => Square_is_round
     PROCEDURE, NOPASS :: get_area_static => Square_area_static
+    PROCEDURE :: dummy => square_dummy
+    PROCEDURE :: poly_add => square_add
   END TYPE Square
 
   INTERFACE Square
@@ -149,5 +172,43 @@ CONTAINS
     INTEGER :: area
     area = side**2
   END FUNCTION square_area_static
+  FUNCTION is_circle(s)
+    CLASS(shape), INTENT(in) :: s
+    LOGICAL :: is_circle
+    SELECT TYPE(s)
+    TYPE is(circle)
+      is_circle = .TRUE.
+    CLASS DEFAULT
+      is_circle = .FALSE.
+    END SELECT
+  END FUNCTION is_circle
+
+  FUNCTION is_square(s)
+    CLASS(shape), INTENT(in) :: s
+    LOGICAL :: is_square
+    SELECT TYPE(s)
+    TYPE is(square)
+      is_square = .TRUE.
+    CLASS DEFAULT
+      is_square = .FALSE.
+    END SELECT
+  END FUNCTION is_square
+
+  SUBROUTINE square_dummy(s)
+    CLASS(square), INTENT(in) :: s
+  END SUBROUTINE square_dummy
+
+  FUNCTION add_area(s1, s2) RESULT(a)
+    CLASS(Shape), INTENT(in) :: s1, s2
+    INTEGER :: a
+    a = s1%get_area() + s2%get_area()
+  END FUNCTION add_area
+
+  FUNCTION square_add(s1, s2) RESULT(a)
+    CLASS (Square), INTENT(in) :: s1
+    CLASS (Polygon), INTENT(in) :: s2
+    INTEGER :: a
+    a = s1%get_area() + s2%get_area()
+  END FUNCTION square_add
 
 END MODULE classes
