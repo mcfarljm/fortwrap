@@ -661,8 +661,6 @@ class FileReader:
         read_count = 0
         if fort_dox_comments.match(line):
             com.append(line.split('!>')[1].strip())
-            # TODO: do I need this:
-            com[0] = com[0].replace('!>','!!')
         elif fort_dox_inline.match(line):
             com.append(line.split('!<')[1].strip())
         else:
