@@ -158,9 +158,6 @@ dox_comments = []
 fort_integer_params = dict()
 enumerations = []
 
-file_pointer = -1
-file_lines_list = []
-
 PRIVATE=1
 PUBLIC=0
 
@@ -626,26 +623,75 @@ def translate_name(name):
             name = pattern.sub(replacement,name)
         return name
 
-def readline(f):
-    """
-    Acts like readline, but grabs the line out of a global list.  This
-    way can move backwards in the list
-    """
-    global file_pointer, file_lines_list
-    if file_pointer < len(file_lines_list):
-        file_pointer = file_pointer + 1
-        return file_lines_list[file_pointer-1]
-    else:
-        return ''
 
+class FileReader:
+    """Wrapper around file that provides facilities for backing up"""
+    def __init__(self, fname):
+        try:
+            with open(fname, 'r') as f:
+                self.file_lines_list = f.readlines()
+        except IOError:
+            error("Error opening file " + fname)
+            self.file_lines_list = None
+            self.success = False
+        else:
+            self.file_pointer = 0
+            self.success = True
 
-def join_lines(line,file):
-    """Join lines possibly continued by & character"""
-    while '&' in line.split('!')[0]:
-        line1 = line.split('&')[0]
-        line2 = readline(file)
-        line = line1 + line2.strip()
-    return line
+    # Note on reading and joining lines.  Did try automatically
+    # calling join_lines inside readlines (with exception within
+    # parse_comments), but that can fail for certain cases with string
+    # continuations, which aren't handled correctly due to the second
+    # "&".  A string continuation at the right place (e.g. right
+    # before the end of a procedure) would cause the resulting parsing
+    # to fail.
+    def readline(self):
+        """Acts like readline, but grabs the line out of a global list.  This
+        way can move backwards in the list
+
+        """
+        if self.file_pointer < len(self.file_lines_list):
+            self.file_pointer += 1
+            return self.file_lines_list[self.file_pointer-1]
+        else:
+            return ''
+
+    def join_lines(self, line):
+        """Join lines possibly continued by & character"""
+        while '&' in line.split('!')[0]:
+            line1 = line.split('&')[0]
+            line2 = self.readline()
+            line = line1 + line2.strip()
+        return line
+
+    def parse_comments(self,line):
+        """
+        Parse doxygen comments.  On inline comments, return file back to
+        line containing comment start.
+        """
+        #print "Parsing comment:", line
+        com = []
+        read_count = 0
+        if fort_dox_comments.match(line):
+            com.append(line.split('!>')[1].strip())
+        elif fort_dox_inline.match(line):
+            com.append(line.split('!<')[1].strip())
+        else:
+            warning("Bad line in parse_comments: " + line)
+        while True:
+            line = self.readline().strip()
+            if line.startswith('!!'):
+                com.append(line.split('!!')[1].strip())
+                read_count+=1
+            else:
+                # Back up a line, or all the way back to the comment start
+                # if it is inline
+                if fort_dox_inline.match(line):
+                        for i in range(read_count):
+                            self.file_pointer -= 1
+                self.file_pointer -= 1
+                break
+        return com    
 
 
 def is_public(name):
@@ -685,7 +731,7 @@ def add_type(t):
 def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
     count = 0
 
-    line = join_lines(line,file)
+    line = file.join_lines(line)
     line = line.split('!')[0]
 
     m = fort_data.match(line)
@@ -771,7 +817,7 @@ def parse_proc(file,line,abstract=False):
     proc_comments = dox_comments 
 
     # First check for line continuation:
-    line = join_lines(line,file)
+    line = file.join_lines(line)
     proc_name = line.split('(')[0].split()[-1]
 
     arg_string = line.split('(')[1].split(')')[0]
@@ -794,9 +840,9 @@ def parse_proc(file,line,abstract=False):
     invalid = False
     arg_comments = []
     while True:
-        line = readline(file)
+        line = file.readline()
         if not line:
-            error("Unexpected end of file in procedure")
+            error("Unexpected end of file parsing procedure '{}'".format(proc_name))
             return
         elif fort_end_proc.match(line):
             break
@@ -806,20 +852,20 @@ def parse_proc(file,line,abstract=False):
             # arguments don't overwrite the parent's arguments, and
             # that we don't wrap the contained procedure itself
             while True:
-                line = readline(file)
+                line = file.readline()
                 if not line:
-                    error("Unexpected end of file in contained procedure")
+                    error("Unexpected end of file parsing contained procedure within '{}'".format(proc_name))
                     return
                 elif fort_end_proc.match(line):
                     break                
         elif fort_contains.match(line):
             in_contains = True
         elif fort_dox_comments.match(line):
-            arg_comments = parse_comments(file,line)
+            arg_comments = file.parse_comments(line)
             continue
         elif fort_dox_inline.match(line):
             # Note: don't CONTINUE here b/c still need to parse this arg
-            arg_comments = parse_comments(file,line)
+            arg_comments = file.parse_comments(line)
         elif fort_comment.match(line):
             continue
         if fort_data_def.match(line):
@@ -832,7 +878,7 @@ def parse_proc(file,line,abstract=False):
     # Check args:
     if len(args) != len(arg_list_lower):
         missing_args = set(arg_list_lower).difference(set(args.keys()))
-        error("Missing argument definitions in procedure %s: %s" % (proc_name, ', '.join(missing_args)))
+        error("Missing argument definitions in procedure {}: {}".format(proc_name, ', '.join(missing_args)))
         invalid = True
     for arg in args.values():
         if arg.fort_only() and not arg.optional:
@@ -850,7 +896,7 @@ def parse_proc(file,line,abstract=False):
             elif retval.type.type == 'CHARACTER':
                 invalid = True
         else:
-            error("Untyped return value in %s: %s" % (proc_name,retval.name))
+            error("Untyped return value in {}: {}".format(proc_name,retval.name))
             invalid = True
     if invalid:
         not_wrapped.append(proc_name)
@@ -884,20 +930,20 @@ def parse_proc(file,line,abstract=False):
 def parse_abstract_interface(file,line):
     global dox_comments
     while True:
-        line = readline(file)
+        line = file.readline()
         if line=='':
             print("Unexpected end of file in abstract interface")
             return
         elif fort_dox_comments.match(line):
             # Grab comments and ignore them
-            dox_comments = parse_comments(file,line)
+            dox_comments = file.parse_comments(line)
             continue
         elif fort_end_interface.match(line):
             break
         elif fort_comment.match(line):
             continue
         elif fort_proc_def.match(line):
-            parse_proc(f,line,abstract=True)
+            parse_proc(file,line,abstract=True)
             dox_comments = []
 
 def parse_type(file,line):
@@ -919,8 +965,8 @@ def parse_type(file,line):
     #     print "{} extends: {}".format(typename, objects[typename.lower()].extends)
     # Move to end of type and parse type bound procedure definitions
     while True:
-        line = readline(file)
-        line = join_lines(line, file)
+        line = file.readline()
+        line = file.join_lines(line)
         if line == '':
             error("Unexpected end of file in TYPE " + typename)
             return
@@ -943,37 +989,6 @@ def parse_type(file,line):
                 tbp = TypeBoundProcedure(name, proc, interface, deferred, nopass)
                 objects[typename.lower()].add_tbp(tbp)
 
-def parse_comments(file,line):
-    """
-    Parse doxygen comments.  On inline comments, return file back to
-    line containing comment start.
-    """
-    global file_pointer
-    #print "Parsing comment:", line
-    com = []
-    read_count = 0
-    if fort_dox_comments.match(line):
-        com.append(line.split('!>')[1].strip())
-        # TODO: do I need this:
-        com[0] = com[0].replace('!>','!!')
-    elif fort_dox_inline.match(line):
-        com.append(line.split('!<')[1].strip())
-    else:
-        warning("Bad line in parse_comments: " + line)
-    while True:
-        line = readline(file).strip()
-        if line.startswith('!!'):
-            com.append(line.split('!!')[1].strip())
-            read_count+=1
-        else:
-            # Back up a line, or all the way back to the comment start
-            # if it is inline
-            if fort_dox_inline.match(line):
-                    for i in range(read_count):
-                        file_pointer -= 1
-            file_pointer -= 1
-            break
-    return com
 
 def parse_enum(file,line):
     """
@@ -981,7 +996,7 @@ def parse_enum(file,line):
     """
     enums = []
     while True:
-        line = readline(file)
+        line = file.readline()
         if line == '':
             print("Unexpected end of file in ENUM")
             return
@@ -989,7 +1004,7 @@ def parse_enum(file,line):
             break
         else:
             if line.strip().upper().startswith('ENUMERATOR'):
-                line = join_lines(line,file)
+                line = file.join_lines(line)
                 try:
                     s = line.split('::')[1].split('!')[0]
                     if s.find('=')>=0:
@@ -1014,23 +1029,19 @@ def initialize_protection():
 
 
 def parse_file(fname):
-    global current_module, file_pointer, file_lines_list, dox_comments, default_protection, private_names, public_names
-    try:
-        f = open(fname)
-    except:
-        error("Error opening file " + fname)
+    global current_module, dox_comments, default_protection, private_names, public_names
+    f = FileReader(fname)
+    if not f.success:
         return 0
     current_module = ''
     initialize_protection()
     dox_comments = []
-    file_lines_list = f.readlines()
-    file_pointer = 0
     while True:
-        line = readline(f)
+        line = f.readline()
         if line == '':
             break
         elif fort_dox_comments.match(line):
-            dox_comments = parse_comments(f,line)
+            dox_comments = f.parse_comments(line)
             continue
         elif fort_comment.match(line):
             continue
@@ -1057,22 +1068,21 @@ def parse_file(fname):
             if '::' not in line:
                 default_protection = PRIVATE
             else:
-                line = join_lines(line,f)
+                line = f.join_lines(line)
                 for name in line.split('::')[1].split(','):
                     private_names.add(name.strip().lower())
         elif line.strip().upper().startswith('PUBLIC'):
             if '::' in line:
-                line = join_lines(line,f)
+                line = f.join_lines(line)
                 for name in line.split('::')[1].split(','):
                     public_names.add(name.strip().lower())
         elif integer_param_def.match(line):
-            line = join_lines(line,f).split('!')[0]
+            line = f.join_lines(line).split('!')[0]
             for param in line.split('::')[1].split(','):
                 name,val = param.split('=')
                 fort_integer_params[name.strip().upper()] = int( val.strip() )
         elif enum_def.match(line):
             parse_enum(f,line)
-    f.close()
     return 1
 
 def associate_procedures():
@@ -1096,7 +1106,7 @@ def associate_procedures():
                     objects[typename.lower()].procs.append(proc)
                     flag_native_args(proc)
                 elif typename.lower() not in name_exclusions:
-                    error("Method %s declared for unknown derived type %s" % (proc.name, typename))
+                    error("Method {} declared for unknown derived type {}".format(proc.name, typename))
             else: # nopass
                 found = False
                 # Note that this association does not respect the
@@ -1197,7 +1207,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # associate_procedures is run).  Can always exclude these args
         # from the arg list or add the derived type to the interface
         if (not arg.fort_only() and not bind and not call and definition) and (arg.type.dt and not arg.native and arg.type.type.upper()!='C_PTR'):
-            error("Derived type argument %s::%s of procedure %s is not defined" % (arg.type.type, arg.name, proc.name))
+            error("Derived type argument {}::{} of procedure {} is not defined".format(arg.type.type, arg.name, proc.name))
         if arg.fort_only():
             # Hide from user -- requires special treatement for three of
             # the four cases
@@ -1967,9 +1977,11 @@ class ConfigurationFile(object):
                 ctor_def = re.compile(line.strip().split('%ctor ')[1], re.IGNORECASE)
             elif words[0] == '%dtor':
                 dtor_def = re.compile(line.strip().split('%dtor ')[1], re.IGNORECASE)
+            else:
+                error("Unrecognized declaration in interface file: {}".format(words[0]))
                 
     def bad_decl(self,line_num):
-        error("%s, line %i <-- bad declaration" % (self.fname, line_num))
+        error("{}, line {} <-- bad declaration".format(self.fname, line_num))
 
 
 # Class for parsing command line options
