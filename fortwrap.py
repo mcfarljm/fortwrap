@@ -872,7 +872,7 @@ def parse_proc(file,line,abstract=False):
     # Check args:
     if len(args) != len(arg_list_lower):
         missing_args = set(arg_list_lower).difference(set(args.keys()))
-        error("Missing argument definitions in procedure %s: %s" % (proc_name, ', '.join(missing_args)))
+        error("Missing argument definitions in procedure {}: {}".format(proc_name, ', '.join(missing_args)))
         invalid = True
     for arg in args.values():
         if arg.fort_only() and not arg.optional:
@@ -890,7 +890,7 @@ def parse_proc(file,line,abstract=False):
             elif retval.type.type == 'CHARACTER':
                 invalid = True
         else:
-            error("Untyped return value in %s: %s" % (proc_name,retval.name))
+            error("Untyped return value in {}: {}".format(proc_name,retval.name))
             invalid = True
     if invalid:
         not_wrapped.append(proc_name)
@@ -1092,7 +1092,7 @@ def associate_procedures():
                 objects[typename.lower()].procs.append(proc)
                 flag_native_args(proc)
             elif typename.lower() not in name_exclusions:
-                error("Method %s declared for unknown derived type %s" % (proc.name, typename))
+                error("Method {} declared for unknown derived type {}".format(proc.name, typename))
         # Associate orphan functions with a dummy class
         elif (not opts.no_orphans) or proc.name.lower() in name_inclusions:
             if not orphan_classname.lower() in objects:
@@ -1179,7 +1179,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # associate_procedures is run).  Can always exclude these args
         # from the arg list or add the derived type to the interface
         if (not arg.fort_only() and not bind and not call and definition) and (arg.type.dt and not arg.native and arg.type.type.upper()!='C_PTR'):
-            error("Derived type argument %s::%s of procedure %s is not defined" % (arg.type.type, arg.name, proc.name))
+            error("Derived type argument {}::{} of procedure {} is not defined".format(arg.type.type, arg.name, proc.name))
         if arg.fort_only():
             # Hide from user -- requires special treatement for three of
             # the four cases
@@ -1948,7 +1948,7 @@ class ConfigurationFile(object):
                 dtor_def = re.compile(line.strip().split('%dtor ')[1], re.IGNORECASE)
                 
     def bad_decl(self,line_num):
-        error("%s, line %i <-- bad declaration" % (self.fname, line_num))
+        error("{}, line {} <-- bad declaration".format(self.fname, line_num))
 
 
 # Class for parsing command line options
