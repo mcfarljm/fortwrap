@@ -632,6 +632,13 @@ class FileReader:
             self.file_pointer = 0
             self.success = True
 
+    # Note on reading and joining lines.  Did try automatically
+    # calling join_lines inside readlines (with exception within
+    # parse_comments), but that can fail for certain cases with string
+    # continuations, which aren't handled correctly due to the second
+    # "&".  A string continuation at the right place (e.g. right
+    # before the end of a procedure) would cause the resulting parsing
+    # to fail.
     def readline(self):
         """Acts like readline, but grabs the line out of a global list.  This
         way can move backwards in the list
