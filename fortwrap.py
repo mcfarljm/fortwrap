@@ -632,18 +632,22 @@ class FileReader:
             self.file_pointer = 0
             self.success = True
 
-    def readline(self):
+    def readline(self, join_lines=True):
         """Acts like readline, but grabs the line out of a global list.  This
         way can move backwards in the list
 
         """
         if self.file_pointer < len(self.file_lines_list):
             self.file_pointer += 1
-            return self.file_lines_list[self.file_pointer-1]
+            line = self.file_lines_list[self.file_pointer-1]
+            if join_lines:
+                return self._join_lines(line)
+            else:
+                return line
         else:
             return ''
 
-    def join_lines(self, line):
+    def _join_lines(self, line):
         """Join lines possibly continued by & character"""
         while '&' in line.split('!')[0]:
             line1 = line.split('&')[0]
@@ -666,7 +670,11 @@ class FileReader:
         else:
             warning("Bad line in parse_comments: " + line)
         while True:
-            line = self.readline().strip()
+            # Don't use join_lines during read, which would cause a
+            # problem if the definition immediately after the comment
+            # contained a continuation (the subsequent backspaces
+            # would not go far enough)
+            line = self.readline(join_lines=False).strip()
             if line.startswith('!!'):
                 com.append(line.split('!!')[1].strip())
                 read_count+=1
@@ -718,7 +726,6 @@ def add_type(t):
 def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
     count = 0
 
-    line = file.join_lines(line)
     line = line.split('!')[0]
 
     m = fort_data.match(line)
@@ -803,8 +810,6 @@ def parse_proc(file,line,abstract=False):
     # Store in case decide to overwrite them when parsing arg comments
     proc_comments = dox_comments 
 
-    # First check for line continuation:
-    line = file.join_lines(line)
     proc_name = line.split('(')[0].split()[-1]
 
     arg_string = line.split('(')[1].split(')')[0]
@@ -947,7 +952,6 @@ def parse_type(file,line):
     # Move to end of type and parse type bound procedure definitions
     while True:
         line = file.readline()
-        line = file.join_lines(line)
         if line == '':
             error("Unexpected end of file in TYPE " + typename)
             return
@@ -984,7 +988,6 @@ def parse_enum(file,line):
             break
         else:
             if line.strip().upper().startswith('ENUMERATOR'):
-                line = file.join_lines(line)
                 try:
                     s = line.split('::')[1].split('!')[0]
                     if s.find('=')>=0:
@@ -1048,16 +1051,14 @@ def parse_file(fname):
             if '::' not in line:
                 default_protection = PRIVATE
             else:
-                line = f.join_lines(line)
                 for name in line.split('::')[1].split(','):
                     private_names.add(name.strip().lower())
         elif line.strip().upper().startswith('PUBLIC'):
             if '::' in line:
-                line = f.join_lines(line)
                 for name in line.split('::')[1].split(','):
                     public_names.add(name.strip().lower())
         elif integer_param_def.match(line):
-            line = f.join_lines(line).split('!')[0]
+            line = line.split('!')[0]
             for param in line.split('::')[1].split(','):
                 name,val = param.split('=')
                 fort_integer_params[name.strip().upper()] = int( val.strip() )
