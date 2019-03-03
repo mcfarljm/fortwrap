@@ -836,7 +836,7 @@ def parse_proc(file,line,abstract=False):
     while True:
         line = file.readline()
         if not line:
-            error("Unexpected end of file in procedure")
+            error("Unexpected end of file parsing procedure '{}'".format(proc_name))
             return
         elif fort_end_proc.match(line):
             break
@@ -848,7 +848,7 @@ def parse_proc(file,line,abstract=False):
             while True:
                 line = file.readline()
                 if not line:
-                    error("Unexpected end of file in contained procedure")
+                    error("Unexpected end of file parsing contained procedure within '{}'".format(proc_name))
                     return
                 elif fort_end_proc.match(line):
                     break                
