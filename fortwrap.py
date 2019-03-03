@@ -1946,6 +1946,8 @@ class ConfigurationFile(object):
                 ctor_def = re.compile(line.strip().split('%ctor ')[1], re.IGNORECASE)
             elif words[0] == '%dtor':
                 dtor_def = re.compile(line.strip().split('%dtor ')[1], re.IGNORECASE)
+            else:
+                error("Unrecognized declaration in interface file: {}".format(words[0]))
                 
     def bad_decl(self,line_num):
         error("{}, line {} <-- bad declaration".format(self.fname, line_num))
