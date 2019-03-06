@@ -803,6 +803,7 @@ def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
             args[name] = Argument(name,arg_list_lower.index(name.lower())+1,type,optional,intent,byval,allocatable,pointer,comment=comments)
         elif retval and name.lower()==retval.name.lower():
             retval.set_type(type)
+            retval.pointer = pointer
     return count
 
 def parse_proc(file,line,abstract=False):
@@ -888,7 +889,9 @@ def parse_proc(file,line,abstract=False):
             method = True
     if retval:
         if retval.type:
-            if retval.type.dt or retval.type.array:
+            if retval.type.dt and not retval.pointer:
+                invalid = True
+            elif retval.type.array:
                 invalid = True
             elif retval.type.type == 'CHARACTER':
                 invalid = True
@@ -1085,6 +1088,8 @@ def associate_procedures():
         for pos,arg in proc.args_by_pos.items():
             if pos>1 and arg.type.dt and not arg.type.array and arg.type.type.lower() in objects:
                 arg.native = True
+        if proc.retval and proc.retval.type.dt and proc.retval.type.type.lower() in objects:
+            proc.retval.native = True
 
     for proc in procedures:
         # Associate methods
@@ -1162,10 +1167,18 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     if (not call) and (proc.nargs == 0 or (not bind and proc.nargs==1 and proc.args_by_pos[1].type.dt)):
         return 'void'
     string = ''
+    # Derived type return values passed as first argument
+    if bind and proc.retval and proc.retval.type.dt and (not proc.retval.pointer):
+        if call:
+            string = 'data_ptr' if proc.retval.type.dt=='TYPE' else '&class_data'
+        else:
+            string = proc.retval.cpp_type() + ' ' + proc.retval.name
+        if proc.nargs > 0:
+            string += ', '
     # Pass "data_ptr" as first arg, if necessary. dt check is necessary to
     # handle orphan functions in the dummy class correctly
     if bind and call and proc.nargs>0 and proc.args_by_pos[1].type.dt:
-        string = 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'        
+        string += 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'        
         if proc.nargs==1:
             return string
         else:
@@ -1370,7 +1383,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     if proc.in_orphan_class and not bind and not call and not obj and not opts.global_orphans:
         s = s + 'static '        
     # Now write return type:
-    if proc.retval:
+    if proc.retval and not (proc.retval.type.dt and bind and not proc.retval.pointer):
         if call:
             if not proc.has_post_call_wrapper_code():
                 s = s + 'return '
@@ -1378,7 +1391,10 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                 # Save return value and return after wrapper code below
                 s = s + proc.retval.cpp_type(value=True) + ' __retval = '
         else:
-            s = s + proc.retval.cpp_type(value=True) + ' '
+            if proc.retval.native and not bind:
+                s += proc.retval.type.type + '* '
+            else:
+                s += proc.retval.cpp_type(value=True) + ' '
     elif not call:
         s = s + 'void '
     # Definition/declaration:

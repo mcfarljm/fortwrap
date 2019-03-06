@@ -28,6 +28,9 @@ CONTAINS
 
   ! Todo: idea here would be to wrap this as a factory function that
   ! returns a new Object, but internally sets up the memory automatically.
+  !
+  ! Tested and appears that with TYPE POINTER result, gfortran returns the
+  ! pointer by value...
   FUNCTION get_alias(o) RESULT(alias)
     TYPE (Object), INTENT(in), TARGET :: o
     TYPE (Object), POINTER :: alias
