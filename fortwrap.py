@@ -1447,6 +1447,7 @@ def write_constructor(file,object,fort_ctor=None):
     file.write('  data_ptr = NULL;\n')
     # Allocate storage for Fortran derived type
     file.write('  ' + mangle_name(fort_wrap_file, 'allocate_' + object.name) + '(&data_ptr); // Allocate Fortran derived type\n')
+    file.write('  owns = true;\n')
     if object.is_class:
         # Class data must be set up before calling constructor, in
         # case constructor uses CLASS argument
@@ -1478,7 +1479,7 @@ def write_destructor(file,object):
                 file.write(', NULL')
             file.write('); // Fortran Destructor\n')
     # Deallocate Fortran derived type
-    file.write('  ' + mangle_name(fort_wrap_file,'deallocate_'+object.name) + '(data_ptr); // Deallocate Fortran derived type\n')
+    file.write('  if (owns) ' + mangle_name(fort_wrap_file,'deallocate_'+object.name) + '(data_ptr); // Deallocate Fortran derived type\n')
     file.write('}\n\n')    
 
 def write_class(object):
@@ -1537,6 +1538,10 @@ def write_class(object):
         file.write('{\n\n')
         if object.abstract:
             file.write('protected:\n  // {0} can not be instantiated\n  {0}() {{}}\n\n'.format(object.cname))
+        # Special pointer constructor:
+        if not object.name==orphan_classname:
+            file.write('private:\n')
+            file.write('  ' + object.cname + '(ADDRESS p);\n\n')
         file.write('public:\n')
     # Constructor:
     fort_ctors = object.ctor_list()
@@ -1582,7 +1587,7 @@ def write_class(object):
         if object.is_class:
             file.write('  FClassContainer class_data;\n')
         file.write('\nprotected:\n')
-        file.write('  bool initialized;\n')
+        file.write('  bool initialized, owns;\n')
     if not opts.global_orphans:
         file.write('};\n\n')
     if object.name == orphan_classname:
@@ -1610,6 +1615,11 @@ def write_class(object):
     if stringh_used:
         file.write('#include <cstring> // For strcpy\n')
     file.write('#include "' + object.cname + '.h"\n\n')
+    # Write special pointer constructor (todo: make private):
+    if object.name != orphan_classname:
+        file.write('// Pointer constructor:\n')
+        file.write(object.cname + '::' + object.cname + '(ADDRESS p) {\n')
+        file.write('  data_ptr = p;\n  owns = false;\n}\n\n')
     # Constructor(s):
     if fort_ctors:
         for fort_ctor in fort_ctors:
