@@ -1162,10 +1162,11 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     # Pass "data_ptr" as first arg, if necessary. dt check is necessary to
     # handle orphan functions in the dummy class correctly
     if bind and call and proc.nargs>0 and proc.args_by_pos[1].type.dt:
+        string = 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'        
         if proc.nargs==1:
-            return 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'
+            return string
         else:
-            string = 'data_ptr, ' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data, '
+            string = string + ', '
     # Add argument names and possibly types
     for pos,arg in proc.args_by_pos.items():
         if (call or not bind) and pos == 1 and proc.args_by_pos[1].type.dt:
