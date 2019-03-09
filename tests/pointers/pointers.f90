@@ -38,4 +38,15 @@ CONTAINS
     alias => o
   END FUNCTION get_alias
 
+  ! Make sure additional wrapper code needed for post-processing string
+  ! outputs works in conjunction with function returning pointer
+  FUNCTION get_alias_with_char(o, s) RESULT(alias)
+    TYPE (Object), INTENT(in), TARGET :: o
+    CHARACTER(len=*), INTENT(out) :: s
+    TYPE (Object), POINTER :: alias
+
+    alias => o
+    s = 'string'
+  END FUNCTION get_alias_with_char
+
 END MODULE pointers
