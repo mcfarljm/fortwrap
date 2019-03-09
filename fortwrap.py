@@ -422,7 +422,6 @@ class Argument(object):
             else:
                 return string
         elif self.type.proc_pointer and self.type.type in abstract_interfaces:
-            #print "Proc pointer not implemented yet:", self.type.type
             proc = abstract_interfaces[self.type.type]
             if proc.retval:
                 string = proc.retval.cpp_type(value=True) + ' '
