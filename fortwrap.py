@@ -405,12 +405,15 @@ class Argument(object):
         # non-pointer arguments in method definitions)
         return self.intent=='in' and not self.pass_by_val() and not self.type.matrix
 
-    def cpp_type(self, value=False):
+    def cpp_type(self, value=False, native=False):
         """
         Convert a Fortran type to a C++ type.
         """
         if self.type.dt:
-            return 'ADDRESS'
+            if native:
+                return self.type.type + '*'
+            else:
+                return 'ADDRESS'
         elif self.type.valid_primitive():
             if self.cpp_const():
                 prefix = 'const '
@@ -1389,7 +1392,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                 s = s + 'return '
             else:
                 # Save return value and return after wrapper code below
-                s = s + proc.retval.cpp_type(value=True) + ' __retval = '
+                s = s + proc.retval.cpp_type(value=True,native=True) + ' __retval = '
             if proc.retval and proc.retval.pointer:
                 s += 'new ' + proc.retval.type.type + '('
         else:
