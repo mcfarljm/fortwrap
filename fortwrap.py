@@ -405,7 +405,7 @@ class Argument(object):
         # non-pointer arguments in method definitions)
         return self.intent=='in' and not self.pass_by_val() and not self.type.matrix
 
-    def cpp_type(self):
+    def cpp_type(self, value=False):
         """
         Convert a Fortran type to a C++ type.
         """
@@ -416,12 +416,16 @@ class Argument(object):
                 prefix = 'const '
             else:
                 prefix = ''
-            return prefix + cpp_type_map[self.type.type.upper()][self.type.kind]
+            string = prefix + cpp_type_map[self.type.type.upper()][self.type.kind]
+            if value:
+                return string[:-1] # Strip "*"
+            else:
+                return string
         elif self.type.proc_pointer and self.type.type in abstract_interfaces:
             #print "Proc pointer not implemented yet:", self.type.type
             proc = abstract_interfaces[self.type.type]
             if proc.retval:
-                string = cpp_type_map[proc.retval.type.type.upper()][proc.retval.type.kind][:-1] + ' '
+                string = proc.retval.cpp_type(value=True) + ' '
             else:
                 string = 'void '
             string = string + '(*' + self.name + ')'
@@ -1210,21 +1214,21 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                     if arg.intent=='in':
                         # const has to be handled separately for this case
                         string = string + 'const '
-                    string = string + matrix_classname + '<' + arg.cpp_type()[:-1] + '> *'
+                    string = string + matrix_classname + '<' + arg.cpp_type(value=True) + '> *'
                 elif arg.type.proc_pointer and bind and not call:
                     # Fortran function pointer in C prototype:
                     string = string + 'void* '
                 elif not bind and arg.native:
                     string = string + arg.type.type + '* '
                 elif not bind and arg.pass_by_val():
-                    string = string + arg.cpp_type()[:-1] + ' '
+                    string = string + arg.cpp_type(value=True) + ' '
                 elif not arg.type.dt and arg.type.vec:
                     if not bind and not opts.no_vector:
                         if arg.intent=='in':
                             # const is manually removed inside <>, so
                             # add it before the type declaration
                             string = string + 'const '
-                        string = string + 'std::vector<' + remove_const(arg.cpp_type()[:-1]) + '>* '
+                        string = string + 'std::vector<' + remove_const(arg.cpp_type(value=True)) + '>* '
                     else:
                         string = string + arg.cpp_type() + ' '
                         if not opts.array_as_ptr:
@@ -1373,9 +1377,9 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                 s = s + 'return '
             else:
                 # Save return value and return after wrapper code below
-                s = s + proc.retval.cpp_type()[:-1] + ' __retval = '
+                s = s + proc.retval.cpp_type(value=True) + ' __retval = '
         else:
-            s = s + proc.retval.cpp_type()[:-1] + ' ' # Strip off the '*'
+            s = s + proc.retval.cpp_type(value=True) + ' '
     elif not call:
         s = s + 'void '
     # Definition/declaration:
