@@ -1390,6 +1390,8 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
             else:
                 # Save return value and return after wrapper code below
                 s = s + proc.retval.cpp_type(value=True) + ' __retval = '
+            if proc.retval and proc.retval.pointer:
+                s += 'new ' + proc.retval.type.type + '('
         else:
             if proc.retval.native and not bind:
                 s += proc.retval.type.type + '* '
@@ -1416,6 +1418,8 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     else:
         s = s + method_name
     s = s + '(' + c_arg_list(proc,bind,call,obj!=None) + ')'
+    if call and proc.retval and proc.retval.pointer:
+            s += ')'
     if not obj:
         s = s + ';'
     if call:
