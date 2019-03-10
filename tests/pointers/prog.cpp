@@ -23,10 +23,16 @@ int main(void)
   if (o3->get_value() != 10)
     return 4;
 
+  Container c(1);
+  Object *o4 = c.get_object_pointer();
+  if (o4->get_value() != 1)
+    return 5;
+
 
   delete o1;
   delete o2;
   delete o3;
+  delete o4;
 
   return 0;
 }

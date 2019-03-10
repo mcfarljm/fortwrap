@@ -6,6 +6,10 @@ MODULE pointers
     INTEGER :: x
   END TYPE Object
 
+  TYPE Container
+    TYPE (Object) :: o
+  END TYPE Container
+
 CONTAINS
 
   SUBROUTINE object_ctor(o,x)
@@ -56,5 +60,19 @@ CONTAINS
     ALLOCATE( o )
     o%x = x
   END FUNCTION create_new_object
+
+  SUBROUTINE container_ctor(c, x)
+    TYPE (Container) :: c
+    INTEGER, INTENT(in) :: x
+
+    c%o%x = x
+  END SUBROUTINE container_ctor
+
+  FUNCTION get_object_pointer(c) RESULT(o)
+    TYPE (Container), TARGET :: c
+    TYPE (Object), POINTER :: o
+
+    o => c%o
+  END FUNCTION get_object_pointer
 
 END MODULE pointers
