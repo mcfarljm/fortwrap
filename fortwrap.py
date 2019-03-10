@@ -557,7 +557,7 @@ class DerivedType(object):
         self.procs = []
         self.mod = current_module
         self.comment = comment
-        self.pointer_ctor_callees = set() # Objects that methods of this type can return using pointers
+        self.pointer_return_types = set() # Objects that methods of this type can return using pointers
 
         self.is_class = False
         self.abstract = False
@@ -578,7 +578,7 @@ class DerivedType(object):
     def get_pointer_return_types(self):
         for proc in self.procs:
             if proc.retval and proc.retval.pointer and proc.retval.type.dt and proc.retval.type.type.lower() in objects and proc.retval.type.type.lower() != self.name.lower():
-                self.pointer_ctor_callees.add(proc.retval.type.type)
+                self.pointer_return_types.add(proc.retval.type.type)
 
 class TypeBoundProcedure(object):
     def __init__(self, name, proc, interface, deferred):
@@ -1557,7 +1557,7 @@ def write_class(object):
             file.write('private:\n')
             file.write('  ' + object.cname + '(ADDRESS p);\n')
             for other in objects.values():
-                if object.name in other.pointer_ctor_callees:
+                if object.name in other.pointer_return_types:
                     file.write('  friend class ' + other.name+ '; // For accessing pointer constructor\n')
             file.write('\n')
         file.write('public:\n')
