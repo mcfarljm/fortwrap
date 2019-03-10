@@ -1091,7 +1091,7 @@ def associate_procedures():
         for pos,arg in proc.args_by_pos.items():
             if pos>1 and arg.type.dt and not arg.type.array and arg.type.type.lower() in objects:
                 arg.native = True
-        if proc.retval and proc.retval.type.dt and proc.retval.type.type.lower() in objects:
+        if proc.retval and proc.retval.pointer and proc.retval.type.dt and proc.retval.type.type.lower() in objects:
             proc.retval.native = True
 
     for proc in procedures:
