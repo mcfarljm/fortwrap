@@ -1668,7 +1668,7 @@ def write_class(object):
 
     if object.has_pointer_ctor:
         file.write('void ' + object.cname + '::_disown() { owns = false; }\n')
-        file.write('void ' + object.cname + '::_acquire() { owns = true; }\n')
+        file.write('void ' + object.cname + '::_acquire() { owns = true; initialized = true; }\n')
 
     file.close()
 

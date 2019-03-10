@@ -3,7 +3,9 @@ MODULE pointers
   IMPLICIT NONE
 
   TYPE Object
-    INTEGER :: x
+    ! Better practice would be to use allocatable instead of pointer.
+    ! Pointer is used here to test ctor/dtor wrapping.
+    INTEGER, POINTER :: x
   END TYPE Object
 
   TYPE Container
@@ -15,8 +17,14 @@ CONTAINS
   SUBROUTINE object_ctor(o,x)
     TYPE(Object) :: o
     INTEGER, INTENT(in) :: x
+    ALLOCATE( o%x )
     o%x = x
   END SUBROUTINE object_ctor
+
+  SUBROUTINE object_dtor(o)
+    TYPE (Object) :: o
+    DEALLOCATE( o%x )
+  END SUBROUTINE object_dtor
 
   SUBROUTINE set_value(o,x)
     TYPE (Object) :: o
@@ -58,15 +66,21 @@ CONTAINS
     TYPE (Object), POINTER :: o
 
     ALLOCATE( o )
-    o%x = x
+    CALL object_ctor(o, x)
   END FUNCTION create_new_object
 
   SUBROUTINE container_ctor(c, x)
     TYPE (Container) :: c
     INTEGER, INTENT(in) :: x
 
-    c%o%x = x
+    CALL object_ctor(c%o, x)
   END SUBROUTINE container_ctor
+
+  SUBROUTINE container_dtor(c)
+    TYPE (Container) :: c
+
+    CALL object_dtor(c%o)
+  END SUBROUTINE container_dtor
 
   FUNCTION get_object_pointer(c) RESULT(o)
     TYPE (Container), TARGET :: c
