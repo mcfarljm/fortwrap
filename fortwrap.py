@@ -558,6 +558,7 @@ class DerivedType(object):
         self.mod = current_module
         self.comment = comment
         self.pointer_return_types = set() # Objects that methods of this type can return using pointers
+        self.has_pointer_ctor = False
 
         self.is_class = False
         self.abstract = False
@@ -1099,6 +1100,7 @@ def associate_procedures():
                 arg.native = True
         if proc.retval and proc.retval.pointer and proc.retval.type.dt and proc.retval.type.type.lower() in objects:
             proc.retval.native = True
+            objects[proc.retval.type.type.lower()].has_pointer_ctor = True
 
     for proc in procedures:
         # Associate methods
@@ -1553,7 +1555,7 @@ def write_class(object):
         if object.abstract:
             file.write('protected:\n  // {0} can not be instantiated\n  {0}() {{}}\n\n'.format(object.cname))
         # Special pointer constructor:
-        if not object.name==orphan_classname:
+        if object.has_pointer_ctor:
             file.write('private:\n')
             file.write('  ' + object.cname + '(ADDRESS p);\n')
             for other in objects.values():
@@ -1600,7 +1602,7 @@ def write_class(object):
             else:
                 file.write('  virtual ' + function_def_str(abstract_interfaces[tbp.interface], dfrd_tbp=tbp, prefix='')[:-1] + ' = 0;\n\n')
     #file.write('\nprivate:\n')
-    if object.name != orphan_classname:
+    if object.has_pointer_ctor:
         file.write('  void _disown();\n')
         file.write('  void _acquire();\n\n')
     if object.name!=orphan_classname and not object.extends:
@@ -1637,7 +1639,7 @@ def write_class(object):
         file.write('#include <cstring> // For strcpy\n')
     file.write('#include "' + object.cname + '.h"\n\n')
     # Write special pointer constructor (todo: make private):
-    if object.name != orphan_classname:
+    if object.has_pointer_ctor:
         file.write('// Pointer constructor:\n')
         file.write(object.cname + '::' + object.cname + '(ADDRESS p) {\n')
         file.write('  data_ptr = p;\n  owns = false;\n  initialized = false;\n}\n\n')
@@ -1664,7 +1666,7 @@ def write_class(object):
             file.write('  initialized = true;\n')
         file.write('}\n\n')
 
-    if object.name != orphan_classname:
+    if object.has_pointer_ctor:
         file.write('void ' + object.cname + '::_disown() { owns = false; }\n')
         file.write('void ' + object.cname + '::_acquire() { owns = true; }\n')
 
