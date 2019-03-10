@@ -18,9 +18,15 @@ int main(void)
   if (o2->get_value() != 5)
     return 3;
 
+  Object *o3 = FortFuncs::create_new_object(10);
+  o3->_acquire(); // Set ownership flag since this is a new reference
+  if (o3->get_value() != 10)
+    return 4;
+
 
   delete o1;
   delete o2;
+  delete o3;
 
   return 0;
 }

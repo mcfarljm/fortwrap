@@ -1548,7 +1548,11 @@ def write_class(object):
         # Special pointer constructor:
         if not object.name==orphan_classname:
             file.write('private:\n')
-            file.write('  ' + object.cname + '(ADDRESS p);\n\n')
+            file.write('  ' + object.cname + '(ADDRESS p);\n')
+            if orphan_classname.lower() in objects:
+                file.write('  friend class ' + orphan_classname + '; // For accessing pointer constructor\n\n')
+            else:
+                file.write('\n')
         file.write('public:\n')
     # Constructor:
     fort_ctors = object.ctor_list()
@@ -1589,6 +1593,9 @@ def write_class(object):
             else:
                 file.write('  virtual ' + function_def_str(abstract_interfaces[tbp.interface], dfrd_tbp=tbp, prefix='')[:-1] + ' = 0;\n\n')
     #file.write('\nprivate:\n')
+    if object.name != orphan_classname:
+        file.write('  void _disown();\n')
+        file.write('  void _acquire();\n\n')
     if object.name!=orphan_classname and not object.extends:
         file.write('  ADDRESS data_ptr;\n')
         if object.is_class:
@@ -1650,6 +1657,10 @@ def write_class(object):
             file.write('  initialized = true;\n')
         file.write('}\n\n')
 
+    if object.name != orphan_classname:
+        file.write('void ' + object.cname + '::_disown() { owns = false; }\n')
+        file.write('void ' + object.cname + '::_acquire() { owns = true; }\n')
+
     file.close()
 
 def get_native_includes(object):
@@ -1673,6 +1684,8 @@ def get_native_includes(object):
                     includes.add('<string>')
                 else:
                     includes.add(string_classname)
+        if proc.retval and proc.retval.type.dt and proc.retval.pointer:
+            includes.add(proc.retval.type.type)
     # For inheritance:
     if object.extends:
         includes.add(object.extends)

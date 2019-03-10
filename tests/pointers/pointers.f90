@@ -49,4 +49,12 @@ CONTAINS
     s = 'string'
   END FUNCTION get_alias_with_char
 
+  FUNCTION create_new_object(x) RESULT(o)
+    INTEGER, INTENT(in) :: x
+    TYPE (Object), POINTER :: o
+
+    ALLOCATE( o )
+    o%x = x
+  END FUNCTION create_new_object
+
 END MODULE pointers
