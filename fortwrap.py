@@ -557,6 +557,7 @@ class DerivedType(object):
         self.procs = []
         self.mod = current_module
         self.comment = comment
+        self.pointer_ctor_callees = set() # Objects that methods of this type can return using pointers
 
         self.is_class = False
         self.abstract = False
@@ -573,6 +574,11 @@ class DerivedType(object):
             if proc.ctor:
                 ctors.append(proc)
         return ctors
+
+    def get_pointer_return_types(self):
+        for proc in self.procs:
+            if proc.retval and proc.retval.pointer and proc.retval.type.dt and proc.retval.type.type.lower() in objects and proc.retval.type.type.lower() != self.name.lower():
+                self.pointer_ctor_callees.add(proc.retval.type.type)
 
 class TypeBoundProcedure(object):
     def __init__(self, name, proc, interface, deferred):
@@ -1117,7 +1123,8 @@ def associate_procedures():
             arg.in_abstract = True
         # Flag native args for abstrat interfacs, which is necessary when writing the prototypes for the virtual methods
         flag_native_args(proc)
-            
+    for obj in objects.values():
+        obj.get_pointer_return_types()
 
 def write_cpp_dox_comments(file,comments,args_by_pos=None,prefix=0):
     # /// Style
@@ -1549,10 +1556,10 @@ def write_class(object):
         if not object.name==orphan_classname:
             file.write('private:\n')
             file.write('  ' + object.cname + '(ADDRESS p);\n')
-            if orphan_classname.lower() in objects:
-                file.write('  friend class ' + orphan_classname + '; // For accessing pointer constructor\n\n')
-            else:
-                file.write('\n')
+            for other in objects.values():
+                if object.name in other.pointer_ctor_callees:
+                    file.write('  friend class ' + other.name+ '; // For accessing pointer constructor\n')
+            file.write('\n')
         file.write('public:\n')
     # Constructor:
     fort_ctors = object.ctor_list()
