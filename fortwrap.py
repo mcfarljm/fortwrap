@@ -1093,6 +1093,7 @@ def associate_procedures():
     After collecting the global objects and procedures list,
     associate procedures with objects, where applicable
     """
+    global fort_class_used
     def flag_native_args(proc):
         # Check for arguments to pass as native classes:
         for pos,arg in proc.args_by_pos.items():
@@ -1137,6 +1138,14 @@ def associate_procedures():
             arg.in_abstract = True
         # Flag native args for abstrat interfacs, which is necessary when writing the prototypes for the virtual methods
         flag_native_args(proc)
+    # Flag all derived types that are passed using CLASS:
+    for proc in procedures:
+        for arg in proc.args.values():
+            if arg.type.dt == 'CLASS':
+                typename = arg.type.type.lower()
+                if typename in objects:
+                    objects[typename].is_class = True
+                    fort_class_used = True
             
 
 def write_cpp_dox_comments(file,comments,args_by_pos=None,prefix=0):

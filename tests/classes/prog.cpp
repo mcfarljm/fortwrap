@@ -60,6 +60,10 @@ int main(void)
   if (p->poly_add(p2) != 16 + 25)
     return 31;
 
+  Object o(2);
+  if (o.get_value() != 2)
+    return 40;
+
   delete p;
   delete s;
   delete p2;

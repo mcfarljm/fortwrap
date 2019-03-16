@@ -6,6 +6,7 @@ MODULE classes
   ! TODO: make robust to case where, e.g., Polygon is not public
   PUBLIC :: Shape, Circle, Polygon, Square, Circle_ctor_sub,&
     Square_ctor_sub
+  PUBLIC :: Object, object_ctor
 
  !> Base shape type
   TYPE, ABSTRACT :: Shape
@@ -86,6 +87,13 @@ MODULE classes
   INTERFACE Square
     PROCEDURE Square_ctor
   END INTERFACE Square
+
+  !> Test plain derived type with type bound procedures
+  TYPE Object
+    INTEGER :: x
+  CONTAINS
+    PROCEDURE :: get_value => object_get_value
+  END TYPE Object
 
 CONTAINS
 
@@ -210,5 +218,18 @@ CONTAINS
     INTEGER :: a
     a = s1%get_area() + s2%get_area()
   END FUNCTION square_add
+
+  SUBROUTINE object_ctor(o, x)
+    TYPE (Object) :: o
+    INTEGER, INTENT(in) :: x
+    o%x = x
+  END SUBROUTINE object_ctor
+
+  FUNCTION object_get_value(o) RESULT(x)
+    CLASS (Object), INTENT(in) :: o
+    INTEGER :: x
+
+    x = o%x
+  END FUNCTION object_get_value
 
 END MODULE classes
