@@ -6,6 +6,7 @@ MODULE class_pointers
     INTEGER :: x
   CONTAINS
     PROCEDURE :: getx
+!!$    PROCEDURE :: get_base_alias
     PROCEDURE(gety_template), DEFERRED :: gety
   END TYPE Base
 
@@ -66,5 +67,12 @@ CONTAINS
 
     p => d
   END FUNCTION get_derived_c_alias
+
+!!$  FUNCTION get_base_alias(b) RESULT(p)
+!!$    CLASS (Base), INTENT(in), TARGET :: b
+!!$    CLASS (Base), POINTER :: p
+!!$
+!!$    p => b
+!!$  END FUNCTION get_base_alias
 
 END MODULE class_pointers

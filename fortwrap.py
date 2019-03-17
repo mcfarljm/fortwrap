@@ -1554,7 +1554,7 @@ def write_class(object):
             file.write('private:\n')
             file.write('  void _init(ADDRESS p, bool memOwn);\n\n')
         # Special pointer constructor:
-        if object.has_pointer_ctor:
+        if object.has_pointer_ctor and not object.abstract:
             file.write('private:\n')
             file.write('  ' + object.cname + '(ADDRESS p);\n')
             for other in objects.values():
@@ -1650,7 +1650,7 @@ def write_class(object):
         file.write('  class_data_ptr = &class_data;\n')
         file.write('}\n\n')
     # Write special pointer constructor:
-    if object.has_pointer_ctor:
+    if object.has_pointer_ctor and not object.abstract:
         file.write('// Pointer constructor:\n')
         file.write(object.cname + '::' + object.cname + '(ADDRESS p) {\n')
         if object.is_class:
