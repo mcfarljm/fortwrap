@@ -1460,15 +1460,20 @@ def write_constructor(file,object,fort_ctor=None):
     else:
         file.write('()')
     file.write(' {\n')
-    file.write('  data_ptr = NULL;\n')
-    # Allocate storage for Fortran derived type
-    file.write('  ' + mangle_name(fort_wrap_file, 'allocate_' + object.name) + '(&data_ptr); // Allocate Fortran derived type\n')
-    file.write('  owns = true;\n')
     if object.is_class:
-        # Class data must be set up before calling constructor, in
-        # case constructor uses CLASS argument
-        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.mod, object.name)))
-        file.write('  class_data.data = data_ptr;\n')
+        # Use local variable and pass to _init
+        pointer_name = '_data_ptr'
+        file.write('  ADDRESS ' + pointer_name + ' = NULL;\n')
+    else:
+        # Use member variable
+        pointer_name = 'data_ptr'
+        file.write('  {} = NULL;\n'.format(pointer_name))
+    # Allocate storage for Fortran derived type
+    file.write('  ' + mangle_name(fort_wrap_file, 'allocate_' + object.name) + '(&{}); // Allocate Fortran derived type\n'.format(pointer_name))
+    if object.is_class:
+        file.write('  _init(_data_ptr, true);\n')
+    else:
+        file.write('  owns = true;\n')
     # If present, call Fortran ctor
     if fort_ctor:
         file.write(function_def_str(fort_ctor,bind=True,call=True) )
@@ -1554,6 +1559,9 @@ def write_class(object):
         file.write('{\n\n')
         if object.abstract:
             file.write('protected:\n  // {0} can not be instantiated\n  {0}() {{}}\n\n'.format(object.cname))
+        if object.is_class and not object.abstract:
+            file.write('private:\n')
+            file.write('  void _init(ADDRESS p, bool memOwn);\n\n')
         # Special pointer constructor:
         if object.has_pointer_ctor:
             file.write('private:\n')
@@ -1638,7 +1646,17 @@ def write_class(object):
     if stringh_used:
         file.write('#include <cstring> // For strcpy\n')
     file.write('#include "' + object.cname + '.h"\n\n')
-    # Write special pointer constructor (todo: make private):
+    if object.is_class and not object.abstract:
+        file.write('// Initialization code to set up class pointers\n')
+        file.write('void ' + object.cname + '::' + '_init(ADDRESS p, bool memOwn) {\n')
+        file.write('  data_ptr = p;\n')
+        file.write('  owns = memOwn;\n')
+        # Class data must be set up before calling constructor, in
+        # case constructor uses CLASS argument
+        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.mod, object.name)))
+        file.write('  class_data.data = data_ptr;\n')        
+        file.write('}\n\n')
+    # Write special pointer constructor:
     if object.has_pointer_ctor:
         file.write('// Pointer constructor:\n')
         file.write(object.cname + '::' + object.cname + '(ADDRESS p) {\n')
