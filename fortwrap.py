@@ -1179,14 +1179,6 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     if (not call) and (proc.nargs == 0 or (not bind and proc.nargs==1 and proc.args_by_pos[1].type.dt)):
         return 'void'
     string = ''
-    # Derived type return values passed as first argument
-    if bind and proc.retval and proc.retval.type.dt and (not proc.retval.pointer):
-        if call:
-            string = 'data_ptr' if proc.retval.type.dt=='TYPE' else 'class_data_ptr'
-        else:
-            string = proc.retval.cpp_type() + ' ' + proc.retval.name
-        if proc.nargs > 0:
-            string += ', '
     # Pass "data_ptr" as first arg, if necessary. dt check is necessary to
     # handle orphan functions in the dummy class correctly
     if bind and call and proc.nargs>0 and proc.args_by_pos[1].type.dt:
