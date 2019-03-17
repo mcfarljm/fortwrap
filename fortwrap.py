@@ -1182,7 +1182,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     # Derived type return values passed as first argument
     if bind and proc.retval and proc.retval.type.dt and (not proc.retval.pointer):
         if call:
-            string = 'data_ptr' if proc.retval.type.dt=='TYPE' else '&class_data'
+            string = 'data_ptr' if proc.retval.type.dt=='TYPE' else 'class_data_ptr'
         else:
             string = proc.retval.cpp_type() + ' ' + proc.retval.name
         if proc.nargs > 0:
@@ -1190,7 +1190,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     # Pass "data_ptr" as first arg, if necessary. dt check is necessary to
     # handle orphan functions in the dummy class correctly
     if bind and call and proc.nargs>0 and proc.args_by_pos[1].type.dt:
-        string += 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'        
+        string += 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else 'class_data_ptr'        
         if proc.nargs==1:
             return string
         else:
@@ -1267,9 +1267,6 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # Change pass-by-value to reference for Fortran
         if call and bind and arg.pass_by_val():
             string = string + '&'
-        # Native class arguments that are not optional need & before arg name
-        if arg.type.dt=='CLASS' and call and arg.native and not (arg.optional and arg.cpp_optional):
-            string = string + '&'
         # Add argument name -------------------------
         if arg.type.proc_pointer and not bind:
             # Arg name is already part of the C function pointer definition
@@ -1304,15 +1301,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # Special native handling of certain types:
         if call and arg.native:
             if arg.optional and arg.cpp_optional:
-                if arg.type.dt == 'TYPE':
-                    string = string + ' ? ' + arg.name + '->data_ptr : NULL'
-                else:
-                    string = string + ' ? &' + arg.name + '->class_data : NULL'
+                string = string + ' ? ' + arg.name + '->{} : NULL'.format('data_ptr' if arg.type.dt == 'TYPE' else 'class_data_ptr')
             else:
-                if arg.type.dt == 'TYPE':
-                    string = string + '->data_ptr'
-                else:
-                    string = string + '->class_data'
+                string = string + '->{}'.format('data_ptr' if arg.type.dt == 'TYPE' else 'class_data_ptr')
         elif not call and not bind and not definition and arg.cpp_optional:
             string = string + '=NULL'
         if proc.has_args_past_pos(pos,bind):
@@ -1492,7 +1483,7 @@ def write_destructor(file,object):
     # Check for Fortran destructor
     for proc in object.procs:
         if proc.dtor:
-            target = 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'
+            target = 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else 'class_data_ptr'
             file.write('  ' + 'if (initialized) ' + mangle_name(proc.mod,proc.name) + '(' + target)
             # Add NULL for any optional arguments (only optional
             # arguments are allowed in the destructor call)
@@ -1617,6 +1608,7 @@ def write_class(object):
         file.write('  ADDRESS data_ptr;\n')
         if object.is_class:
             file.write('  FClassContainer class_data;\n')
+            file.write('  FClassContainer* class_data_ptr;\n')
         file.write('\nprotected:\n')
         file.write('  bool initialized, owns;\n')
     if not opts.global_orphans:
@@ -1654,7 +1646,8 @@ def write_class(object):
         # Class data must be set up before calling constructor, in
         # case constructor uses CLASS argument
         file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.mod, object.name)))
-        file.write('  class_data.data = data_ptr;\n')        
+        file.write('  class_data.data = data_ptr;\n')
+        file.write('  class_data_ptr = &class_data;\n')
         file.write('}\n\n')
     # Write special pointer constructor:
     if object.has_pointer_ctor:
