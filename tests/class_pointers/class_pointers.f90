@@ -13,6 +13,8 @@ MODULE class_pointers
     INTEGER :: y
   CONTAINS
     PROCEDURE :: gety
+    PROCEDURE :: get_t_alias => get_derived_t_alias_class
+    PROCEDURE :: get_c_alias => get_derived_c_alias
   END TYPE Derived
 
   ABSTRACT INTERFACE
@@ -50,5 +52,19 @@ CONTAINS
 
     p => d
   END FUNCTION get_derived_t_alias
+
+  FUNCTION get_derived_t_alias_class(d) RESULT(p)
+    CLASS (Derived), INTENT(in), TARGET :: d
+    TYPE (Derived), POINTER :: p
+
+    p => d
+  END FUNCTION get_derived_t_alias_class
+
+  FUNCTION get_derived_c_alias(d) RESULT(p)
+    CLASS (Derived), INTENT(in), TARGET :: d
+    CLASS (Derived), POINTER :: p
+
+    p => d
+  END FUNCTION get_derived_c_alias
 
 END MODULE class_pointers
