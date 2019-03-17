@@ -1660,7 +1660,12 @@ def write_class(object):
     if object.has_pointer_ctor:
         file.write('// Pointer constructor:\n')
         file.write(object.cname + '::' + object.cname + '(ADDRESS p) {\n')
-        file.write('  data_ptr = p;\n  owns = false;\n  initialized = false;\n}\n\n')
+        if object.is_class:
+            file.write('  _init(p, false);\n')
+        else:
+            file.write('  data_ptr = p;\n')
+            file.write('  owns = false;\n')
+        file.write('  initialized = false;\n}\n\n')
     # Constructor(s):
     if fort_ctors:
         for fort_ctor in fort_ctors:
