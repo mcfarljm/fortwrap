@@ -1325,7 +1325,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                     s = s + prefix + 'int ' + arg.name + '_len__ = 0;\n'
                     s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = static_cast<int>('+ arg.name + '->length());\n'
                 s = s + prefix + '// Declare memory to store output character data\n'
-                s = s + prefix + 'char ' + arg.name + '_c__[' + str_len_p1 + '];\n'
+                s = s + prefix + 'char *' + arg.name + '_c__ = new char[' + str_len_p1 + '];\n'
                 s = s + prefix + arg.name + '_c__[' + str_len + "] = '\\0';\n"
             elif arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='in':
                 if arg.type.str_len.assumed:
@@ -1393,7 +1393,8 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                 s = s + prefix + 'if ('+arg.name+') {\n'
                 s = s + prefix + '  // Trim trailing whitespace and assign character array to string:\n'
                 s = s + prefix + '  for (int i=' + str_len_m1 + '; ' + arg.name + "_c__[i]==' '; i--) " + arg.name + "_c__[i] = '\\0';\n"
-                s = s + prefix + '  ' + arg.name + '->assign(' + arg.name + '_c__);\n  }'
+                s = s + prefix + '  ' + arg.name + '->assign(' + arg.name + '_c__);\n  }\n'
+                s = s + prefix + 'delete[] ' + arg.name + '_c__;'
         if proc.retval and proc.has_post_call_wrapper_code():
             s = s + '\n' + prefix + 'return __retval;'
     return s
