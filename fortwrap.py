@@ -142,7 +142,7 @@ cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*',
                 'REAL':{'':'float*', '4':'float*', '8':'double*', 'C_DOUBLE':'double*', 'C_FLOAT':'float*'},
                 'LOGICAL':{'':'int*'}, 
                 'CHARACTER':{'':'char*'}, 
-                'INT':{'':'int'}}
+                'INT':{'':'fortran_charlen_t'}}
 
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
 
@@ -1348,15 +1348,15 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                     # length, even if the arg is not present (testing
                     # with gfortran indicates that in case of not
                     # present it passes 0 for the length)
-                    s = s + prefix + 'int ' + arg.name + '_len__ = 0;\n'
-                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = static_cast<int>('+ arg.name + '->length());\n'
+                    s = s + prefix + 'fortran_charlen_t ' + arg.name + '_len__ = 0;\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = static_cast<fortran_charlen_t>('+ arg.name + '->length());\n'
                 s = s + prefix + '// Declare memory to store output character data\n'
                 s = s + prefix + 'char *' + arg.name + '_c__ = new char[' + str_len_p1 + '];\n'
                 s = s + prefix + arg.name + '_c__[' + str_len + "] = '\\0';\n"
             elif arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='in':
                 if arg.type.str_len.assumed:
                     s = s + prefix + 'int ' + arg.name + '_len__ = 0;\n'
-                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name+ '_len__ = static_cast<int>(strlen('+arg.name+')); // Protect Optional args\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name+ '_len__ = static_cast<fortran_charlen_t>(strlen('+arg.name+')); // Protect Optional args\n'
                 else:
                     s = s + prefix + '// Create C array for Fortran input string data\n'
                     s = s + prefix + 'char ' + arg.name + '_c__[' + str_len_p1 + '];\n'
@@ -1671,6 +1671,13 @@ def write_misc_defs():
     f.write(HEADER_STRING + '\n')
     f.write('#ifndef ' + misc_defs_filename.upper()[:-2] + '_H_\n')
     f.write('#define ' + misc_defs_filename.upper()[:-2] + '_H_\n\n')
+
+    f.write("""#if __GNUC__ > 7
+#include <cstdlib>
+typedef std::size_t fortran_charlen_t;
+#else
+typedef int fortran_charlen_t;
+#endif\n\n""")
 
     f.write('typedef void(*generic_fpointer)(void);\n')
     f.write('typedef void* ADDRESS;\n\n')
