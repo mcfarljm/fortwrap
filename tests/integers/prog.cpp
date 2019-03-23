@@ -25,6 +25,14 @@ int main(void)
   if (FortFuncs::add_ints8(a8,b8) != (a8+b8))
     return 7;
 
+  // ISO_C_BINDING
+  if (FortFuncs::add_iso_ints(a4,b4) != a4+b4)
+    return 100;
+
+  long ail = 1000000000, bil=1100000000;
+  if (FortFuncs::add_iso_longs(ail,bil) != ail+bil)
+    return 101;
+
   return 0;
 }
 
