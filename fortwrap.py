@@ -892,6 +892,8 @@ def parse_proc(file,line,abstract=False):
                 invalid = True
             elif retval.type.type == 'CHARACTER':
                 invalid = True
+            elif not retval.type.valid_primitive():
+                invalid = True
         else:
             error("Untyped return value in {}: {}".format(proc_name,retval.name))
             invalid = True
