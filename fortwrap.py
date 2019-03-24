@@ -177,13 +177,6 @@ iso_c_type_map = {'INTEGER':
                 'INT':
                   {'':'fortran_charlen_t'}}
 
-def get_iso_c_type(type, kind):
-    if kind.upper().startswith('C_'):
-        c_kind = kind
-    else:
-        c_kind = iso_c_type_map[type][kind]
-    return '{}({})'.format(type, c_kind)
-
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
 
 current_module = ''
@@ -473,6 +466,13 @@ class Argument(object):
             return string
         else:
             raise FWTypeException(self.type.type)
+
+    def get_iso_c_type(self):
+        if self.type.kind.upper().startswith('C_'):
+            c_kind = self.type.kind
+        else:
+            c_kind = iso_c_type_map[self.type.type][self.type.kind]
+        return '{}({})'.format(self.type.type, c_kind)
 
 
 class Procedure(object):
@@ -1894,8 +1894,8 @@ def write_fortran_iso_wrapper():
             if proc.retval:
                 f.write('  FUNCTION ' + proc_wrap_name + '(' + proc.fort_arg_list() + ') BIND(C)\n')
                 for p,arg in proc.args_by_pos.items():
-                    f.write('    ' + get_iso_c_type(arg.type.type, arg.type.kind) + ' :: ' + arg.name + '\n')
-                f.write('    {} :: '.format(get_iso_c_type(proc.retval.type.type, proc.retval.type.kind)) + proc_wrap_name + '\n')
+                    f.write('    ' + arg.get_iso_c_type() + ' :: ' + arg.name + '\n')
+                f.write('    {} :: '.format(proc.retval.get_iso_c_type()) + proc_wrap_name + '\n')
                 f.write('    ' + proc_wrap_name + ' = ')
                 f.write(proc.name + '(' + proc.fort_arg_list() + ')\n')
                 f.write('  END FUNCTION ' + proc_wrap_name + '\n\n')
