@@ -1349,9 +1349,6 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # Change pass-by-value to reference for Fortran
         if call and bind and arg.pass_by_val():
             string = string + '&'
-        # Native class arguments that are not optional need & before arg name
-        if arg.type.dt=='CLASS' and call and arg.native and not (arg.optional and arg.cpp_optional):
-            string = string + '&'
         # Add argument name -------------------------
         if arg.type.proc_pointer and not call:
             # Arg name is already part of the C function pointer definition
