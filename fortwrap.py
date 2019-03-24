@@ -1906,18 +1906,22 @@ def write_fortran_iso_wrapper():
 
         for proc in procedures:
             proc_wrap_name = c_binding_name(proc.module, proc.name)
+            proc_type = 'FUNCTION' if proc.retval else 'SUBROUTINE'
+            f.write('  {} '.format(proc_type) + proc_wrap_name + '(' + proc.fort_arg_list(False) + ') BIND(C)\n')
+            for p,arg in proc.args_by_pos.items():
+                f.write('    ' + arg.get_iso_c_type() + ' :: ' + arg.name + '\n')
             if proc.retval:
-                f.write('  FUNCTION ' + proc_wrap_name + '(' + proc.fort_arg_list(False) + ') BIND(C)\n')
-                for p,arg in proc.args_by_pos.items():
-                    f.write('    ' + arg.get_iso_c_type() + ' :: ' + arg.name + '\n')
                 f.write('    {} :: '.format(proc.retval.get_iso_c_type()) + proc_wrap_name + '\n')
-                for p,arg in proc.args_by_pos.items():
-                    f.write(arg.get_iso_c_type_local_decs())
-                for p,arg in proc.args_by_pos.items():
-                    f.write(arg.get_iso_c_setup_code())
+            for p,arg in proc.args_by_pos.items():
+                f.write(arg.get_iso_c_type_local_decs())
+            for p,arg in proc.args_by_pos.items():
+                f.write(arg.get_iso_c_setup_code())
+            if proc.retval:
                 f.write('    ' + proc_wrap_name + ' = ')
-                f.write(proc.name + '(' + proc.fort_arg_list(True) + ')\n')
-                f.write('  END FUNCTION ' + proc_wrap_name + '\n\n')
+            else:
+                f.write('    CALL ')
+            f.write(proc.name + '(' + proc.fort_arg_list(True) + ')\n')
+            f.write('  END {} '.format(proc_type) + proc_wrap_name + '\n\n')
         
         f.write('END MODULE ' + 'FortranISOWrappers' + '\n')
     

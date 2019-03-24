@@ -13,12 +13,12 @@ int main(void)
   if (FortFuncs::array_in(&v)  != 10)
     return 1;
 
-  // std::vector<int> v2(10);
-  // FortFuncs::array_out(&v,&v2);
-  // if (static_cast<size_t>(count(v.begin(), v.end(), 20)) != v.size())
-  //   return 2;
-  // else if (static_cast<size_t>(count(v2.begin(), v2.end(), 30)) != v2.size())
-  //   return 3;
+  std::vector<int> v2(10);
+  FortFuncs::array_out(&v,&v2);
+  if (static_cast<size_t>(count(v.begin(), v.end(), 20)) != v.size())
+    return 2;
+  else if (static_cast<size_t>(count(v2.begin(), v2.end(), 30)) != v2.size())
+    return 3;
   
 
   std::vector<int> a(3), b(3);
