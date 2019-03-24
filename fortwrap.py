@@ -478,12 +478,24 @@ class Argument(object):
 
     def get_iso_c_type_local_decs(self):
         if self.type.array:
-            return '    ' + self.get_iso_c_type(True) + ', POINTER :: {}__p(:)\n'.format(self.name)
+            if self.type.array.d == 1:
+                shape = '(:)'
+            elif self.type.array.d == 2:
+                shape = '(:,:)'
+            else:
+                shape = '' # Shouldn't get here
+            return '    ' + self.get_iso_c_type(True) + ', POINTER :: {}__p{}\n'.format(self.name, shape)
         return ''
 
     def get_iso_c_setup_code(self):
         if self.type.array:
-            return '    CALL C_F_POINTER({0}, {0}__p, [{1}])\n'.format(self.name, self.type.array.size_var)
+            if self.type.array.d == 1:
+                shape = '{}'.format(self.type.array.size_var)
+            elif self.type.array.d == 2:
+                shape = '{},{}'.format(*self.type.array.size_var)
+            else:
+                shape = '' # Shouldn't get here            
+            return '    CALL C_F_POINTER({0}, {0}__p, [{1}])\n'.format(self.name, shape)
         return ''
 
 

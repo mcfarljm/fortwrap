@@ -15,18 +15,19 @@ CONTAINS
     END DO
   END FUNCTION one_norm
 
-  ! Test assumed size 
-  FUNCTION one_norm_2(m,A) RESULT(one_norm)
-    INTEGER, INTENT(in) :: m, A(m,*)
-    INTEGER :: one_norm
-    INTEGER :: icol, colsum, n
-    n = 2
-    one_norm = -HUGE(one_norm)
-    DO icol = 1,n
-      colsum = SUM(A(:,icol))
-      IF (colsum > one_norm) one_norm = colsum
-    END DO
-  END FUNCTION one_norm_2
+  ! Test assumed size
+  ! Todo: flag as invalid (probably impractical to wrap with ISO_C_BINDING)
+!!$  FUNCTION one_norm_2(m,A) RESULT(one_norm)
+!!$    INTEGER, INTENT(in) :: m, A(m,*)
+!!$    INTEGER :: one_norm
+!!$    INTEGER :: icol, colsum, n
+!!$    n = 2
+!!$    one_norm = -HUGE(one_norm)
+!!$    DO icol = 1,n
+!!$      colsum = SUM(A(:,icol))
+!!$      IF (colsum > one_norm) one_norm = colsum
+!!$    END DO
+!!$  END FUNCTION one_norm_2
 
   SUBROUTINE multiply(m,n,A,b,Ab)
     INTEGER, INTENT(in) :: m,n, b(n)
