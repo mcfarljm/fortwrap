@@ -138,18 +138,34 @@ name_inclusions = set()
 proc_arg_exclusions = set()
 
 # 'INT' is for the hidden name length argument
-cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*','8':'long long*','C_INT':'int*', 'C_LONG':'long*'}, 
-                'REAL':{'':'float*', '4':'float*', '8':'double*', 'C_DOUBLE':'double*', 'C_FLOAT':'float*'},
-                'LOGICAL':{'':'int*', 'C_BOOL':'int*'}, 
-                'CHARACTER':{'':'char*'}, 
-                'INT':{'':'fortran_charlen_t'}}
+cpp_type_map = {'INTEGER':
+                {'':'int*',
+                 '1':'signed char*',
+                 '2':'short*',
+                 '4':'int*',
+                 '8':'long long*',
+                 'C_INT':'int*',
+                 'C_LONG':'long*'}, 
+                'REAL':
+                {'':'float*',
+                 '4':'float*',
+                 '8':'double*',
+                 'C_DOUBLE':'double*',
+                 'C_FLOAT':'float*'},
+                'LOGICAL':
+                {'':'int*',
+                 'C_BOOL':'int*'}, 
+                'CHARACTER':
+                {'':'char*'}, 
+                'INT':
+                {'':'fortran_charlen_t'}}
 
 iso_c_type_map = {'INTEGER':
-                  {'':'int*',
-                   '1':'signed char*',
-                   '2':'short*',
-                   '4':'int*',
-                   '8':'long long*'},
+                  {'':'C_INT',
+                   '1':'C_SIGNED_CHAR',
+                   '2':'C_SHORT',
+                   '4':'C_INT',
+                   '8':'C_LONG_LONG'},
                   'REAL':
                   {'':'float*',
                    '4':'float*',
@@ -570,7 +586,12 @@ class Procedure(object):
             if arg.pos > 1 and not arg.optional:
                 return False
         return True
-        
+
+    def fort_arg_list(self):
+        s = ''
+        for p,arg in self.args_by_pos.items():
+            s += arg.name + (', ' if self.has_args_past_pos(p, True) else '')
+        return s
         
 class DerivedType(object):
     def __init__(self,name,comment=None):
@@ -1871,10 +1892,12 @@ def write_fortran_iso_wrapper():
         for proc in procedures:
             proc_wrap_name = c_binding_name(proc.module, proc.name)
             if proc.retval:
-                f.write('  FUNCTION ' + proc_wrap_name + '() BIND(C)\n')
+                f.write('  FUNCTION ' + proc_wrap_name + '(' + proc.fort_arg_list() + ') BIND(C)\n')
+                for p,arg in proc.args_by_pos.items():
+                    f.write('    ' + get_iso_c_type(arg.type.type, arg.type.kind) + ' :: ' + arg.name + '\n')
                 f.write('    {} :: '.format(get_iso_c_type(proc.retval.type.type, proc.retval.type.kind)) + proc_wrap_name + '\n')
                 f.write('    ' + proc_wrap_name + ' = ')
-                f.write(proc.name + '()\n')
+                f.write(proc.name + '(' + proc.fort_arg_list() + ')\n')
                 f.write('  END FUNCTION ' + proc_wrap_name + '\n\n')
         
         f.write('END MODULE ' + 'FortranISOWrappers' + '\n')
