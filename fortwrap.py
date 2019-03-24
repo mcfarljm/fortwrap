@@ -474,7 +474,10 @@ class Argument(object):
             c_kind = self.type.kind
         else:
             c_kind = iso_c_type_map[self.type.type][self.type.kind]
-        return '{}({})'.format(self.type.type, c_kind)
+        string = '{}({})'.format(self.type.type, c_kind)
+        if self.optional:
+            string += ', OPTIONAL'
+        return string
 
     def get_iso_c_type_local_decs(self):
         if self.type.dt:
