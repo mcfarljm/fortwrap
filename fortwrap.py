@@ -226,9 +226,10 @@ class Array(object):
             self.assumed_shape = True
         if self.d == 1:
             self.size_var = spec.strip()
-        elif self.d == 2 and not opts.no_fmat:
-            matrix_used = True
+        else:
             self.size_var = tuple([v.strip() for v in spec.split(',')])
+        if self.d == 2 and not opts.no_fmat:
+            matrix_used = True
 
         if self.d==2 and opts.no_fmat:
             if not Array.two_d_warning_written:
@@ -495,12 +496,7 @@ class Argument(object):
         elif self.type.type == 'CHARACTER':
             return '    CHARACTER({1}), POINTER :: {0}__p\n'.format(self.name, self.type.str_len.as_string(self.name))
         elif self.type.array:
-            if self.type.array.d == 1:
-                shape = '(:)'
-            elif self.type.array.d == 2:
-                shape = '(:,:)'
-            else:
-                shape = '' # Shouldn't get here
+            shape = '(' + ','.join(':' for i in range(self.type.array.d)) + ')'
             return '    ' + self.get_iso_c_type(True) + ', POINTER :: {}__p{}\n'.format(self.name, shape)
         return ''
 
@@ -512,10 +508,8 @@ class Argument(object):
         elif self.type.array:
             if self.type.array.d == 1:
                 shape = '{}'.format(self.type.array.size_var)
-            elif self.type.array.d == 2:
-                shape = '{},{}'.format(*self.type.array.size_var)
             else:
-                shape = '' # Shouldn't get here            
+                shape = ','.join(d for d in self.type.array.size_var)
             return '    CALL C_F_POINTER({0}, {0}__p, [{1}])\n'.format(self.name, shape)
         return ''
 
