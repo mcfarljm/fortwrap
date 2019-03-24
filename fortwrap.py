@@ -485,7 +485,10 @@ class Argument(object):
 
     def get_iso_c_type_local_decs(self):
         if self.type.dt:
-            return '    TYPE(' + self.type.type + '), POINTER :: {}__p\n'.format(self.name)
+            typename = self.type.type
+            if objects[self.type.type.lower()].is_class:
+                typename += '_container_'
+            return '    TYPE(' + typename + '), POINTER :: {}__p\n'.format(self.name)
         elif self.type.proc_pointer:
             return '    PROCEDURE({}), POINTER :: {}__p\n'.format(self.type.type, self.name)
         elif self.type.type == 'CHARACTER':
@@ -636,6 +639,8 @@ class Procedure(object):
             name = arg.name
             if call and (arg.type.array or arg.type.dt or arg.type.type=='CHARACTER' or arg.type.proc_pointer):
                 name += '__p'
+                if arg.type.dt and objects[arg.type.type.lower()].is_class:
+                    name += '%c'
             s += name + (', ' if self.has_args_past_pos(p, not call) else '')
         return s
 
@@ -1273,7 +1278,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     # Pass "data_ptr" as first arg, if necessary. dt check is necessary to
     # handle orphan functions in the dummy class correctly
     if bind and call and proc.nargs>0 and proc.args_by_pos[1].type.dt:
-        string = 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'        
+        string = 'data_ptr'        
         if proc.nargs==1:
             return string
         else:
@@ -1378,15 +1383,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # Special native handling of certain types:
         if call and arg.native:
             if arg.optional and arg.cpp_optional:
-                if arg.type.dt == 'TYPE':
-                    string = string + ' ? ' + arg.name + '->data_ptr : NULL'
-                else:
-                    string = string + ' ? &' + arg.name + '->class_data : NULL'
+                string = string + ' ? ' + arg.name + '->data_ptr : NULL'
             else:
-                if arg.type.dt == 'TYPE':
-                    string = string + '->data_ptr'
-                else:
-                    string = string + '->class_data'
+                string = string + '->data_ptr'
         elif not call and not bind and not definition and arg.cpp_optional:
             string = string + '=NULL'
         if proc.has_args_past_pos(pos,bind):
@@ -1517,11 +1516,6 @@ def write_constructor(file,object,fort_ctor=None):
     file.write('  data_ptr = NULL;\n')
     # Allocate storage for Fortran derived type
     file.write('  ' + object_allocator_binding_name(object.name) + '(&data_ptr); // Allocate Fortran derived type\n')
-    if object.is_class:
-        # Class data must be set up before calling constructor, in
-        # case constructor uses CLASS argument
-        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.module, object.name)))
-        file.write('  class_data.data = data_ptr;\n')
     # If present, call Fortran ctor
     if fort_ctor:
         file.write(function_def_str(fort_ctor,bind=True,call=True) )
@@ -1540,7 +1534,7 @@ def write_destructor(file,object):
     # Check for Fortran destructor
     for proc in object.procs:
         if proc.dtor:
-            target = 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'
+            target = 'data_ptr'
             file.write('  ' + 'if (initialized) ' + proc.c_binding_name() + '(' + target)
             # Add NULL for any optional arguments (only optional
             # arguments are allowed in the destructor call)
@@ -1649,8 +1643,6 @@ def write_class(object):
     #file.write('\nprivate:\n')
     if object.name!=orphan_classname and not object.extends:
         file.write('  ADDRESS data_ptr;\n')
-        if object.is_class:
-            file.write('  FClassContainer class_data;\n')
         file.write('\nprotected:\n')
         file.write('  bool initialized;\n')
     if not opts.global_orphans:
@@ -1757,8 +1749,6 @@ typedef int fortran_charlen_t;
 
     f.write('typedef void(*generic_fpointer)(void);\n')
     f.write('typedef void* ADDRESS;\n\n')
-    if fort_class_used:
-        f.write('struct FClassContainer {\n  ADDRESS data;\n  ADDRESS vptr;\n};\n\n')
     f.write('extern "C" {\n')
     f.write('}\n')
     f.write('\n#endif /* ' + misc_defs_filename.upper()[:-2] + '_H_ */\n')
@@ -1900,6 +1890,14 @@ def write_fortran_iso_wrapper():
         for m in module_list:
             f.write('  USE ' + m + '\n')
         f.write('  IMPLICIT NONE\n\n')
+
+        # Container types for classes
+        for obj in objects.values():
+            if obj.is_class:
+                f.write('  TYPE {}_container_\n'.format(obj.name))
+                f.write('    CLASS ({}), ALLOCATABLE :: c\n'.format(obj.name))
+                f.write('  END TYPE {}_container_\n\n'.format(obj.name))
+        
         f.write('CONTAINS\n\n')
 
         alloc_comment_written = False
@@ -1916,8 +1914,13 @@ def write_fortran_iso_wrapper():
             # Write allocate function
             f.write('  SUBROUTINE ' + object_allocator_binding_name(obj.name) + '(' + cptr + ') BIND(C)\n')
             f.write('    TYPE (C_PTR) :: ' + cptr + '\n\n')
-            f.write('    TYPE (' + obj.name + '), POINTER :: ' + fptr + '\n\n')
+            obj_name = obj.name
+            if obj.is_class:
+                obj_name += '_container_'
+            f.write('    TYPE (' + obj_name + '), POINTER :: ' + fptr + '\n\n')
             f.write('    ALLOCATE( ' + fptr + ' )\n')
+            if obj.is_class:
+                f.write('    ALLOCATE( ' + fptr + '%c )\n')
             f.write('    ' + cptr + ' = C_LOC(' + fptr + ')\n')
             f.write('  END SUBROUTINE ' + object_allocator_binding_name(obj.name) + '\n\n')
             # Write deallocate function
@@ -1945,7 +1948,17 @@ def write_fortran_iso_wrapper():
                 f.write('    ' + proc_wrap_name + ' = ')
             else:
                 f.write('    CALL ')
-            f.write(proc.name + '(' + proc.fort_arg_list(True) + ')\n')
+            arg_list = proc.fort_arg_list(True)
+            try:
+                tbp = objects[proc.args_by_pos[1].type.type.lower()].tbps[proc.name.lower()].name
+            except:
+                tbp = None
+            if tbp:
+                arg1 = arg_list.split(',')[0]
+                args = ','.join(arg_list.split(',')[1:])
+                f.write('{}%{}({})\n'.format(arg1, tbp, args))
+            else:
+                f.write(proc.name + '(' + arg_list + ')\n')
             f.write('  END {} {}\n\n'.format(proc_type, proc_wrap_name))
         
         f.write('END MODULE ' + 'FortranISOWrappers' + '\n')
