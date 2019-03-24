@@ -11,6 +11,8 @@ import os
 import glob
 import subprocess
 
+active_tests = ['logicals']
+
 OPTS = '-g --clean -d wrap'     # FortWrap options
 
 # Add the executable to the command.  This way the tests are run with
@@ -27,7 +29,8 @@ excludes = [ 'comments' ]
 
 tests_dir = os.path.abspath('tests')
 os.chdir('tests')
-tests = glob.glob('*')
+#tests = glob.glob('*')
+tests = active_tests
 
 num_err = 0
 
