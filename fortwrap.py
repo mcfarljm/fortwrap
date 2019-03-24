@@ -42,9 +42,6 @@ VERSION = '2.2.2'
 
 # SETTINGS ==========================================
 
-# Default Fortran compiler.  Can be overridden by command option
-compiler = 'gfortran'
-
 ERROR_FILE_NAME = 'FortWrap-error.txt'
 
 code_output_dir = '.'
@@ -1764,15 +1761,6 @@ typedef int fortran_charlen_t;
     if fort_class_used:
         f.write('struct FClassContainer {\n  ADDRESS data;\n  ADDRESS vptr;\n};\n\n')
     f.write('extern "C" {\n')
-    if compiler == 'g95':
-        f.write('  /* g95_runtime_start and stop are supposed to be called\n')
-        f.write('     to start and stop the g95 runtime engine, but I have not\n')
-        f.write('     had any problems when leaving them out.  The only thing\n')
-        f.write('     I have noticed is that a bunch of "still reachable" memory\n')
-        f.write('     reported by valgrind goes away when a g95_runtime_stop call\n')
-        f.write('     is used */\n')
-        f.write('  void g95_runtime_start(int narg, char* args[]);\n')
-        f.write('  void g95_runtime_stop(void);\n\n')
     f.write('}\n')
     f.write('\n#endif /* ' + misc_defs_filename.upper()[:-2] + '_H_ */\n')
     f.close()
@@ -2089,7 +2077,6 @@ class Options(object):
         parser.add_argument('-v','--version', action='version', version='%(prog)s '+VERSION)
         parser.add_argument('files', nargs='*', help='files to process')
         parser.add_argument('-n', '--dry-run', action='store_true', help='run parser but do not generate any wrapper code (dry run)')
-        parser.add_argument('-c', '--compiler', default=compiler, choices=['gfortran','g95'], help='use name mangling for Fortran compiler COMPILER.  Only supports g95 and gfortran (Default=%(default)s)')
         parser.add_argument('-g','--glob', action='store_true', help='wrap source files found in current directory')
         parser.add_argument('-d','--directory', default='.', help='output generated wrapper code to DIRECTORY')
         parser.add_argument('--file-list', help='Read list of Fortran source files to parser from file FILE_LIST.  The format is a newline-separated list of filenames with full or relative paths.')
@@ -2134,10 +2121,9 @@ class Options(object):
 
     def assign_globals(self):
         """Assign certain options to global variables"""
-        global code_output_dir, include_output_dir, fort_output_dir, string_object_type, constants_classname, compiler, orphan_classname, file_list
+        global code_output_dir, include_output_dir, fort_output_dir, string_object_type, constants_classname, orphan_classname, file_list
 
         file_list = self.files
-        compiler = self.compiler
         orphan_classname = self.dummy_class
 
         if self.directory != '.':
