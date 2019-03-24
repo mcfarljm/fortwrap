@@ -467,12 +467,24 @@ class Argument(object):
         else:
             raise FWTypeException(self.type.type)
 
-    def get_iso_c_type(self):
+    def get_iso_c_type(self, ignore_array=False):
+        if self.type.array and (not ignore_array):
+            return 'TYPE(C_PTR), VALUE'
         if self.type.kind.upper().startswith('C_'):
             c_kind = self.type.kind
         else:
             c_kind = iso_c_type_map[self.type.type][self.type.kind]
         return '{}({})'.format(self.type.type, c_kind)
+
+    def get_iso_c_type_local_decs(self):
+        if self.type.array:
+            return '    ' + self.get_iso_c_type(True) + ', POINTER :: {}__p(:)\n'.format(self.name)
+        return ''
+
+    def get_iso_c_setup_code(self):
+        if self.type.array:
+            return '    CALL C_F_POINTER({0}, {0}__p, [{1}])\n'.format(self.name, self.type.array.size_var)
+        return ''
 
 
 class Procedure(object):
@@ -587,10 +599,13 @@ class Procedure(object):
                 return False
         return True
 
-    def fort_arg_list(self):
+    def fort_arg_list(self, call):
         s = ''
         for p,arg in self.args_by_pos.items():
-            s += arg.name + (', ' if self.has_args_past_pos(p, True) else '')
+            name = arg.name
+            if call and arg.type.array:
+                name += '__p'
+            s += name + (', ' if self.has_args_past_pos(p, True) else '')
         return s
         
 class DerivedType(object):
@@ -1892,12 +1907,16 @@ def write_fortran_iso_wrapper():
         for proc in procedures:
             proc_wrap_name = c_binding_name(proc.module, proc.name)
             if proc.retval:
-                f.write('  FUNCTION ' + proc_wrap_name + '(' + proc.fort_arg_list() + ') BIND(C)\n')
+                f.write('  FUNCTION ' + proc_wrap_name + '(' + proc.fort_arg_list(False) + ') BIND(C)\n')
                 for p,arg in proc.args_by_pos.items():
                     f.write('    ' + arg.get_iso_c_type() + ' :: ' + arg.name + '\n')
                 f.write('    {} :: '.format(proc.retval.get_iso_c_type()) + proc_wrap_name + '\n')
+                for p,arg in proc.args_by_pos.items():
+                    f.write(arg.get_iso_c_type_local_decs())
+                for p,arg in proc.args_by_pos.items():
+                    f.write(arg.get_iso_c_setup_code())
                 f.write('    ' + proc_wrap_name + ' = ')
-                f.write(proc.name + '(' + proc.fort_arg_list() + ')\n')
+                f.write(proc.name + '(' + proc.fort_arg_list(True) + ')\n')
                 f.write('  END FUNCTION ' + proc_wrap_name + '\n\n')
         
         f.write('END MODULE ' + 'FortranISOWrappers' + '\n')
