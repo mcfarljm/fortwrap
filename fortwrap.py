@@ -144,6 +144,30 @@ cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*',
                 'CHARACTER':{'':'char*'}, 
                 'INT':{'':'fortran_charlen_t'}}
 
+iso_c_type_map = {'INTEGER':
+                  {'':'int*',
+                   '1':'signed char*',
+                   '2':'short*',
+                   '4':'int*',
+                   '8':'long long*'},
+                  'REAL':
+                  {'':'float*',
+                   '4':'float*',
+                   '8':'double*'},
+                  'LOGICAL':
+                  {'':'C_BOOL'},
+                'CHARACTER':
+                  {'':'char*'}, 
+                'INT':
+                  {'':'fortran_charlen_t'}}
+
+def get_iso_c_type(type, kind):
+    if kind.upper().startswith('C_'):
+        c_kind = kind
+    else:
+        c_kind = iso_c_type_map[type][kind]
+    return '{}({})'.format(type, c_kind)
+
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
 
 current_module = ''
@@ -1848,7 +1872,7 @@ def write_fortran_iso_wrapper():
             proc_wrap_name = c_binding_name(proc.module, proc.name)
             if proc.retval:
                 f.write('  FUNCTION ' + proc_wrap_name + '() BIND(C)\n')
-                f.write('    LOGICAL(C_BOOL) :: ' + proc_wrap_name + '\n')
+                f.write('    {} :: '.format(get_iso_c_type(proc.retval.type.type, proc.retval.type.kind)) + proc_wrap_name + '\n')
                 f.write('    ' + proc_wrap_name + ' = ')
                 f.write(proc.name + '()\n')
                 f.write('  END FUNCTION ' + proc_wrap_name + '\n\n')
