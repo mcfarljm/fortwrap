@@ -53,8 +53,6 @@ fort_output_dir = '.'
 
 HEADER_STRING = '/* This source file automatically generated on ' + str(date.today()) + ' using \n   FortWrap wrapper generator version ' + VERSION + ' */\n'
 
-func_pointer_converter = 'convert_c_funcpointer'
-
 misc_defs_filename = 'InterfaceDefs.h'
 matrix_classname = 'FortranMatrix'
 string_classname = 'FortranString'
@@ -194,8 +192,6 @@ enumerations = []
 PRIVATE=1
 PUBLIC=0
 
-# Indicate whether or not we will need procedure pointer wrapper code
-proc_pointer_used = False
 # Whether or not matrices are used
 matrix_used = False
 stringh_used = False            # Whether "string.h" is used (needed for strcpy)
@@ -271,7 +267,7 @@ class CharacterLength(object):
 class DataType(object):
     complex_warning_written = False
     def __init__(self,type,array=None,str_len=None,hidden=False):
-        global proc_pointer_used, stringh_used
+        global stringh_used
         self.type = type
         self.kind = ''
         self.array = array
@@ -320,7 +316,6 @@ class DataType(object):
                 self.type = m.group('proc_spec')
                 if 'POINTER' in type.upper():
                     self.proc_pointer = True
-                    proc_pointer_used = True
                 else:
                     self.proc = True
             else:
@@ -1768,8 +1763,6 @@ typedef int fortran_charlen_t;
         f.write('     is used */\n')
         f.write('  void g95_runtime_start(int narg, char* args[]);\n')
         f.write('  void g95_runtime_stop(void);\n\n')
-    if proc_pointer_used:
-        f.write('  void ' + mangle_name(fort_wrap_file,func_pointer_converter) + '(generic_fpointer c_pointer, void* fortran_pointer);\n')
     f.write('}\n')
     f.write('\n#endif /* ' + misc_defs_filename.upper()[:-2] + '_H_ */\n')
     f.close()
@@ -1944,7 +1937,7 @@ def write_fortran_wrapper():
     for obj in objects.values():
         if obj.name != orphan_classname:
             count += 1
-    if count == 0 and not proc_pointer_used:
+    if count == 0:
         return
     # Build list of modules we need to USE
     use_mods = set()
@@ -1958,13 +1951,6 @@ def write_fortran_wrapper():
     for mod in use_mods:
         f.write('USE ' + mod + '\n')
     f.write('USE ISO_C_BINDING\n\nCONTAINS\n\n')
-    if proc_pointer_used:
-        f.write('  SUBROUTINE '+func_pointer_converter+'(cpointer,fpointer)\n')
-        f.write('    USE ISO_C_BINDING\n')
-        f.write('    TYPE(C_FUNPTR), VALUE :: cpointer\n')
-        f.write('    PROCEDURE(), POINTER :: fpointer\n')
-        f.write('    CALL C_F_PROCPOINTER(cpointer,fpointer)\n')
-        f.write('  END SUBROUTINE '+func_pointer_converter+'\n\n')
     for obj in objects.values():
         if obj.name == orphan_classname or obj.abstract:
             continue
