@@ -1,3 +1,5 @@
+! Wrapping this code is not currently supported
+
 SUBROUTINE int_sub(x,y)
   INTEGER, INTENT(in) :: x
   INTEGER, INTENT(out) :: y

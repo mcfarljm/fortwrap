@@ -629,7 +629,8 @@ class Procedure(object):
         return s
 
     def c_binding_name(self):
-        return '{}__{}_wrap'.format(self.module, self.name).lower()
+        module = self.module or 'global_'
+        return '{}__{}_wrap'.format(module, self.name).lower()
         
 class DerivedType(object):
     def __init__(self,name,comment=None):
@@ -981,6 +982,11 @@ def parse_proc(file,line,abstract=False):
         else:
             error("Untyped return value in {}: {}".format(proc_name,retval.name))
             invalid = True
+    if not current_module:
+        # Don't wrap procedures not in a module.  The problem is that
+        # the ISO_C_BINDING wrapper code needs an interface definition
+        # in order to call the original procedure.
+        invalid = True
     if invalid:
         not_wrapped.append(proc_name)
     else:

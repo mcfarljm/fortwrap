@@ -27,6 +27,8 @@ custom_opts = { 'c_arrays' : OPTS + ' --no-vector',
 # Tests for demonstration purposes only:
 excludes = [ 'comments' ]
 
+excludes.append('no_module')
+
 tests_dir = os.path.abspath('tests')
 os.chdir('tests')
 #tests = glob.glob('*')
