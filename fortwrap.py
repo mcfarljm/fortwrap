@@ -486,8 +486,9 @@ class Argument(object):
     def get_iso_c_type_local_decs(self):
         if self.type.dt:
             typename = self.type.type
-            if objects[self.type.type.lower()].is_class:
-                typename += '_container_'
+            obj = objects[self.type.type.lower()]
+            if obj.is_class:
+                typename = get_base_class(obj).name + '_container_'
             return '    TYPE(' + typename + '), POINTER :: {}__p\n'.format(self.name)
         elif self.type.proc_pointer:
             return '    PROCEDURE({}), POINTER :: {}__p\n'.format(self.type.type, self.name)
@@ -640,13 +641,29 @@ class Procedure(object):
             if call and (arg.type.array or arg.type.dt or arg.type.type=='CHARACTER' or arg.type.proc_pointer):
                 name += '__p'
                 if arg.type.dt and objects[arg.type.type.lower()].is_class:
-                    name += '%c'
+                    if objects[arg.type.type.lower()].extends:
+                        name += 'p'
+                    else:
+                        name += '%c'
             s += name + (', ' if self.has_args_past_pos(p, not call) else '')
         return s
 
     def c_binding_name(self):
         module = self.module or 'global_'
         return '{}__{}_wrap'.format(module, self.name).lower()
+
+    def get_iso_c_select_type_code(self, indent=2):
+        string = ''
+        count = 0
+        for p,arg in self.args_by_pos.items():
+            if arg.type.dt:
+                obj = objects[arg.type.type.lower()]
+                if obj.is_class and obj.extends:
+                    string += (count+2)*indent*' ' + 'SELECT TYPE ({1} => {0})\n'.format(arg.name + '__p%c', arg.name + '__pp')
+                    string += (count+2)*indent*' ' + 'CLASS IS ({})\n'.format(arg.type.type)
+                    count += 1
+        return string, count
+                
         
 class DerivedType(object):
     def __init__(self,name,comment=None):
@@ -699,6 +716,12 @@ def get_proc(name):
         if proc.name.lower()==name.lower():
             return proc
     return None
+
+def get_base_class(obj):
+    if obj.extends:
+        return get_base_class(objects[obj.extends.lower()])
+    else:
+        return obj
 
 def remove_const(argtype):
     """Remove const from argtype"""
@@ -1890,7 +1913,8 @@ def write_fortran_iso_wrapper():
 
         # Container types for classes
         for obj in objects.values():
-            if obj.is_class:
+            # Only create container types for the base classes
+            if obj.is_class and not obj.extends:
                 f.write('  TYPE {}_container_\n'.format(obj.name))
                 f.write('    CLASS ({}), ALLOCATABLE :: c\n'.format(obj.name))
                 f.write('  END TYPE {}_container_\n\n'.format(obj.name))
@@ -1913,11 +1937,15 @@ def write_fortran_iso_wrapper():
             f.write('    TYPE (C_PTR) :: ' + cptr + '\n\n')
             obj_name = obj.name
             if obj.is_class:
-                obj_name += '_container_'
+                obj_name = get_base_class(obj).name + '_container_'
             f.write('    TYPE (' + obj_name + '), POINTER :: ' + fptr + '\n\n')
             f.write('    ALLOCATE( ' + fptr + ' )\n')
             if obj.is_class:
-                f.write('    ALLOCATE( ' + fptr + '%c )\n')
+                if obj.extends:
+                    dynamic_type = obj.name + '::'
+                else:
+                    dynamic_type = ''
+                f.write('    ALLOCATE( ' + dynamic_type + fptr + '%c )\n')
             f.write('    ' + cptr + ' = C_LOC(' + fptr + ')\n')
             f.write('  END SUBROUTINE ' + object_allocator_binding_name(obj.name) + '\n\n')
             # Write deallocate function
@@ -1941,10 +1969,13 @@ def write_fortran_iso_wrapper():
                 f.write(arg.get_iso_c_type_local_decs())
             for p,arg in proc.args_by_pos.items():
                 f.write(arg.get_iso_c_setup_code())
+            selector_setup, count = proc.get_iso_c_select_type_code()
+            f.write(selector_setup)
+            f.write(2*(count+2)*' ') # Indentation for call
             if proc.retval:
-                f.write('    ' + proc_wrap_name + ' = ')
+                f.write(proc_wrap_name + ' = ')
             else:
-                f.write('    CALL ')
+                f.write('CALL ')
             arg_list = proc.fort_arg_list(True)
             try:
                 tbp = objects[proc.args_by_pos[1].type.type.lower()].tbps[proc.name.lower()].name
@@ -1956,6 +1987,9 @@ def write_fortran_iso_wrapper():
                 f.write('{}%{}({})\n'.format(arg1, tbp, args))
             else:
                 f.write(proc.name + '(' + arg_list + ')\n')
+            # Close the select type statements
+            for i in range(count,0,-1):
+                f.write(2*(i+1)*' ' + 'END SELECT\n')
             f.write('  END {} {}\n\n'.format(proc_type, proc_wrap_name))
         
         f.write('END MODULE ' + 'FortranISOWrappers' + '\n')
