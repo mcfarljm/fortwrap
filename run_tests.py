@@ -11,7 +11,7 @@ import os
 import glob
 import subprocess
 
-active_tests = ['logicals', 'integers', 'reals']
+active_tests = ['logicals', 'integers', 'reals', 'syntax', 'enumerations']
 
 OPTS = '-g --clean -d wrap'     # FortWrap options
 
