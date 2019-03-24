@@ -680,18 +680,13 @@ class TypeBoundProcedure(object):
         self.interface = interface
         self.deferred = deferred
 
+
+def object_allocator_binding_name(obj_name, deallocate=False):
+    prefix = 'allocate_'
+    if deallocate:
+        prefix = 'de' + prefix
+    return prefix + obj_name.lower() + '_'
         
-def mangle_name(mod,func):
-    if mod:
-        if compiler == 'g95':
-            return mod.lower() + "_MP_" + func.lower()
-        else: # gfortran
-            return '__' + mod.lower() + '_MOD_' + func.lower()
-    else:
-        suffix = '_'
-        if compiler=='g95' and '_' in func:        
-            suffix = suffix + '_'
-        return func.lower() + suffix
 
 def vtab_symbol(mod,name):
     return '__{0}_MOD___vtab_{0}_{1}'.format(mod.lower(), name.capitalize())
@@ -1525,7 +1520,7 @@ def write_constructor(file,object,fort_ctor=None):
     file.write(' {\n')
     file.write('  data_ptr = NULL;\n')
     # Allocate storage for Fortran derived type
-    file.write('  ' + mangle_name(fort_wrap_file, 'allocate_' + object.name) + '(&data_ptr); // Allocate Fortran derived type\n')
+    file.write('  ' + object_allocator_binding_name(object.name) + '(&data_ptr); // Allocate Fortran derived type\n')
     if object.is_class:
         # Class data must be set up before calling constructor, in
         # case constructor uses CLASS argument
@@ -1557,7 +1552,7 @@ def write_destructor(file,object):
                 file.write(', NULL')
             file.write('); // Fortran Destructor\n')
     # Deallocate Fortran derived type
-    file.write('  ' + mangle_name(fort_wrap_file,'deallocate_'+object.name) + '(data_ptr); // Deallocate Fortran derived type\n')
+    file.write('  ' + object_allocator_binding_name(object.name, True) + '(data_ptr); // Deallocate Fortran derived type\n')
     file.write('}\n\n')    
 
 def write_class(object):
@@ -1598,8 +1593,8 @@ def write_class(object):
     file.write('\nextern "C" {\n')
     # Write bindings for allocate/deallocate funcs
     if object.name!=orphan_classname and not object.abstract:
-        file.write('  void ' + mangle_name(fort_wrap_file, 'allocate_'+object.name) + '(ADDRESS *caddr);\n')
-        file.write('  void ' + mangle_name(fort_wrap_file, 'deallocate_'+object.name) + '(ADDRESS caddr);\n')
+        file.write('  void ' + object_allocator_binding_name(object.name) + '(ADDRESS *caddr);\n')
+        file.write('  void ' + object_allocator_binding_name(object.name, True) + '(ADDRESS caddr);\n')
     for proc in object.procs:
         file.write(function_def_str(proc,bind=True) + '\n')
     file.write('}\n')
@@ -1972,19 +1967,19 @@ def write_fortran_wrapper():
         cptr = obj.name + '_cptr'
         fptr = obj.name + '_fptr'
         # Write allocate function
-        f.write(' SUBROUTINE allocate_' + obj.name + '(' + cptr + ')\n')
+        f.write(' SUBROUTINE ' + object_allocator_binding_name(obj.name) + '(' + cptr + ') BIND(C)\n')
         f.write('    TYPE (C_PTR) :: ' + cptr + '\n\n')
         f.write('    TYPE (' + obj.name + '), POINTER :: ' + fptr + '\n\n')
         f.write('    ALLOCATE( ' + fptr + ' )\n')
         f.write('    ' + cptr + ' = C_LOC(' + fptr + ')\n')
-        f.write('  END SUBROUTINE allocate_' + obj.name + '\n\n')
+        f.write('  END SUBROUTINE ' + object_allocator_binding_name(obj.name) + '\n\n')
         # Write deallocate function
-        f.write(' SUBROUTINE deallocate_' + obj.name + '(' + cptr + ')\n')
+        f.write(' SUBROUTINE ' + object_allocator_binding_name(obj.name, True) + '(' + cptr + ') BIND(C)\n')
         f.write('    TYPE (C_PTR), VALUE :: ' + cptr + '\n\n')
         f.write('    TYPE (' + obj.name + '), POINTER :: ' + fptr + '\n\n')
         f.write('    CALL C_F_POINTER(' + cptr + ', ' + fptr + ')\n')
         f.write('    DEALLOCATE( ' + fptr + ' )\n')
-        f.write('  END SUBROUTINE deallocate_' + obj.name + '\n\n')        
+        f.write('  END SUBROUTINE ' + object_allocator_binding_name(obj.name, True) + '\n\n')
     f.write('END MODULE ' + fort_wrap_file + '\n')
                 
 
