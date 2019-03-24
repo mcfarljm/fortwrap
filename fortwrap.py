@@ -167,9 +167,9 @@ iso_c_type_map = {'INTEGER':
                    '4':'C_INT',
                    '8':'C_LONG_LONG'},
                   'REAL':
-                  {'':'float*',
-                   '4':'float*',
-                   '8':'double*'},
+                  {'':'C_FLOAT',
+                   '4':'C_FLOAT',
+                   '8':'C_DOUBLE'},
                   'LOGICAL':
                   {'':'C_BOOL'},
                 'CHARACTER':
