@@ -58,7 +58,6 @@ orphan_classname = 'FortFuncs'
 orphan_class_comments = ['Wrapper class for Fortran routines that do not operate on a derived type']
 constants_classname = 'FortConstants'
 
-fort_wrap_file = 'CppWrappers'
 SWIG = True  # Whether or not to include preprocessor defs that will
              # be used by swig
 
@@ -1903,6 +1902,33 @@ def write_fortran_iso_wrapper():
         f.write('  IMPLICIT NONE\n\n')
         f.write('CONTAINS\n\n')
 
+        alloc_comment_written = False
+
+        # Write derived type allocate and deallocate functions
+        for obj in objects.values():
+            if obj.name == orphan_classname or obj.abstract:
+                continue
+            if not alloc_comment_written:
+                f.write('  ! Derived type allocate and deallocate functions:\n\n')
+                alloc_comment_written = True
+            cptr = obj.name + '_cptr'
+            fptr = obj.name + '_fptr'
+            # Write allocate function
+            f.write('  SUBROUTINE ' + object_allocator_binding_name(obj.name) + '(' + cptr + ') BIND(C)\n')
+            f.write('    TYPE (C_PTR) :: ' + cptr + '\n\n')
+            f.write('    TYPE (' + obj.name + '), POINTER :: ' + fptr + '\n\n')
+            f.write('    ALLOCATE( ' + fptr + ' )\n')
+            f.write('    ' + cptr + ' = C_LOC(' + fptr + ')\n')
+            f.write('  END SUBROUTINE ' + object_allocator_binding_name(obj.name) + '\n\n')
+            # Write deallocate function
+            f.write('  SUBROUTINE ' + object_allocator_binding_name(obj.name, True) + '(' + cptr + ') BIND(C)\n')
+            f.write('    TYPE (C_PTR), VALUE :: ' + cptr + '\n\n')
+            f.write('    TYPE (' + obj.name + '), POINTER :: ' + fptr + '\n\n')
+            f.write('    CALL C_F_POINTER(' + cptr + ', ' + fptr + ')\n')
+            f.write('    DEALLOCATE( ' + fptr + ' )\n')
+            f.write('  END SUBROUTINE ' + object_allocator_binding_name(obj.name, True) + '\n\n')        
+
+        f.write('  ! C binding wrappers:\n\n')
         for proc in procedures:
             proc_wrap_name = proc.c_binding_name()
             proc_type = 'FUNCTION' if proc.retval else 'SUBROUTINE'
@@ -1923,52 +1949,6 @@ def write_fortran_iso_wrapper():
             f.write('  END {} {}\n\n'.format(proc_type, proc_wrap_name))
         
         f.write('END MODULE ' + 'FortranISOWrappers' + '\n')
-    
-def write_fortran_wrapper():
-    """
-    Write the Fortran code for allocating/deallocating Fortran derived
-    types from C pointers
-    """
-    # TODO: fix hack for testing whether we need to write this file
-    # Hack: check for real (non-orphan) methods
-    count = 0
-    for obj in objects.values():
-        if obj.name != orphan_classname:
-            count += 1
-    if count == 0:
-        return
-    # Build list of modules we need to USE
-    use_mods = set()
-    for obj in objects.values():
-        if obj.name != orphan_classname:
-            use_mods.add(obj.module)
-    f = open(fort_output_dir+'/' + fort_wrap_file + '.f90', "w")
-    #f.write(HEADER_STRING + '\n') # Wrong comment style
-    f.write('MODULE ' + fort_wrap_file + '\n\n')
-    # USE the necessary modules:
-    for mod in use_mods:
-        f.write('USE ' + mod + '\n')
-    f.write('USE ISO_C_BINDING\n\nCONTAINS\n\n')
-    for obj in objects.values():
-        if obj.name == orphan_classname or obj.abstract:
-            continue
-        cptr = obj.name + '_cptr'
-        fptr = obj.name + '_fptr'
-        # Write allocate function
-        f.write(' SUBROUTINE ' + object_allocator_binding_name(obj.name) + '(' + cptr + ') BIND(C)\n')
-        f.write('    TYPE (C_PTR) :: ' + cptr + '\n\n')
-        f.write('    TYPE (' + obj.name + '), POINTER :: ' + fptr + '\n\n')
-        f.write('    ALLOCATE( ' + fptr + ' )\n')
-        f.write('    ' + cptr + ' = C_LOC(' + fptr + ')\n')
-        f.write('  END SUBROUTINE ' + object_allocator_binding_name(obj.name) + '\n\n')
-        # Write deallocate function
-        f.write(' SUBROUTINE ' + object_allocator_binding_name(obj.name, True) + '(' + cptr + ') BIND(C)\n')
-        f.write('    TYPE (C_PTR), VALUE :: ' + cptr + '\n\n')
-        f.write('    TYPE (' + obj.name + '), POINTER :: ' + fptr + '\n\n')
-        f.write('    CALL C_F_POINTER(' + cptr + ', ' + fptr + ')\n')
-        f.write('    DEALLOCATE( ' + fptr + ' )\n')
-        f.write('  END SUBROUTINE ' + object_allocator_binding_name(obj.name, True) + '\n\n')
-    f.write('END MODULE ' + fort_wrap_file + '\n')
                 
 
 def clean_directories():
@@ -2200,7 +2180,6 @@ if __name__ == "__main__":
         write_matrix_class()
         if not opts.std_string:
             write_string_class()
-        write_fortran_wrapper()
         write_fortran_iso_wrapper()
 
         if fort_class_used:
