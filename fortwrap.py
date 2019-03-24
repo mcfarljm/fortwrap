@@ -147,6 +147,7 @@ cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*',
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
 
 current_module = ''
+module_list = []
 module_proc_num = 1 # For keeping track of the order that the
                     # procedures are defined in the Fortran code.  Not
                     # needed now that they are stored in a list, but
@@ -441,7 +442,7 @@ class Procedure(object):
         self.args = args # By name
         self.args_by_pos = collections.OrderedDict()
         self.nargs = len(args)
-        self.mod = current_module
+        self.module = current_module
         self.comment = comment
         self.method = method # None, 't' (TYPE), 'c' (CLASS)
         self.num = module_proc_num
@@ -552,7 +553,7 @@ class DerivedType(object):
         self.name = name
         self.cname = translate_name(name) # Account for name renaming
         self.procs = []
-        self.mod = current_module
+        self.module = current_module
         self.comment = comment
 
         self.is_class = False
@@ -580,6 +581,9 @@ class TypeBoundProcedure(object):
         self.interface = interface
         self.deferred = deferred
 
+
+def c_binding_name(module, function):
+    return '{}__{}_wrap'.format(module, function)
         
 def mangle_name(mod,func):
     if mod:
@@ -1039,6 +1043,7 @@ def parse_file(fname):
             continue
         elif module_def.match(line) and 'PROCEDURE' not in line.upper():
             current_module = line.split()[1]
+            module_list.append(current_module)
             #print 'MOD:', current_module
             dox_comments = []
             initialize_protection()
@@ -1405,7 +1410,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
         else:
             method_name= translate_name(proc.name)        
     if bind:
-        s = s + mangle_name(proc.mod,proc.name)
+        s = s + c_binding_name(proc.module,proc.name)
     elif obj and not opts.global_orphans:
         s = s + obj.cname + '::' + method_name
     else:
@@ -1446,7 +1451,7 @@ def write_constructor(file,object,fort_ctor=None):
     if object.is_class:
         # Class data must be set up before calling constructor, in
         # case constructor uses CLASS argument
-        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.mod, object.name)))
+        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.module, object.name)))
         file.write('  class_data.data = data_ptr;\n')
     # If present, call Fortran ctor
     if fort_ctor:
@@ -1467,7 +1472,7 @@ def write_destructor(file,object):
     for proc in object.procs:
         if proc.dtor:
             target = 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'
-            file.write('  ' + 'if (initialized) ' + mangle_name(proc.mod,proc.name) + '(' + target)
+            file.write('  ' + 'if (initialized) ' + mangle_name(proc.module,proc.name) + '(' + target)
             # Add NULL for any optional arguments (only optional
             # arguments are allowed in the destructor call)
             for i in range(proc.nargs-1):
@@ -1510,7 +1515,7 @@ def write_class(object):
     # Declare external vtab data
     if object.is_class:
         file.write('\n// Declare external vtab data:\n')
-        file.write('extern int {0}; // int is dummy data type\n'.format(vtab_symbol(object.mod, object.name)))
+        file.write('extern int {0}; // int is dummy data type\n'.format(vtab_symbol(object.module, object.name)))
     # C Bindings
     file.write('\nextern "C" {\n')
     # Write bindings for allocate/deallocate funcs
@@ -1829,6 +1834,26 @@ char* $CLASSNAME::c_str(void) { return data_; }
 """.replace('$CLASSNAME', string_classname)
     f.write(body)
     f.close()
+
+def write_fortran_iso_wrapper():
+    with open(os.path.join(fort_output_dir,'FortranISOWrappers.f90'), 'w') as f:
+        f.write('MODULE ' + 'FortranISOWrappers' + '\n\n')
+        f.write('  USE ISO_C_BINDING\n')
+        for m in module_list:
+            f.write('  USE ' + m + '\n')
+        f.write('  IMPLICIT NONE\n\n')
+        f.write('CONTAINS\n\n')
+
+        for proc in procedures:
+            proc_wrap_name = c_binding_name(proc.module, proc.name)
+            if proc.retval:
+                f.write('  FUNCTION ' + proc_wrap_name + '() BIND(C)\n')
+                f.write('    LOGICAL(C_BOOL) :: ' + proc_wrap_name + '\n')
+                f.write('    ' + proc_wrap_name + ' = ')
+                f.write(proc.name + '()\n')
+                f.write('  END FUNCTION ' + proc_wrap_name + '\n\n')
+        
+        f.write('END MODULE ' + 'FortranISOWrappers' + '\n')
     
 def write_fortran_wrapper():
     """
@@ -1847,7 +1872,7 @@ def write_fortran_wrapper():
     use_mods = set()
     for obj in objects.values():
         if obj.name != orphan_classname:
-            use_mods.add(obj.mod)
+            use_mods.add(obj.module)
     f = open(fort_output_dir+'/' + fort_wrap_file + '.f90', "w")
     #f.write(HEADER_STRING + '\n') # Wrong comment style
     f.write('MODULE ' + fort_wrap_file + '\n\n')
@@ -2116,6 +2141,7 @@ if __name__ == "__main__":
         if not opts.std_string:
             write_string_class()
         write_fortran_wrapper()
+        write_fortran_iso_wrapper()
 
         if fort_class_used:
             warning("support for wrapping abstract types and type extension is experimental")
@@ -2126,5 +2152,6 @@ if __name__ == "__main__":
         # Raised by sys.exit
         raise
 
-    except:
+    except NotImplementedError:
+        # NotImplementedError used to bypass error handling
         internal_error()
