@@ -88,7 +88,7 @@ fort_comment = re.compile('\s*!')
 fort_contains = re.compile(r'\s*CONTAINS\s*$', re.IGNORECASE)
 
 # Data types
-primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>(\w+|\*))\s*\)))?'
+primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>(\w+|\*))\s*\)))?'
 primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
 fort_data_str = r'\s*(' + primitive_data_str + '|(?P<dt_mode>TYPE|CLASS)\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)(\s*,\s*POINTER)?)'
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
@@ -143,7 +143,8 @@ cpp_type_map = {'INTEGER':
                  '4':'int*',
                  '8':'long long*',
                  'C_INT':'int*',
-                 'C_LONG':'long*'}, 
+                 'C_LONG':'long*',
+                 'CHARLEN_':'size_t'}, 
                 'REAL':
                 {'':'float*',
                  '4':'float*',
@@ -154,16 +155,15 @@ cpp_type_map = {'INTEGER':
                 {'':'int*',
                  'C_BOOL':'int*'}, 
                 'CHARACTER':
-                {'':'char*'}, 
-                'INT':
-                {'':'fortran_charlen_t'}}
+                {'':'char*'}}
 
 iso_c_type_map = {'INTEGER':
                   {'':'C_INT',
                    '1':'C_SIGNED_CHAR',
                    '2':'C_SHORT',
                    '4':'C_INT',
-                   '8':'C_LONG_LONG'},
+                   '8':'C_LONG_LONG',
+                   'CHARLEN_':'C_SIZE_T'},
                   'REAL':
                   {'':'C_FLOAT',
                    '4':'C_FLOAT',
@@ -171,9 +171,7 @@ iso_c_type_map = {'INTEGER':
                   'LOGICAL':
                   {'':'C_BOOL'},
                 'CHARACTER':
-                  {'':'char*'}, 
-                'INT':
-                  {'':'fortran_charlen_t'}}
+                  {'':'C_CHAR'}}
 
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
 
@@ -263,6 +261,11 @@ class CharacterLength(object):
     def set_assumed(self, argname):
         self.val = argname
         self.assumed = True
+    def as_string(self, name):
+        if self.assumed:
+            return name + '_len__'
+        else:
+            return str(self.val)        
 
 class DataType(object):
     complex_warning_written = False
@@ -307,8 +310,8 @@ class DataType(object):
             if not self.valid_primitive():
                 warning(self.type+'('+self.kind+') not supported')
 
-        if not primitive_data_match and type!='INT':
-            # (INT is used to represent the hidden length arguments,
+        if not primitive_data_match:
+            # (CHARLEN_ is used to represent the hidden length arguments,
             # passed by value)
             if 'PROCEDURE' in type.upper():
                 # Matching broken b/c of "::'
@@ -467,6 +470,8 @@ class Argument(object):
             return 'TYPE(C_PTR), VALUE'
         if self.type.proc_pointer:
             return 'TYPE(C_FUNPTR), VALUE'
+        if self.type.type == 'CHARACTER':
+            return 'TYPE(C_PTR), VALUE'
         if self.type.kind.upper().startswith('C_'):
             c_kind = self.type.kind
         else:
@@ -474,13 +479,21 @@ class Argument(object):
         string = '{}({})'.format(self.type.type, c_kind)
         if self.optional:
             string += ', OPTIONAL'
+        if self.type.kind == 'CHARLEN_':
+            string += ', VALUE'
         return string
+
+    def get_iso_c_type_dec(self):
+        dec = '{} :: {}'.format(self.get_iso_c_type(), self.name)
+        return dec
 
     def get_iso_c_type_local_decs(self):
         if self.type.dt:
             return '    TYPE(' + self.type.type + '), POINTER :: {}__p\n'.format(self.name)
         elif self.type.proc_pointer:
             return '    PROCEDURE({}), POINTER :: {}__p\n'.format(self.type.type, self.name)
+        elif self.type.type == 'CHARACTER':
+            return '    CHARACTER({1}), POINTER :: {0}__p\n'.format(self.name, self.type.str_len.as_string(self.name))
         elif self.type.array:
             if self.type.array.d == 1:
                 shape = '(:)'
@@ -492,7 +505,7 @@ class Argument(object):
         return ''
 
     def get_iso_c_setup_code(self):
-        if self.type.dt:
+        if self.type.dt or self.type.type=='CHARACTER':
             return '    CALL C_F_POINTER({0}, {0}__p)\n'.format(self.name)
         elif self.type.proc_pointer:
             return '    CALL C_F_PROCPOINTER({0}, {0}__p)\n'.format(self.name)
@@ -575,7 +588,7 @@ class Procedure(object):
         args_by_pos_new = collections.OrderedDict() # Track hidden str-len args
         for arg in self.args_by_pos.values():
             if arg.type.type=='CHARACTER' and not arg.fort_only():
-                str_length_arg = Argument(arg.name + '_len__', pos, DataType('INT', str_len=arg.type.str_len ,hidden=True))
+                str_length_arg = Argument(arg.name + '_len__', pos, DataType('INTEGER(CHARLEN_)', str_len=arg.type.str_len ,hidden=True))
                 self.args[ str_length_arg.name ] = str_length_arg
                 args_by_pos_new[pos] = str_length_arg # Ordered add is correct since self.args_by_pos is ordered
                 pos = pos + 1
@@ -622,10 +635,12 @@ class Procedure(object):
     def fort_arg_list(self, call):
         s = ''
         for p,arg in self.args_by_pos.items():
+            if call and arg.type.hidden:
+                continue
             name = arg.name
-            if call and (arg.type.array or arg.type.dt or arg.type.proc_pointer):
+            if call and (arg.type.array or arg.type.dt or arg.type.type=='CHARACTER' or arg.type.proc_pointer):
                 name += '__p'
-            s += name + (', ' if self.has_args_past_pos(p, True) else '')
+            s += name + (', ' if self.has_args_past_pos(p, not call) else '')
         return s
 
     def c_binding_name(self):
@@ -1291,13 +1306,10 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             # the four cases
             if bind and call:
                 if arg.type.hidden:
-                    if arg.type.str_len.assumed:
-                        # val stores the arg name of the string
-                        # itself.  In wrapper code, length variable is
-                        # declared as name+'_len__'
-                        string = string + arg.type.str_len.val + '_len__'
-                    else:
-                        string = string + str(arg.type.str_len.val)
+                    # val stores the arg name of the string itself.
+                    # In wrapper code, length variable is declared as
+                    # name+'_len__'
+                    string += arg.type.str_len.as_string(arg.type.str_len.val)
                 elif arg.type.is_array_size or arg.type.is_matrix_size:
                     string = string + '&' + arg.name
                 else:
@@ -1410,10 +1422,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     if call:
         for arg in proc.args.values():
             if arg.type.type=='CHARACTER' and not arg.fort_only():
-                if arg.type.str_len.assumed:
-                    str_len = arg.name+'_len__'
-                else:
-                    str_len = str(arg.type.str_len.val)
+                str_len = arg.type.str_len.as_string(arg.name)
                 str_len_p1 = str_len + '+1'
                 str_len_m1 = str_len + '-1'
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
@@ -1916,7 +1925,7 @@ def write_fortran_iso_wrapper():
             proc_type = 'FUNCTION' if proc.retval else 'SUBROUTINE'
             f.write('  {} {}({}) BIND(C)\n'.format(proc_type, proc_wrap_name, proc.fort_arg_list(False)))
             for p,arg in proc.args_by_pos.items():
-                f.write('    {} :: {}\n'.format(arg.get_iso_c_type(), arg.name))
+                f.write('    {}\n'.format(arg.get_iso_c_type_dec()))
             if proc.retval:
                 f.write('    {} :: {}\n'.format(proc.retval.get_iso_c_type(), proc_wrap_name))
             for p,arg in proc.args_by_pos.items():
