@@ -1,3 +1,11 @@
+! Note the generated C bindings pass the function pointer by value.  This
+! would not be compatible with wrapping procedures that use the procedure
+! pointer argument as an output.  FortWrap prevents wrapping intent(out),
+! but it doesn't require intent(in) because that seems to be incompatible
+! with the use cases below where the pointer is stored (gfortran 5.4 won't
+! compile the below code if the procedure pointer arguments are declared as
+! intent(in)).
+
 MODULE func_pointers
 
   IMPLICIT NONE
