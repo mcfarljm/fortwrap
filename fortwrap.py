@@ -470,6 +470,8 @@ class Argument(object):
     def get_iso_c_type(self, ignore_array=False):
         if (self.type.array and (not ignore_array)) or self.type.dt:
             return 'TYPE(C_PTR), VALUE'
+        if self.type.proc_pointer:
+            return 'TYPE(C_FUNPTR), VALUE'
         if self.type.kind.upper().startswith('C_'):
             c_kind = self.type.kind
         else:
@@ -481,7 +483,9 @@ class Argument(object):
 
     def get_iso_c_type_local_decs(self):
         if self.type.dt:
-          return '    TYPE(' + self.type.type + '), POINTER :: {}__p\n'.format(self.name)
+            return '    TYPE(' + self.type.type + '), POINTER :: {}__p\n'.format(self.name)
+        elif self.type.proc_pointer:
+            return '    PROCEDURE({}), POINTER :: {}__p\n'.format(self.type.type, self.name)
         elif self.type.array:
             if self.type.array.d == 1:
                 shape = '(:)'
@@ -495,6 +499,8 @@ class Argument(object):
     def get_iso_c_setup_code(self):
         if self.type.dt:
             return '    CALL C_F_POINTER({0}, {0}__p)\n'.format(self.name)
+        elif self.type.proc_pointer:
+            return '    CALL C_F_PROCPOINTER({0}, {0}__p)\n'.format(self.name)
         elif self.type.array:
             if self.type.array.d == 1:
                 shape = '{}'.format(self.type.array.size_var)
@@ -622,7 +628,7 @@ class Procedure(object):
         s = ''
         for p,arg in self.args_by_pos.items():
             name = arg.name
-            if call and (arg.type.array or arg.type.dt):
+            if call and (arg.type.array or arg.type.dt or arg.type.proc_pointer):
                 name += '__p'
             s += name + (', ' if self.has_args_past_pos(p, True) else '')
         return s
@@ -1309,9 +1315,6 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                         # const has to be handled separately for this case
                         string = string + 'const '
                     string = string + matrix_classname + '<' + arg.cpp_type(value=True) + '> *'
-                elif arg.type.proc_pointer and bind and not call:
-                    # Fortran function pointer in C prototype:
-                    string = string + 'void* '
                 elif not bind and arg.native:
                     string = string + arg.type.type + '* '
                 elif not bind and arg.pass_by_val():
@@ -1341,12 +1344,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         if arg.type.dt=='CLASS' and call and arg.native and not (arg.optional and arg.cpp_optional):
             string = string + '&'
         # Add argument name -------------------------
-        if arg.type.proc_pointer and not bind:
+        if arg.type.proc_pointer and not call:
             # Arg name is already part of the C function pointer definition
             pass
-        elif call and arg.type.proc_pointer:
-            # Pass converted Fortran function pointer
-            string = string + arg.name + ' ? &FORT_' + arg.name + ' : NULL'
         elif (bind or opts.no_vector) and not call and not arg.type.dt and arg.type.vec and not opts.array_as_ptr:
             string = string + arg.name + '[]'
         elif (not opts.no_vector) and call and not arg.type.dt and arg.type.vec:
@@ -1405,17 +1405,6 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     the (abstract) procedure itself
     """
     s = ''
-    # Add wrapper code for function pointers
-    if call:
-        declared_c_pointer = False
-        for arg in proc.args.values():
-            if arg.type.proc_pointer and not arg.fort_only():
-                if not declared_c_pointer:
-                    s = s + prefix + 'generic_fpointer c_pointer;\n'
-                    declared_c_pointer = True
-                s = s + prefix + 'c_pointer = (generic_fpointer) ' + arg.name + ';\n'
-                s = s + prefix + 'long long FORT_' + arg.name + ';\n'
-                s = s + prefix + 'if (' + arg.name + ') ' + mangle_name(fort_wrap_file,func_pointer_converter) + '(c_pointer' + ', &FORT_' + arg.name + ');\n'
     # Add wrapper code for strings
     if call:
         for arg in proc.args.values():
