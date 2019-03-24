@@ -4,7 +4,10 @@ MODULE source
 
   ! For the Fortran module, these can be made private since they are
   ! accessed via the generic interface object_ctor
-  PRIVATE :: object_constructor_i, object_constructor_f
+  ! Todo: Is there a way to support this with the ISO_C_BINDING wrapping?
+  ! May not be important if long-term plan is to move towards type bound
+  ! procedures
+!!$  PRIVATE :: object_constructor_i, object_constructor_f
 
   TYPE Object
     INTEGER :: i
