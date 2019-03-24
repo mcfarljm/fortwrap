@@ -468,7 +468,7 @@ class Argument(object):
             raise FWTypeException(self.type.type)
 
     def get_iso_c_type(self, ignore_array=False):
-        if self.type.array and (not ignore_array):
+        if (self.type.array and (not ignore_array)) or self.type.dt:
             return 'TYPE(C_PTR), VALUE'
         if self.type.kind.upper().startswith('C_'):
             c_kind = self.type.kind
@@ -477,7 +477,9 @@ class Argument(object):
         return '{}({})'.format(self.type.type, c_kind)
 
     def get_iso_c_type_local_decs(self):
-        if self.type.array:
+        if self.type.dt:
+          return '    TYPE(' + self.type.type + '), POINTER :: {}__p\n'.format(self.name)
+        elif self.type.array:
             if self.type.array.d == 1:
                 shape = '(:)'
             elif self.type.array.d == 2:
@@ -488,7 +490,9 @@ class Argument(object):
         return ''
 
     def get_iso_c_setup_code(self):
-        if self.type.array:
+        if self.type.dt:
+            return '    CALL C_F_POINTER({0}, {0}__p)\n'.format(self.name)
+        elif self.type.array:
             if self.type.array.d == 1:
                 shape = '{}'.format(self.type.array.size_var)
             elif self.type.array.d == 2:
@@ -615,10 +619,13 @@ class Procedure(object):
         s = ''
         for p,arg in self.args_by_pos.items():
             name = arg.name
-            if call and arg.type.array:
+            if call and (arg.type.array or arg.type.dt):
                 name += '__p'
             s += name + (', ' if self.has_args_past_pos(p, True) else '')
         return s
+
+    def c_binding_name(self):
+        return '{}__{}_wrap'.format(self.module, self.name).lower()
         
 class DerivedType(object):
     def __init__(self,name,comment=None):
@@ -653,9 +660,6 @@ class TypeBoundProcedure(object):
         self.interface = interface
         self.deferred = deferred
 
-
-def c_binding_name(module, function):
-    return '{}__{}_wrap'.format(module, function)
         
 def mangle_name(mod,func):
     if mod:
@@ -1482,7 +1486,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
         else:
             method_name= translate_name(proc.name)        
     if bind:
-        s = s + c_binding_name(proc.module,proc.name)
+        s = s + proc.c_binding_name()
     elif obj and not opts.global_orphans:
         s = s + obj.cname + '::' + method_name
     else:
@@ -1544,7 +1548,7 @@ def write_destructor(file,object):
     for proc in object.procs:
         if proc.dtor:
             target = 'data_ptr' if proc.args_by_pos[1].type.dt=='TYPE' else '&class_data'
-            file.write('  ' + 'if (initialized) ' + mangle_name(proc.module,proc.name) + '(' + target)
+            file.write('  ' + 'if (initialized) ' + proc.c_binding_name() + '(' + target)
             # Add NULL for any optional arguments (only optional
             # arguments are allowed in the destructor call)
             for i in range(proc.nargs-1):
@@ -1917,7 +1921,7 @@ def write_fortran_iso_wrapper():
         f.write('CONTAINS\n\n')
 
         for proc in procedures:
-            proc_wrap_name = c_binding_name(proc.module, proc.name)
+            proc_wrap_name = proc.c_binding_name()
             proc_type = 'FUNCTION' if proc.retval else 'SUBROUTINE'
             f.write('  {} {}({}) BIND(C)\n'.format(proc_type, proc_wrap_name, proc.fort_arg_list(False)))
             for p,arg in proc.args_by_pos.items():
