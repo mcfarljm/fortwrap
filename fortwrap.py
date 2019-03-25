@@ -657,6 +657,14 @@ class Procedure(object):
                     string += (count+2)*indent*' ' + 'CLASS IS ({})\n'.format(arg.type.type)
                     count += 1
         return string, count
+
+    def supported_args(self):
+        """For use after all source has been parsed, verify that all arguments are supported"""
+        for arg in self.args.values():
+            if arg.type.dt and arg.type.type.lower() not in objects:
+                # Todo: this could be supported for optional arguments
+                return False
+        return True    
                 
         
 class DerivedType(object):
@@ -1208,6 +1216,13 @@ def associate_procedures():
             if pos>1 and arg.type.dt and not arg.type.array and arg.type.type.lower() in objects:
                 arg.native = True
 
+    # Drop any procedures that aren't supported once we know what
+    # derived types have been parsed:
+    for proc in procedures:
+        if not proc.supported_args():
+            not_wrapped.append(proc.name)
+    procedures[:] = [proc for proc in procedures if proc.supported_args()]
+                
     for proc in procedures:
         # Associate methods
         if proc.method:
@@ -2199,9 +2214,6 @@ if __name__ == "__main__":
             error("No source files")
             sys.exit(3)
 
-        if opts.warn_not_wrapped and len(not_wrapped) > 0:
-            warning("Some procedures not wrapped:\n " + '\n '.join(not_wrapped))
-
         # Prevent writing any files if there is nothing to wrap
         if len(procedures)==0:
             error("No procedures to wrap")
@@ -2209,6 +2221,8 @@ if __name__ == "__main__":
 
         associate_procedures()
 
+        if opts.warn_not_wrapped and len(not_wrapped) > 0:
+            warning("Some procedures not wrapped:\n " + '\n '.join(not_wrapped))
         if opts.dry_run:
             sys.exit(0)
 

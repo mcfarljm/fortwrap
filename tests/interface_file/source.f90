@@ -83,4 +83,9 @@ CONTAINS
     TYPE (Object_to_ignore) :: o
   END SUBROUTINE object_ignore_ctor
 
+  SUBROUTINE ignored_arg(o, oi)
+    TYPE (Object) :: o
+    TYPE (Object_to_ignore) :: oi
+  END SUBROUTINE ignored_arg
+
 END MODULE source
