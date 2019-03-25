@@ -23,6 +23,9 @@ MODULE source
     INTEGER :: i
   END TYPE Object_to_rename
 
+  TYPE Object_to_ignore
+  END TYPE Object_to_ignore
+
 CONTAINS
 
   ! Demonstrate use of a different regular expression for matching
@@ -75,5 +78,9 @@ CONTAINS
     INTEGER :: i
     i = o%i
   END FUNCTION object2_val
+
+  SUBROUTINE object_ignore_ctor(o)
+    TYPE (Object_to_ignore) :: o
+  END SUBROUTINE object_ignore_ctor
 
 END MODULE source

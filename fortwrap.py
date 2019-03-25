@@ -1952,6 +1952,8 @@ def write_fortran_iso_wrapper():
 
         f.write('  ! C binding wrappers:\n\n')
         for proc in procedures:
+            if proc.method and proc.args_by_pos[1].type.type.lower() not in objects:
+                continue
             proc_wrap_name = proc.c_binding_name()
             proc_type = 'FUNCTION' if proc.retval else 'SUBROUTINE'
             f.write('  {} {}({}) BIND(C)\n'.format(proc_type, proc_wrap_name, proc.fort_arg_list(False)))

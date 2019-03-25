@@ -17,3 +17,6 @@ Exclude a procedure:
 Test for renaming a derived type
 %rename Object_to_rename Steve
 %rename object2_val val
+
+Test ignoring a derived TYPE
+%ignore Object_to_ignore
