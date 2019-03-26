@@ -646,7 +646,7 @@ class Procedure(object):
                 continue
             if arg.fort_only():
                 continue
-            if call and not (self.method and p==1):
+            if call and not (self.method and p==1) and self.has_fort_only_arg():
                 # Use keyword passing, but not for "this" argument,
                 # which interferes with conversion to TBP call
                 s += arg.name + '='
@@ -683,7 +683,11 @@ class Procedure(object):
             if arg.type.dt and arg.type.type.lower() not in objects:
                 # Todo: this could be supported for optional arguments
                 return False
-        return True    
+        return True
+
+    def has_fort_only_arg(self):
+        """Whether any arguments are not available in the wrapper code"""
+        return any((arg.fort_only() for arg in self.args.values()))
                 
         
 class DerivedType(object):
