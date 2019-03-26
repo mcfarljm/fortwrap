@@ -389,10 +389,7 @@ class Argument(object):
         return not self.optional and not self.type.dt and self.intent=='in' and not self.type.array and not self.type.type=='CHARACTER' and not self.in_abstract
 
     def fort_only(self):
-        if self.type.hidden:
-            return True
-        elif self.type.is_array_size or self.type.is_matrix_size:
-            return True
+        """Whether argument is not wrappable"""
         if self.type.array and self.type.array.fort_only:
             return True
         elif self.exclude:
@@ -425,6 +422,14 @@ class Argument(object):
         if self.pointer:
             return True
         return False
+
+    def is_hidden(self):
+        if self.type.hidden:
+            return True
+        elif self.type.is_array_size or self.type.is_matrix_size:
+            return True
+        else:
+            return False
     
     def cpp_const(self):
         """Whether or not it can be const in C++"""
@@ -481,10 +486,14 @@ class Argument(object):
         return string
 
     def get_iso_c_type_dec(self):
-        dec = '{} :: {}'.format(self.get_iso_c_type(), self.name)
+        if self.fort_only():
+            return ''
+        dec = '    {} :: {}\n'.format(self.get_iso_c_type(), self.name)
         return dec
 
     def get_iso_c_type_local_decs(self):
+        if self.fort_only():
+            return ''
         if self.type.dt:
             typename = self.type.type
             obj = objects[self.type.type.lower()]
@@ -501,6 +510,8 @@ class Argument(object):
         return ''
 
     def get_iso_c_setup_code(self):
+        if self.fort_only():
+            return ''
         if self.type.dt or self.type.type=='CHARACTER':
             return '    CALL C_F_POINTER({0}, {0}__p)\n'.format(self.name)
         elif self.type.proc_pointer:
@@ -563,15 +574,17 @@ class Procedure(object):
                 elif not opts.no_fmat and self.get_matrix_size_parent(arg.name):
                     arg.type.is_matrix_size = True
             
-    def has_args_past_pos(self,pos,bind):
+    def has_args_past_pos(self, pos, include_hidden):
         """Query whether or not the argument list continues past pos,
         accounting for c++ optional args"""
         has = False
         for p,arg in self.args_by_pos.items():
             if p > pos:
-                if not arg.fort_only():
+                if arg.fort_only():
+                    continue
+                if not arg.is_hidden():
                     has = True
-                elif bind:
+                elif include_hidden:
                     has = True
         return has
 
@@ -631,6 +644,12 @@ class Procedure(object):
         for p,arg in self.args_by_pos.items():
             if call and arg.type.hidden:
                 continue
+            if arg.fort_only():
+                continue
+            if call and not (self.method and p==1):
+                # Use keyword passing, but not for "this" argument,
+                # which interferes with conversion to TBP call
+                s += arg.name + '='
             name = arg.name
             if call and (arg.type.array or arg.type.dt or arg.type.type=='CHARACTER' or arg.type.proc_pointer):
                 name += '__p'
@@ -1330,8 +1349,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         if (not arg.fort_only() and not bind and not call and definition) and (arg.type.dt and not arg.native and arg.type.type.upper()!='C_PTR'):
             error("Derived type argument {}::{} of procedure {} is not defined".format(arg.type.type, arg.name, proc.name))
         if arg.fort_only():
-            # Hide from user -- requires special treatement for three of
-            # the four cases
+            continue
+        if arg.is_hidden():
+            # Hide certain args from user:
             if bind and call:
                 if arg.type.hidden:
                     # val stores the arg name of the string itself.
@@ -1340,9 +1360,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                     string += arg.type.str_len.as_string(arg.type.str_len.val)
                 elif arg.type.is_array_size or arg.type.is_matrix_size:
                     string = string + '&' + arg.name
-                else:
-                    string = string + 'NULL'
-                if proc.has_args_past_pos(pos,bind):
+                if proc.has_args_past_pos(pos,True):
                     string = string + ', '
                 continue
             elif not bind:
@@ -1417,7 +1435,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                 string = string + '->data_ptr'
         elif not call and not bind and not definition and arg.cpp_optional:
             string = string + '=NULL'
-        if proc.has_args_past_pos(pos,bind):
+        if proc.has_args_past_pos(pos, bind or call):
             string = string + ', '
     return string
     
@@ -1971,7 +1989,7 @@ def write_fortran_iso_wrapper():
             proc_type = 'FUNCTION' if proc.retval else 'SUBROUTINE'
             f.write('  {} {}({}) BIND(C)\n'.format(proc_type, proc_wrap_name, proc.fort_arg_list(False)))
             for p,arg in proc.args_by_pos.items():
-                f.write('    {}\n'.format(arg.get_iso_c_type_dec()))
+                f.write(arg.get_iso_c_type_dec())
             if proc.retval:
                 f.write('    {} :: {}\n'.format(proc.retval.get_iso_c_type(), proc_wrap_name))
             for p,arg in proc.args_by_pos.items():
