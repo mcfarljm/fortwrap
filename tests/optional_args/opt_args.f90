@@ -21,5 +21,17 @@ MODULE opt_args
       IF (PRESENT(c)) y = y + c
       IF (PRESENT(d)) y = y + d
     END FUNCTION add_mixed
+
+    FUNCTION add_with_hidden(a,b,c,d) RESULT(y)
+      INTEGER, INTENT(in) :: a
+      INTEGER, INTENT(in), OPTIONAL :: b(:) ! Hidden
+      INTEGER, INTENT(in), OPTIONAL :: c
+      INTEGER, INTENT(in), OPTIONAL :: d(:) ! Hidden
+      INTEGER :: y
+      y = a
+      IF (PRESENT(b)) y = y + 1
+      IF (PRESENT(c)) y = y + c
+      IF (PRESENT(d)) y = y + 1
+    END FUNCTION add_with_hidden
   
 END MODULE opt_args
