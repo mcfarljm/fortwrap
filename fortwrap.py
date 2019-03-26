@@ -266,7 +266,7 @@ class CharacterLength(object):
 
 class DataType(object):
     complex_warning_written = False
-    def __init__(self,type,array=None,str_len=None,hidden=False):
+    def __init__(self,type,array=None,str_len=None,is_str_len=False):
         global stringh_used
         self.type = type
         self.kind = ''
@@ -275,7 +275,7 @@ class DataType(object):
         self.proc_pointer = False
         self.proc = False # PROCEDURE without POINTER attribute
         self.dt = False      # False, 'TYPE', or 'CLASS'
-        self.hidden = hidden # hidden name length arg
+        self.is_str_len = is_str_len # string length arg
         # For array, name of argument used to pass the array length:
         self.is_array_size = False # integer defining an array size
         self.is_matrix_size = False
@@ -424,7 +424,7 @@ class Argument(object):
         return False
 
     def is_hidden(self):
-        if self.type.hidden:
+        if self.type.is_str_len:
             return True
         elif self.type.is_array_size or self.type.is_matrix_size:
             return True
@@ -595,7 +595,7 @@ class Procedure(object):
         args_by_pos_new = collections.OrderedDict() # Track hidden str-len args
         for arg in self.args_by_pos.values():
             if arg.type.type=='CHARACTER' and not arg.fort_only():
-                str_length_arg = Argument(arg.name + '_len__', pos, DataType('INTEGER(CHARLEN_)', str_len=arg.type.str_len ,hidden=True))
+                str_length_arg = Argument(arg.name + '_len__', pos, DataType('INTEGER(CHARLEN_)', str_len=arg.type.str_len, is_str_len=True))
                 self.args[ str_length_arg.name ] = str_length_arg
                 args_by_pos_new[pos] = str_length_arg # Ordered add is correct since self.args_by_pos is ordered
                 pos = pos + 1
@@ -642,7 +642,7 @@ class Procedure(object):
     def fort_arg_list(self, call):
         s = ''
         for p,arg in self.args_by_pos.items():
-            if call and arg.type.hidden:
+            if call and arg.type.is_str_len:
                 continue
             if arg.fort_only():
                 continue
@@ -1353,7 +1353,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         if arg.is_hidden():
             # Hide certain args from user:
             if bind and call:
-                if arg.type.hidden:
+                if arg.type.is_str_len:
                     # val stores the arg name of the string itself.
                     # In wrapper code, length variable is declared as
                     # name+'_len__'
