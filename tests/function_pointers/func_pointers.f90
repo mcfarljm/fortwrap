@@ -47,5 +47,24 @@ MODULE func_pointers
       INTEGER :: y
       y = f(a,b)
     END FUNCTION callf
+
+    ! With current wrapping approach, the optional procedure pointer
+    ! argument will always be present, so the function should be written
+    ! such that it treats a null pointer as if the argument is not present
+    FUNCTION callf_opt(a,b,f) RESULT(y)
+      INTEGER, INTENT(in) :: a,b
+      PROCEDURE(int_template), POINTER, OPTIONAL :: f
+      INTEGER :: y
+
+      IF (PRESENT(f)) THEN
+        ! Check that the optional pointer is associated
+        IF (ASSOCIATED(f)) THEN
+          y = f(a,b)
+          RETURN
+        END IF
+      END IF
+      
+      y = -1
+    END FUNCTION callf_opt
   
 END MODULE func_pointers

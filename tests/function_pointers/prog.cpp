@@ -23,5 +23,11 @@ int main(void)
   if (FortFuncs::callf(add, a, b) != a + b)
     return 2;
 
+  // Optional arguments
+  if (FortFuncs::callf_opt(a, b, add) != a + b)
+    return 5;
+  if (FortFuncs::callf_opt(a, b) != -1)
+    return 6;
+
   return 0;
 }
