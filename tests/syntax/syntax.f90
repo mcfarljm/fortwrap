@@ -51,4 +51,15 @@ CONTAINS
     y = x
   END FUNCTION argument_case_sensitivity
 
+  ! Verify that ISO_C_BINDING wrappers don't violate line length limitations
+  ! (even free form has line length limitations)
+  FUNCTION long_function_name______________________________(&
+    long_argument_name_____________________________________) RESULT(y)
+    INTEGER, INTENT(in) ::&
+      long_argument_name_____________________________________
+    INTEGER :: y
+
+    y = long_argument_name_____________________________________
+  END FUNCTION long_function_name______________________________
+  
 END MODULE syntax

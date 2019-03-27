@@ -23,6 +23,9 @@ int main(void)
   if (FortFuncs::argument_case_sensitivity(x) != x)
     return 9;
 
+  if (FortFuncs::long_function_name______________________________(x) != x)
+    return 10;
+
   return 0;
 }
 

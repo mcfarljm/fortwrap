@@ -835,6 +835,16 @@ class FileReader:
         return com    
 
 
+def add_line_continuations(line, prefix, max_len=76):
+    """Add line continuations to generated Fortran code so doesn't violate line length limit
+
+    Long lines can easily happen in the wrapper when the function calls are generated.
+    
+    For free format code, the line length limit is 132.  Shorter lines are used here for readability"""
+    lines = [line[i:i + max_len] for i in range(0, len(line), max_len)]
+    return ('&\n  ' + prefix + '&').join(lines)
+
+    
 def is_public(name):
     """Check whether a name is public and not excluded
 
@@ -1993,7 +2003,8 @@ def write_fortran_iso_wrapper():
         for proc in procedures:
             proc_wrap_name = proc.c_binding_name()
             proc_type = 'FUNCTION' if proc.retval else 'SUBROUTINE'
-            f.write('  {} {}({}) BIND(C)\n'.format(proc_type, proc_wrap_name, proc.fort_arg_list(False)))
+            line = '  {} {}({}) BIND(C)\n'.format(proc_type, proc_wrap_name, proc.fort_arg_list(False))
+            f.write(add_line_continuations(line, '  '))
             for p,arg in proc.args_by_pos.items():
                 f.write(arg.get_iso_c_type_dec())
             if proc.retval:
@@ -2004,11 +2015,12 @@ def write_fortran_iso_wrapper():
                 f.write(arg.get_iso_c_setup_code())
             selector_setup, count = proc.get_iso_c_select_type_code()
             f.write(selector_setup)
-            f.write(2*(count+2)*' ') # Indentation for call
+            # Call Fortran function
+            line = 2*(count+2)*' ' # Indentation for call
             if proc.retval:
-                f.write(proc_wrap_name + ' = ')
+                line += proc_wrap_name + ' = '
             else:
-                f.write('CALL ')
+                line += 'CALL '
             arg_list = proc.fort_arg_list(True)
             try:
                 tbp = objects[proc.args_by_pos[1].type.type.lower()].tbps[proc.name.lower()].name
@@ -2017,9 +2029,10 @@ def write_fortran_iso_wrapper():
             if tbp:
                 arg1 = arg_list.split(',')[0]
                 args = ','.join(arg_list.split(',')[1:])
-                f.write('{}%{}({})\n'.format(arg1, tbp, args))
+                line += '{}%{}({})\n'.format(arg1, tbp, args)
             else:
-                f.write(proc.name + '(' + arg_list + ')\n')
+                line += proc.name + '(' + arg_list + ')\n'
+            f.write(add_line_continuations(line, 2*(count+2)*' '))
             # Close the select type statements
             for i in range(count,0,-1):
                 f.write(2*(i+1)*' ' + 'END SELECT\n')
