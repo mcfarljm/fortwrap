@@ -20,46 +20,6 @@ This work can be followed on the `iso_c_binding` branch, which
 includes a test suite that covers essentially the same feature
 set as the current release version.
 
-Here is a preview of the `ISO_C_BINDING` wrapping.  Start with a
-source function:
-
-``` Fortran
-  FUNCTION inner_prod(n,a,b) RESULT(y)
-    INTEGER, INTENT(in) :: n
-    INTEGER, INTENT(in), dimension(n) :: a, b
-    INTEGER :: y
-    y = DOT_PRODUCT(a,b)
-  END FUNCTION inner_prod
-```
-
-FortWrap generates the following Fortran C binding wrapper:
-
-``` Fortran
-  FUNCTION arrays__inner_prod_wrap(n, a, b) BIND(C)
-    INTEGER(C_INT) :: n
-    TYPE(C_PTR), VALUE :: a
-    TYPE(C_PTR), VALUE :: b
-    INTEGER(C_INT) :: arrays__inner_prod_wrap
-    INTEGER(C_INT), POINTER :: a__p(:)
-    INTEGER(C_INT), POINTER :: b__p(:)
-    CALL C_F_POINTER(a, a__p, [n])
-    CALL C_F_POINTER(b, b__p, [n])
-    arrays__inner_prod_wrap = inner_prod(n, a__p, b__p)
-  END FUNCTION arrays__inner_prod_wrap
-```
-
-As well as the associated C prototype:
-
-``` C
-int arrays__inner_prod_wrap(int* n, const int a[], const int b[]);
-```
-
-And the following C++ interface (which recognizes and hides the array size argument):
-
-``` C++
-int inner_prod(const std::vector<int>* a, const std::vector<int>* b);
-```
-
 ## Features
 
 * Fortran derived types wrapped in C++ proxy classes
