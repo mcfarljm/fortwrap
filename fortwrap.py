@@ -1868,6 +1868,19 @@ def get_native_includes(object):
         includes.add(object.extends)
     return includes
 
+def get_required_modules(module):
+    """
+    Determine what other modules must be USE'd when writing the wrapper code for a given module
+    """
+    includes = set()
+    for proc in procedures:
+        if proc.module != module:
+            continue
+        for argname,arg in proc.args.items():
+            if arg.native:
+                includes.add(objects[arg.type.type.lower()].module)
+    return includes
+
 def write_global_header_file():
     f = open(include_output_dir+'/' + opts.main_header + '.h','w')
     f.write(HEADER_STRING + '\n')
@@ -2057,6 +2070,9 @@ def write_fortran_iso_wrapper_multiple_modules():
             f.write('MODULE ' + '{}_wrap_'.format(module) + '\n\n')
             f.write('  USE ISO_C_BINDING\n')
             f.write('  USE ' + module + '\n')
+            includes = get_required_modules(module)
+            for include in includes:
+                f.write('  USE ' + include + '\n')
             f.write('  IMPLICIT NONE\n\n')
 
             # Container types for classes
