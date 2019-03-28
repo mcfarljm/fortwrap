@@ -33,6 +33,15 @@ int main(void)
   // Test assumed size
   if (FortFuncs::inner_prod_2(3,&a,&b) != 8)
     return 5;
+
+  // Set up v3 = [1,2,3,4]
+  std::vector<int> v3(4);
+  for (std::vector<int>::size_type i=0; i<v3.size(); i++)
+    v3[i] = i+1;
+
+  SizeContainer c(v3.size());
+  if (c.sum_with_dt_size(&v3) != 10)
+    return 10;
   
   return 0;
 }

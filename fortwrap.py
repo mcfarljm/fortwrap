@@ -217,8 +217,10 @@ class Array(object):
     two_d_warning_written = False
     multi_d_warning_written = False
     def __init__(self,spec):
+        """spec is the part inside the parentheses"""
         global matrix_used
-        # spec is the part inside the parentheses
+        # If derived type components are used in spec, convert to '*'
+        spec = ','.join(['*' if '%' in s else s for s in spec.split(',')])
         self.spec = spec
         self.assumed_shape = False
         self.size_var = ''

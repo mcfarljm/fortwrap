@@ -2,6 +2,10 @@ MODULE arrays
 
   IMPLICIT NONE
 
+  TYPE SizeContainer
+    INTEGER :: n
+  END TYPE SizeContainer
+
 CONTAINS
 
   FUNCTION array_in(n,x) RESULT(y)
@@ -34,5 +38,20 @@ CONTAINS
     INTEGER :: y
     y = DOT_PRODUCT(a(1:n),b(1:n))
   END FUNCTION inner_prod_2
+
+  SUBROUTINE sizecontainer_ctor(c, n)
+    TYPE (SizeContainer) :: c
+    INTEGER, INTENT(in) :: n
+    c%n = n
+  END SUBROUTINE sizecontainer_ctor
+
+  FUNCTION sum_with_dt_size(c, x) RESULT(y)
+    TYPE (SizeContainer) :: c
+    ! Make sure this declaration is handled correctly (treated as assumed
+    ! size)
+    INTEGER, INTENT(in) :: x(c%n)
+    INTEGER :: y
+    y = sum(x)
+  END FUNCTION sum_with_dt_size
 
 END MODULE arrays
