@@ -2021,7 +2021,7 @@ char* $CLASSNAME::c_str(void) { return data_; }
     f.write(body)
     f.close()
 
-def write_fortran_iso_wrapper():
+def write_fortran_iso_wrapper_single_module():
     with open(os.path.join(fort_output_dir,'FortranISOWrappers.f90'), 'w') as f:
         f.write('MODULE ' + 'FortranISOWrappers' + '\n\n')
         f.write('  USE ISO_C_BINDING\n')
@@ -2050,6 +2050,41 @@ def write_fortran_iso_wrapper():
             proc.write_bindc_wrapper(f)
         
         f.write('END MODULE ' + 'FortranISOWrappers' + '\n')
+
+def write_fortran_iso_wrapper_multiple_modules():
+    with open(os.path.join(fort_output_dir,'FortranISOWrappers.f90'), 'w') as f:
+        for module in module_list:
+            f.write('MODULE ' + '{}_wrap_'.format(module) + '\n\n')
+            f.write('  USE ISO_C_BINDING\n')
+            f.write('  USE ' + module + '\n')
+            f.write('  IMPLICIT NONE\n\n')
+
+            # Container types for classes
+            for obj in objects.values():
+                if obj.module != module:
+                    continue
+                # Only create container types for the base classes
+                if obj.is_class and not obj.extends:
+                    obj.write_container_type(f)
+
+            f.write('CONTAINS\n\n')
+
+            alloc_comment_written = False
+
+            # Write derived type allocate and deallocate functions
+            for obj in objects.values():
+                if obj.module != module:
+                    continue
+                if obj.name == orphan_classname or obj.abstract:
+                    continue
+                alloc_comment_written = obj.write_allocators(f, alloc_comment_written)
+
+            f.write('  ! C binding wrappers:\n\n')
+            for proc in procedures:
+                if proc.module == module:
+                    proc.write_bindc_wrapper(f)
+
+            f.write('END MODULE ' + '{}_wrap_'.format(module) + '\n\n\n')
                 
 
 def clean_directories():
@@ -2281,7 +2316,10 @@ if __name__ == "__main__":
         write_matrix_class()
         if not opts.std_string:
             write_string_class()
-        write_fortran_iso_wrapper()
+        if opts.single_module:
+            write_fortran_iso_wrapper_single_module()
+        else:
+            write_fortran_iso_wrapper_multiple_modules()
 
         if fort_class_used:
             warning("support for wrapping abstract types and type extension is experimental")
