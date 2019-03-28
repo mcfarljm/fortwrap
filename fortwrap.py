@@ -219,6 +219,7 @@ class Array(object):
     def __init__(self,spec):
         global matrix_used
         # spec is the part inside the parentheses
+        self.spec = spec
         self.assumed_shape = False
         self.size_var = ''
         self.d = spec.count(',') + 1
@@ -468,6 +469,8 @@ class Argument(object):
             raise FWTypeException(self.type.type)
 
     def get_iso_c_type(self, ignore_array=False):
+        if self.type.array and not self.type.array.assumed_shape:
+            return '{}({}), DIMENSION({})'.format(self.type.type, iso_c_type_map[self.type.type][self.type.kind], self.type.array.spec)
         if (self.type.array and (not ignore_array)) or self.type.dt:
             return 'TYPE(C_PTR), VALUE'
         if self.type.proc_pointer:
@@ -504,7 +507,7 @@ class Argument(object):
             return '    PROCEDURE({}), POINTER :: {}__p\n'.format(self.type.type, self.name)
         elif self.type.type == 'CHARACTER':
             return '    CHARACTER({1}), POINTER :: {0}__p\n'.format(self.name, self.type.str_len.as_string(self.name))
-        elif self.type.array:
+        elif self.type.array and self.type.array.assumed_shape:
             shape = '(' + ','.join(':' for i in range(self.type.array.d)) + ')'
             return '    ' + self.get_iso_c_type(True) + ', POINTER :: {}__p{}\n'.format(self.name, shape)
         return ''
@@ -516,7 +519,7 @@ class Argument(object):
             return '    CALL C_F_POINTER({0}, {0}__p)\n'.format(self.name)
         elif self.type.proc_pointer:
             return '    CALL C_F_PROCPOINTER({0}, {0}__p)\n'.format(self.name)
-        elif self.type.array:
+        elif self.type.array and self.type.array.assumed_shape:
             if self.type.array.d == 1:
                 shape = '{}'.format(self.type.array.size_var)
             else:
@@ -651,7 +654,7 @@ class Procedure(object):
                 # which interferes with conversion to TBP call
                 s += arg.name + '='
             name = arg.name
-            if call and (arg.type.array or arg.type.dt or arg.type.type=='CHARACTER' or arg.type.proc_pointer):
+            if call and ((arg.type.array and arg.type.array.assumed_shape) or arg.type.dt or arg.type.type=='CHARACTER' or arg.type.proc_pointer):
                 name += '__p'
                 if arg.type.dt and objects[arg.type.type.lower()].is_class:
                     if objects[arg.type.type.lower()].extends:
