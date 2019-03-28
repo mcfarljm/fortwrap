@@ -693,6 +693,44 @@ class Procedure(object):
     def has_fort_only_arg(self):
         """Whether any arguments are not available in the wrapper code"""
         return any((arg.fort_only() for arg in self.args.values()))
+
+    def write_bindc_wrapper(self, f):
+        proc_wrap_name = self.c_binding_name()
+        proc_type = 'FUNCTION' if self.retval else 'SUBROUTINE'
+        line = '  {} {}({}) BIND(C)'.format(proc_type, proc_wrap_name, self.fort_arg_list(False))
+        f.write(add_line_continuations(line, '  ') + '\n')
+        for p,arg in self.args_by_pos.items():
+            f.write(arg.get_iso_c_type_dec())
+        if self.retval:
+            f.write('    {} :: {}\n'.format(self.retval.get_iso_c_type(), proc_wrap_name))
+        for p,arg in self.args_by_pos.items():
+            f.write(arg.get_iso_c_type_local_decs())
+        for p,arg in self.args_by_pos.items():
+            f.write(arg.get_iso_c_setup_code())
+        selector_setup, count = self.get_iso_c_select_type_code()
+        f.write(selector_setup)
+        # Call Fortran function
+        line = 2*(count+2)*' ' # Indentation for call
+        if self.retval:
+            line += proc_wrap_name + ' = '
+        else:
+            line += 'CALL '
+        arg_list = self.fort_arg_list(True)
+        try:
+            tbp = objects[self.args_by_pos[1].type.type.lower()].tbps[self.name.lower()].name
+        except:
+            tbp = None
+        if tbp:
+            arg1 = arg_list.split(',')[0]
+            args = ','.join(arg_list.split(',')[1:])
+            line += '{}%{}({})'.format(arg1, tbp, args)
+        else:
+            line += self.name + '(' + arg_list + ')'
+        f.write(add_line_continuations(line, 2*(count+2)*' ') + '\n')
+        # Close the select type statements
+        for i in range(count,0,-1):
+            f.write(2*(i+1)*' ' + 'END SELECT\n')
+        f.write('  END {} {}\n\n'.format(proc_type, proc_wrap_name))        
                 
         
 class DerivedType(object):
@@ -718,6 +756,45 @@ class DerivedType(object):
             if proc.ctor:
                 ctors.append(proc)
         return ctors
+
+    def write_container_type(self, f):
+        f.write('  TYPE {}_container_\n'.format(self.name))
+        f.write('    CLASS ({}), ALLOCATABLE :: c\n'.format(self.name))
+        f.write('  END TYPE {}_container_\n\n'.format(self.name))
+
+    def write_allocators(self, f, comment_written):
+        if not comment_written:
+            f.write('  ! Derived type allocate and deallocate functions:\n\n')
+            alloc_comment_written = True
+
+        cptr = self.name + '_cptr'
+        fptr = self.name + '_fptr'
+        # Write allocate function
+        f.write('  SUBROUTINE ' + object_allocator_binding_name(self.name) + '(' + cptr + ') BIND(C)\n')
+        f.write('    TYPE (C_PTR) :: ' + cptr + '\n\n')
+        obj_name = self.name
+        if self.is_class:
+            obj_name = get_base_class(self).name + '_container_'
+        f.write('    TYPE (' + obj_name + '), POINTER :: ' + fptr + '\n\n')
+        f.write('    ALLOCATE( ' + fptr + ' )\n')
+        if self.is_class:
+            if self.extends:
+                dynamic_type = self.name + '::'
+            else:
+                dynamic_type = ''
+            f.write('    ALLOCATE( ' + dynamic_type + fptr + '%c )\n')
+        f.write('    ' + cptr + ' = C_LOC(' + fptr + ')\n')
+        f.write('  END SUBROUTINE ' + object_allocator_binding_name(self.name) + '\n\n')
+        # Write deallocate function
+        f.write('  SUBROUTINE ' + object_allocator_binding_name(self.name, True) + '(' + cptr + ') BIND(C)\n')
+        f.write('    TYPE (C_PTR), VALUE :: ' + cptr + '\n\n')
+        f.write('    TYPE (' + self.name + '), POINTER :: ' + fptr + '\n\n')
+        f.write('    CALL C_F_POINTER(' + cptr + ', ' + fptr + ')\n')
+        f.write('    DEALLOCATE( ' + fptr + ' )\n')
+        f.write('  END SUBROUTINE ' + object_allocator_binding_name(self.name, True) + '\n\n')
+
+        return comment_written
+        
 
 class TypeBoundProcedure(object):
     def __init__(self, name, proc, interface, deferred):
@@ -1956,9 +2033,7 @@ def write_fortran_iso_wrapper():
         for obj in objects.values():
             # Only create container types for the base classes
             if obj.is_class and not obj.extends:
-                f.write('  TYPE {}_container_\n'.format(obj.name))
-                f.write('    CLASS ({}), ALLOCATABLE :: c\n'.format(obj.name))
-                f.write('  END TYPE {}_container_\n\n'.format(obj.name))
+                obj.write_container_type(f)
         
         f.write('CONTAINS\n\n')
 
@@ -1968,73 +2043,11 @@ def write_fortran_iso_wrapper():
         for obj in objects.values():
             if obj.name == orphan_classname or obj.abstract:
                 continue
-            if not alloc_comment_written:
-                f.write('  ! Derived type allocate and deallocate functions:\n\n')
-                alloc_comment_written = True
-            cptr = obj.name + '_cptr'
-            fptr = obj.name + '_fptr'
-            # Write allocate function
-            f.write('  SUBROUTINE ' + object_allocator_binding_name(obj.name) + '(' + cptr + ') BIND(C)\n')
-            f.write('    TYPE (C_PTR) :: ' + cptr + '\n\n')
-            obj_name = obj.name
-            if obj.is_class:
-                obj_name = get_base_class(obj).name + '_container_'
-            f.write('    TYPE (' + obj_name + '), POINTER :: ' + fptr + '\n\n')
-            f.write('    ALLOCATE( ' + fptr + ' )\n')
-            if obj.is_class:
-                if obj.extends:
-                    dynamic_type = obj.name + '::'
-                else:
-                    dynamic_type = ''
-                f.write('    ALLOCATE( ' + dynamic_type + fptr + '%c )\n')
-            f.write('    ' + cptr + ' = C_LOC(' + fptr + ')\n')
-            f.write('  END SUBROUTINE ' + object_allocator_binding_name(obj.name) + '\n\n')
-            # Write deallocate function
-            f.write('  SUBROUTINE ' + object_allocator_binding_name(obj.name, True) + '(' + cptr + ') BIND(C)\n')
-            f.write('    TYPE (C_PTR), VALUE :: ' + cptr + '\n\n')
-            f.write('    TYPE (' + obj.name + '), POINTER :: ' + fptr + '\n\n')
-            f.write('    CALL C_F_POINTER(' + cptr + ', ' + fptr + ')\n')
-            f.write('    DEALLOCATE( ' + fptr + ' )\n')
-            f.write('  END SUBROUTINE ' + object_allocator_binding_name(obj.name, True) + '\n\n')        
+            alloc_comment_written = obj.write_allocators(f, alloc_comment_written)
 
         f.write('  ! C binding wrappers:\n\n')
         for proc in procedures:
-            proc_wrap_name = proc.c_binding_name()
-            proc_type = 'FUNCTION' if proc.retval else 'SUBROUTINE'
-            line = '  {} {}({}) BIND(C)'.format(proc_type, proc_wrap_name, proc.fort_arg_list(False))
-            f.write(add_line_continuations(line, '  ') + '\n')
-            for p,arg in proc.args_by_pos.items():
-                f.write(arg.get_iso_c_type_dec())
-            if proc.retval:
-                f.write('    {} :: {}\n'.format(proc.retval.get_iso_c_type(), proc_wrap_name))
-            for p,arg in proc.args_by_pos.items():
-                f.write(arg.get_iso_c_type_local_decs())
-            for p,arg in proc.args_by_pos.items():
-                f.write(arg.get_iso_c_setup_code())
-            selector_setup, count = proc.get_iso_c_select_type_code()
-            f.write(selector_setup)
-            # Call Fortran function
-            line = 2*(count+2)*' ' # Indentation for call
-            if proc.retval:
-                line += proc_wrap_name + ' = '
-            else:
-                line += 'CALL '
-            arg_list = proc.fort_arg_list(True)
-            try:
-                tbp = objects[proc.args_by_pos[1].type.type.lower()].tbps[proc.name.lower()].name
-            except:
-                tbp = None
-            if tbp:
-                arg1 = arg_list.split(',')[0]
-                args = ','.join(arg_list.split(',')[1:])
-                line += '{}%{}({})'.format(arg1, tbp, args)
-            else:
-                line += proc.name + '(' + arg_list + ')'
-            f.write(add_line_continuations(line, 2*(count+2)*' ') + '\n')
-            # Close the select type statements
-            for i in range(count,0,-1):
-                f.write(2*(i+1)*' ' + 'END SELECT\n')
-            f.write('  END {} {}\n\n'.format(proc_type, proc_wrap_name))
+            proc.write_bindc_wrapper(f)
         
         f.write('END MODULE ' + 'FortranISOWrappers' + '\n')
                 
@@ -2159,6 +2172,7 @@ class Options(object):
         parser.add_argument('--no-W-not-wrapped', action='store_true', help='do not warn about procedures that were not wrapped')
         parser.add_argument('--main-header', default='FortWrap', help='Use MAIN_HEADER as name of the main header file (default=%(default)s)')
         parser.add_argument('--constants-class', default='FortConstants', help='use CONSTANTS_CLASS as name of the class for wrapping enumerations (default=%(default)s)')
+        parser.add_argument('--single-module', action='store_true', help='write all Fortran ISO_C_BINDING wrappers to single module')
         # Not documenting, as this option could be dangerous, although it is
         # protected from -d.  help='remove all wrapper-related files from
         # wrapper code directory before generating new code.  Requires -d.
