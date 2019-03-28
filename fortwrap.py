@@ -2001,8 +2001,8 @@ def write_fortran_iso_wrapper():
         for proc in procedures:
             proc_wrap_name = proc.c_binding_name()
             proc_type = 'FUNCTION' if proc.retval else 'SUBROUTINE'
-            line = '  {} {}({}) BIND(C)\n'.format(proc_type, proc_wrap_name, proc.fort_arg_list(False))
-            f.write(add_line_continuations(line, '  '))
+            line = '  {} {}({}) BIND(C)'.format(proc_type, proc_wrap_name, proc.fort_arg_list(False))
+            f.write(add_line_continuations(line, '  ') + '\n')
             for p,arg in proc.args_by_pos.items():
                 f.write(arg.get_iso_c_type_dec())
             if proc.retval:
@@ -2027,10 +2027,10 @@ def write_fortran_iso_wrapper():
             if tbp:
                 arg1 = arg_list.split(',')[0]
                 args = ','.join(arg_list.split(',')[1:])
-                line += '{}%{}({})\n'.format(arg1, tbp, args)
+                line += '{}%{}({})'.format(arg1, tbp, args)
             else:
-                line += proc.name + '(' + arg_list + ')\n'
-            f.write(add_line_continuations(line, 2*(count+2)*' '))
+                line += proc.name + '(' + arg_list + ')'
+            f.write(add_line_continuations(line, 2*(count+2)*' ') + '\n')
             # Close the select type statements
             for i in range(count,0,-1):
                 f.write(2*(i+1)*' ' + 'END SELECT\n')
