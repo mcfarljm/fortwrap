@@ -148,8 +148,8 @@ cpp_type_map = {'INTEGER':
                  'C_DOUBLE':'double*',
                  'C_FLOAT':'float*'},
                 'LOGICAL':
-                {'':'int*',
-                 'C_BOOL':'int*'}, 
+                {'':'bool*',
+                 'C_BOOL':'bool*'}, 
                 'CHARACTER':
                 {'':'char*'}}
 
@@ -512,6 +512,8 @@ class Argument(object):
         elif self.type.array and self.type.array.assumed_shape:
             shape = '(' + ','.join(':' for i in range(self.type.array.d)) + ')'
             return '    ' + self.get_iso_c_type(True) + ', POINTER :: {}__p{}\n'.format(self.name, shape)
+        elif self.type.type == 'LOGICAL':
+            return '    LOGICAL{} :: {}__l\n'.format('({})'.format(self.type.kind) if self.type.kind else '', self.name)
         return ''
 
     def get_iso_c_setup_code(self):
@@ -527,6 +529,13 @@ class Argument(object):
             else:
                 shape = ','.join(d for d in self.type.array.size_var)
             return '    CALL C_F_POINTER({0}, {0}__p, [{1}])\n'.format(self.name, shape)
+        elif self.type.type == 'LOGICAL':
+            return '    {0}__l = {0}\n'.format(self.name)
+        return ''
+
+    def get_iso_c_post_call_code(self):
+        if self.type.type=='LOGICAL' and self.intent!='in':
+            return '    {0} = {0}__l\n'.format(self.name)
         return ''
 
 
@@ -663,6 +672,8 @@ class Procedure(object):
                         name += 'p'
                     else:
                         name += '%c'
+            elif call and arg.type.type=='LOGICAL':
+                name += '__l'
             s += name + (', ' if self.has_args_past_pos(p, not call) else '')
         return s
 
@@ -730,6 +741,8 @@ class Procedure(object):
         # Close the select type statements
         for i in range(count,0,-1):
             f.write(2*(i+1)*' ' + 'END SELECT\n')
+        for p,arg in self.args_by_pos.items():
+            f.write(arg.get_iso_c_post_call_code())            
         f.write('  END {} {}\n\n'.format(proc_type, proc_wrap_name))        
                 
         
