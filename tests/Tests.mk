@@ -1,7 +1,8 @@
 FC = gfortran
 CXXFLAGS = -Wall -g -I $(WRAP) -std=c++11 -pedantic-errors
-# Replace -std=f2008ts with =std=f2018 on newer versions of gfortran
-FFLAGS = -g -I $(WRAP) -std=f2008ts
+# Use -std=f2008ts or -std=f2018 on newer versions of gfortran.  However, this will flag as an error the REAL*8 type declarations in the tests
+FFLAGS_BASE = -g -I $(WRAP)
+FFLAGS = $(FFLAGS_BASE) -std=f2008ts
 
 # Directory for wrapper code
 WRAP = wrap
