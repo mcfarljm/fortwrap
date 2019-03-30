@@ -1892,6 +1892,12 @@ def get_required_modules(module):
         for argname,arg in proc.args.items():
             if arg.native:
                 includes.add(objects[arg.type.type.lower()].module)
+            elif arg.pos==1 and arg.type.dt and arg.type.type.lower() in objects:
+                # This is needed for cases where the derived type
+                # "method" is defined in a separate module, and that
+                # module doesn't make the derived type public
+                includes.add(objects[arg.type.type.lower()].module)
+                
     return includes
 
 def write_global_header_file():

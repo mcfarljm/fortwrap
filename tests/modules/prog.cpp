@@ -13,6 +13,8 @@ int main(void)
     return 2;
   if (c.getval() != 3)
     return 3;
+  if (a.getvala_fromd() != 1)
+    return 4;
 
   return 0;
 }
