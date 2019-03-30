@@ -71,7 +71,7 @@ CONTAINS
     INTEGER, INTENT(in) :: radius
     PRINT*, 'in cricle_ctor_f:', radius
     s%radius = radius
-    PRINT*, 'cloc in Circle_ctor_f:', c_loc(s)
+!!$    PRINT*, 'cloc in Circle_ctor_f:', c_loc(s)
     !PRINT*, 'Shape num in ctor:', s%num
   END FUNCTION Circle_ctor_f
 
@@ -106,7 +106,7 @@ CONTAINS
     TYPE (Circle), INTENT(in), TARGET :: s
     INTEGER :: a
     a = 3 * s%radius**2
-    PRINT*, 'c loc in circle_area_dt:', c_loc(s)
+!!$    PRINT*, 'c loc in circle_area_dt:', c_loc(s)
   END FUNCTION circle_area_dt
 
   FUNCTION Circle_diameter(s) RESULT(d)
