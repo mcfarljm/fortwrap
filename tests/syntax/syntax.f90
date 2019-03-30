@@ -8,12 +8,12 @@ CONTAINS
   FUNCTION add_ints1(a,b) RESULT(y)
     INTEGER ( KIND = 1 ) , INTENT(in) :: a  ! Comment with & character
     INTEGER(1), INTENT(in) :: b
-    INTEGER*1 :: y
+    INTEGER(1) :: y
     y = a+b
   END FUNCTION add_ints1
   
   FUNCTION add_ints2(a,b) RESULT(y)
-    INTEGER*2, INTENT(in) :: a,& ! Line continuation with comment
+    INTEGER(2), INTENT(in) :: a,& ! Line continuation with comment
       b
     INTEGER(KIND=2  ) :: y
     y = a+b
@@ -37,11 +37,11 @@ CONTAINS
   CONTAINS
 
     SUBROUTINE foo(a)
-      REAL*8, INTENT(in) :: a
+      REAL(8), INTENT(in) :: a
     END SUBROUTINE foo
 
     SUBROUTINE bar(b)
-      REAL*8, INTENT(in) :: b
+      REAL(8), INTENT(in) :: b
     END SUBROUTINE bar
   END FUNCTION contains_arg_clash
 
