@@ -105,6 +105,8 @@ result_name_def = re.compile(r'.*RESULT\s*\(\s*(\w+)\s*\)',re.IGNORECASE)
 intent_in_def = re.compile(r'.*INTENT\s?\(\s*IN\s*\)',re.IGNORECASE)
 intent_out_def = re.compile(r'.*INTENT\s?\(\s*OUT\s*\)',re.IGNORECASE)
 fort_abstract_def = re.compile(r'\s*ABSTRACT\s+INTERFACE',re.IGNORECASE)
+fort_interface_def = re.compile(r'\s*INTERFACE\s+(\w+)',re.IGNORECASE)
+module_proc_def = re.compile(r'\s*MODULE\s+PROCEDURE\s+:*(.*)',re.IGNORECASE)
 integer_param_def = re.compile(r'\s+INTEGER,\s+PARAMETER\s+::',re.IGNORECASE)
 # Regular expression to break up arguments.  This is needed to handle
 # multi-dimensional arrays (e.g. A(m,n)).  It uses a negative
@@ -130,6 +132,7 @@ pattern_substitutions = [] # List of (regex,replace) tuples
 name_exclusions = set()
 name_inclusions = set()
 proc_arg_exclusions = set()
+interface_defs = dict() # module -> proc name -> generic interface
 
 # 'INT' is for the hidden name length argument
 cpp_type_map = {'INTEGER':
@@ -736,7 +739,10 @@ class Procedure(object):
             args = ','.join(arg_list.split(',')[1:])
             line += '{}%{}({})'.format(arg1, tbp, args)
         else:
-            line += self.name + '(' + arg_list + ')'
+            # Use generic interface name if defined in INTERFACE
+            # block, in case actual name is not public
+            name = interface_defs[self.module].get(self.name.lower(), self.name)
+            line += name + '(' + arg_list + ')'
         f.write(add_line_continuations(line, 2*(count+2)*' ') + '\n')
         # Close the select type statements
         for i in range(count,0,-1):
@@ -1193,6 +1199,21 @@ def parse_abstract_interface(file,line):
             parse_proc(file,line,abstract=True)
             dox_comments = []
 
+def parse_interface_def(f, interface_name):
+    global interface_defs
+    while True:
+        line = f.readline()
+        line = f.join_lines(line)
+        if not line:
+            error("Unexpected end of file in INTERFACE block")
+            return
+        elif fort_end_interface.match(line):
+            break
+        elif module_proc_def.match(line):
+            procs = module_proc_def.match(line).group(1).split(',')
+            for proc in procs:
+                interface_defs[current_module][proc.lower().strip()] = interface_name
+
 def parse_type(file,line):
     global fort_class_used
     m = fort_type_def.match(line)
@@ -1294,6 +1315,7 @@ def parse_file(fname):
         elif module_def.match(line) and 'PROCEDURE' not in line.upper():
             current_module = line.split()[1]
             module_list.append(current_module)
+            interface_defs[current_module] = dict()
             #print 'MOD:', current_module
             dox_comments = []
             initialize_protection()
@@ -1311,6 +1333,8 @@ def parse_file(fname):
         elif fort_abstract_def.match(line):
             parse_abstract_interface(f,line)
             dox_comments = []
+        elif fort_interface_def.match(line):
+            parse_interface_def(f, fort_interface_def.match(line).group(1))
         elif line.strip().upper().startswith('PRIVATE'):
             if '::' not in line:
                 default_protection = PRIVATE

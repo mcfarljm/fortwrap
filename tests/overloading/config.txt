@@ -1,0 +1,3 @@
+%include foo_private0
+%include foo_private1
+%include foo_private2
