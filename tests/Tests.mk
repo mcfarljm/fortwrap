@@ -1,6 +1,7 @@
 FC = gfortran
 CXXFLAGS = -Wall -g -I $(WRAP) -std=c++11 -pedantic-errors
-FFLAGS = -g -I $(WRAP)
+# Replace -std=f2008ts with =std=f2018 on newer versions of gfortran
+FFLAGS = -g -I $(WRAP) -std=f2008ts
 
 # Directory for wrapper code
 WRAP = wrap
