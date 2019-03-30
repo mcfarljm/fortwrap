@@ -474,9 +474,7 @@ class Argument(object):
             raise FWTypeException(self.type.type)
 
     def get_iso_c_type(self, ignore_array=False):
-        if self.type.array and not self.type.array.assumed_shape:
-            return '{}({}), DIMENSION({})'.format(self.type.type, iso_c_type_map[self.type.type][self.type.kind], self.type.array.spec)
-        if (self.type.array and (not ignore_array)) or self.type.dt:
+        if self.type.dt:
             return 'TYPE(C_PTR), VALUE'
         if self.type.proc_pointer:
             return 'TYPE(C_FUNPTR), VALUE'
@@ -489,6 +487,8 @@ class Argument(object):
         string = '{}({})'.format(self.type.type, c_kind)
         if self.optional:
             string += ', OPTIONAL'
+        if self.type.array and not ignore_array:
+            string += ', DIMENSION({})'.format(self.type.array.spec)
         if self.type.kind == 'CHARLEN_':
             string += ', VALUE'
         return string
