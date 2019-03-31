@@ -11,6 +11,12 @@ CONTAINS
     y = DOT_PRODUCT(a,b)
   END FUNCTION inner_prod
 
+  FUNCTION inner_prod_assumed_shape(a,b) RESULT(y)
+    INTEGER, INTENT(in) :: a(:), b(:)
+    INTEGER :: y
+    y = DOT_PRODUCT(a,b)
+  END FUNCTION inner_prod_assumed_shape
+
   ! Test assumed size
 !!$  FUNCTION inner_prod_2(n,a,b) RESULT(y)
 !!$    INTEGER, INTENT(in) :: n

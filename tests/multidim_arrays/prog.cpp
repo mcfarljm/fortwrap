@@ -19,6 +19,10 @@ int main(void)
     // Test assumed size
     // if (FortFuncs::inner_prod_2(3,a,b) != 8)
     //   return 2;
+
+    // Test assumed shape:
+    if (FortFuncs::inner_prod_assumed_shape(3, 3, a, b) != 8)
+      return 3;
   }
 
   // 2-D array test:
@@ -45,7 +49,7 @@ int main(void)
     for (int i=0; i<3; i++) 
       {
 	if (Xa[i] != Xa_test[i])
-	  return 3;
+	  return 10;
       }
   }
 
@@ -58,7 +62,7 @@ int main(void)
       for (int j=0; j<3; j++) {
 	for (int k=0; k<4; k++) {
 	  if (X[i][j][k] != pow(j+k+2,i+1))
-	    return 4;
+	    return 20;
 	}
       }
     }
