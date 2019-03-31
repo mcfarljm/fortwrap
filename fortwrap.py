@@ -229,6 +229,7 @@ class Array(object):
         self.spec = spec
         self.assumed_shape = False
         self.size_var = ''
+        self.assumed_shape_vars = []
         self.d = spec.count(',') + 1
         if ':' in spec:
             self.assumed_shape = True
@@ -250,8 +251,17 @@ class Array(object):
 
         # Properties queried by the wrapper generator:
         # vec=vector: 1-d array
-        self.vec = self.d==1 and not self.assumed_shape
-        self.matrix = self.d==2 and not self.assumed_shape
+        self.vec = self.d==1
+        self.matrix = self.d==2
+
+    def add_assumed_shape_var(self, var):
+        self.assumed_shape_vars.append(var)
+
+    def get_shape(self):
+        if self.assumed_shape_vars:
+            return ','.join(self.assumed_shape_vars)
+        else:
+            return self.spec
 
 class CharacterLength(object):
     """
@@ -269,11 +279,11 @@ class CharacterLength(object):
         if self.assumed:
             return self.val + '_len__'
         else:
-            return str(self.val)        
+            return str(self.val)
 
 class DataType(object):
     complex_warning_written = False
-    def __init__(self,type,array=None,str_len=None,is_str_len=False):
+    def __init__(self, type, array=None, str_len=None, is_str_len=False, is_assumed_shape_size=False):
         global stringh_used
         self.type = type
         self.kind = ''
@@ -283,6 +293,7 @@ class DataType(object):
         self.proc = False # PROCEDURE without POINTER attribute
         self.dt = False      # False, 'TYPE', or 'CLASS'
         self.is_str_len = is_str_len # string length arg
+        self.is_assumed_shape_size = is_assumed_shape_size
         # For array, name of argument used to pass the array length:
         self.is_array_size = False # integer defining an array size
         self.is_matrix_size = False
@@ -429,10 +440,13 @@ class Argument(object):
             return True
         return False
 
-    def is_hidden(self):
+    def is_hidden(self, fortran_api=False):
+        """fortran_api: whether the argument is hidden from the call to the original Fortran function"""
         if self.type.is_str_len:
             return True
-        elif self.type.is_array_size or self.type.is_matrix_size:
+        elif self.type.is_assumed_shape_size:
+            return True
+        elif (not fortran_api) and (self.type.is_array_size or self.type.is_matrix_size):
             return True
         else:
             return False
@@ -490,7 +504,7 @@ class Argument(object):
         if self.optional:
             string += ', OPTIONAL'
         if self.type.array and not ignore_array:
-            string += ', DIMENSION({})'.format(self.type.array.spec)
+            string += ', DIMENSION({})'.format(self.type.array.get_shape())
         if self.type.kind == 'SIZE_':
             string += ', VALUE'
         return string
@@ -514,9 +528,6 @@ class Argument(object):
             return '    PROCEDURE({}), POINTER :: {}__p\n'.format(self.type.type, self.name)
         elif self.type.type == 'CHARACTER':
             return '    CHARACTER({1}), POINTER :: {0}__p\n'.format(self.name, self.type.str_len.as_string())
-        elif self.type.array and self.type.array.assumed_shape:
-            shape = '(' + ','.join(':' for i in range(self.type.array.d)) + ')'
-            return '    ' + self.get_iso_c_type(True) + ', POINTER :: {}__p{}\n'.format(self.name, shape)
         elif self.type.type == 'LOGICAL':
             return '    LOGICAL{} :: {}__l\n'.format('({})'.format(self.type.kind) if self.type.kind else '', self.name)
         return ''
@@ -528,12 +539,6 @@ class Argument(object):
             return '    CALL C_F_POINTER({0}, {0}__p)\n'.format(self.name)
         elif self.type.proc_pointer:
             return '    CALL C_F_PROCPOINTER({0}, {0}__p)\n'.format(self.name)
-        elif self.type.array and self.type.array.assumed_shape:
-            if self.type.array.d == 1:
-                shape = '{}'.format(self.type.array.size_var)
-            else:
-                shape = ','.join(d for d in self.type.array.size_var)
-            return '    CALL C_F_POINTER({0}, {0}__p, [{1}])\n'.format(self.name, shape)
         elif self.type.type == 'LOGICAL':
             return '    {0}__l = {0}\n'.format(self.name)
         return ''
@@ -582,6 +587,7 @@ class Procedure(object):
             else:
                 break
         self.add_hidden_strlen_args()
+        self.add_hidden_array_len_args()
         # Check for integer arguments that define array sizes:
         for arg in self.args.values():
             if arg.type.type.upper()=='INTEGER' and arg.intent=='in':
@@ -621,6 +627,25 @@ class Procedure(object):
                 pos = pos + 1
         # Have to add to self.args_by_pos outside of above loop b/c can't mutate dict during iteration
         self.args_by_pos.update(args_by_pos_new)
+
+    def add_hidden_array_len_args(self):
+        """Add array length arguments for assumed shape"""
+        nargs = len(self.args)
+        pos = nargs + 1
+        args_by_pos_new = collections.OrderedDict() # Track hidden str-len args
+        for arg in self.args_by_pos.values():
+            # Hidden length argument only needed for assumed shape arrays
+            if arg.type.array and arg.type.array.assumed_shape and not arg.fort_only():
+                arg.type.array.hidden_size_vars = []
+                for idim in range(arg.type.array.d):
+                    array_length_arg = Argument(arg.name + '_len__', pos, DataType('INTEGER(SIZE_)', is_assumed_shape_size=True))
+                    self.args[ array_length_arg.name ] = array_length_arg
+                    args_by_pos_new[pos] = array_length_arg # Ordered add is correct since self.args_by_pos is ordered
+                    # Store reference to this arg in array definition:
+                    arg.type.array.add_assumed_shape_var(arg.name+'_len__')
+                    pos = pos + 1
+        # Have to add to self.args_by_pos outside of above loop b/c can't mutate dict during iteration
+        self.args_by_pos.update(args_by_pos_new)        
 
     def get_vec_size_parent(self,argname):
         """Get the first 1d array argument that uses the argument argname to
@@ -662,7 +687,7 @@ class Procedure(object):
     def fort_arg_list(self, call):
         s = ''
         for p,arg in self.args_by_pos.items():
-            if call and arg.type.is_str_len:
+            if call and arg.is_hidden(fortran_api=True):
                 continue
             if arg.fort_only():
                 continue
@@ -671,7 +696,7 @@ class Procedure(object):
                 # which interferes with conversion to TBP call
                 s += arg.name + '='
             name = arg.name
-            if call and ((arg.type.array and arg.type.array.assumed_shape) or arg.type.dt or arg.type.type=='CHARACTER' or arg.type.proc_pointer):
+            if call and (arg.type.dt or arg.type.type=='CHARACTER' or arg.type.proc_pointer):
                 name += '__p'
                 if arg.type.dt and objects[arg.type.type.lower()].is_class:
                     if objects[arg.type.type.lower()].extends:
@@ -1498,6 +1523,8 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                     string += arg.type.str_len.as_string()
                 elif arg.type.is_array_size or arg.type.is_matrix_size:
                     string = string + '&' + arg.name
+                elif arg.type.is_assumed_shape_size:
+                    string += arg.name
                 if proc.has_args_past_pos(pos,True):
                     string = string + ', '
                 continue
@@ -1624,6 +1651,11 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                     s = s + prefix + '  strncpy(' + arg.name + '_c__, ' + arg.name + ', ' + str_len_p1 + '); ' +arg.name+'_c__['+str_len+'] = 0; // strncpy protects in case '+arg.name+' is too long\n'
                     s = s + prefix + '  for (size_t i=strlen('+arg.name+'_c__); i<'+str_len_p1+'; i++) '+arg.name+"_c__[i] = ' '; // Add whitespace for Fortran\n"
                     s = s + prefix + '}\n'
+            elif arg.type.array and arg.type.array.assumed_shape and not arg.fort_only():
+                # Todo: handle --no-vector option
+                s += prefix + 'size_t ' + arg.name + '_len__ = 0;\n'
+                s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = '+ arg.name + '->size();\n'
+                
     # Add wrapper code for array size values
     if call:
         for arg in proc.args.values():
