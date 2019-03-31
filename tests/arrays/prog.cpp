@@ -15,7 +15,7 @@ int main(void)
 
   // Assumed shape:
   if (FortFuncs::assumed_shape_in(&v) != 10)
-    return 20;
+    return 10;
   
   std::vector<int> v2(10);
   FortFuncs::array_out(&v,&v2);
@@ -45,7 +45,7 @@ int main(void)
 
   SizeContainer c(v3.size());
   if (c.sum_with_dt_size(&v3) != 10)
-    return 10;
+    return 20;
 
   return 0;
 }

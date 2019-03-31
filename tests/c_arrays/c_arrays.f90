@@ -2,9 +2,9 @@ MODULE c_arrays
 
   IMPLICIT NONE
 
-!!$  TYPE SizeContainer
-!!$    INTEGER :: n
-!!$  END TYPE SizeContainer
+  TYPE SizeContainer
+    INTEGER :: n
+  END TYPE SizeContainer
 
 CONTAINS
 
@@ -31,28 +31,28 @@ CONTAINS
   END FUNCTION inner_prod
 
   ! Test assumed size
-!!$  FUNCTION inner_prod_2(n,a,b) RESULT(y)
-!!$    INTEGER, INTENT(in) :: n
-!!$    INTEGER, INTENT(in), DIMENSION(*) :: a
-!!$    INTEGER, INTENT(in) :: b(*)
-!!$    INTEGER :: y
-!!$    y = DOT_PRODUCT(a(1:n),b(1:n))
-!!$  END FUNCTION inner_prod_2
+  FUNCTION inner_prod_2(n,a,b) RESULT(y)
+    INTEGER, INTENT(in) :: n
+    INTEGER, INTENT(in), DIMENSION(*) :: a
+    INTEGER, INTENT(in) :: b(*)
+    INTEGER :: y
+    y = DOT_PRODUCT(a(1:n),b(1:n))
+  END FUNCTION inner_prod_2
 
-!!$  SUBROUTINE sizecontainer_ctor(c, n)
-!!$    TYPE (SizeContainer) :: c
-!!$    INTEGER, INTENT(in) :: n
-!!$    c%n = n
-!!$  END SUBROUTINE sizecontainer_ctor
-!!$
-!!$  FUNCTION sum_with_dt_size(c, x) RESULT(y)
-!!$    TYPE (SizeContainer) :: c
-!!$    ! Make sure this declaration is handled correctly (treated as assumed
-!!$    ! size)
-!!$    INTEGER, INTENT(in) :: x(c%n)
-!!$    INTEGER :: y
-!!$    y = sum(x)
-!!$  END FUNCTION sum_with_dt_size
+  SUBROUTINE sizecontainer_ctor(c, n)
+    TYPE (SizeContainer) :: c
+    INTEGER, INTENT(in) :: n
+    c%n = n
+  END SUBROUTINE sizecontainer_ctor
+
+  FUNCTION sum_with_dt_size(c, x) RESULT(y)
+    TYPE (SizeContainer) :: c
+    ! Make sure this declaration is handled correctly (treated as assumed
+    ! size)
+    INTEGER, INTENT(in) :: x(c%n)
+    INTEGER :: y
+    y = sum(x)
+  END FUNCTION sum_with_dt_size
 
   FUNCTION assumed_shape_in(x) RESULT(y)
     INTEGER, INTENT(in) :: x(:)

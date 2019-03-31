@@ -18,13 +18,13 @@ CONTAINS
   END FUNCTION inner_prod_assumed_shape
 
   ! Test assumed size
-!!$  FUNCTION inner_prod_2(n,a,b) RESULT(y)
-!!$    INTEGER, INTENT(in) :: n
-!!$    INTEGER, INTENT(in), DIMENSION(*) :: a
-!!$    INTEGER, INTENT(in) :: b(*)
-!!$    INTEGER :: y
-!!$    y = DOT_PRODUCT(a(1:n),b(1:n))
-!!$  END FUNCTION inner_prod_2
+  FUNCTION inner_prod_2(n,a,b) RESULT(y)
+    INTEGER, INTENT(in) :: n
+    INTEGER, INTENT(in), DIMENSION(*) :: a
+    INTEGER, INTENT(in) :: b(*)
+    INTEGER :: y
+    y = DOT_PRODUCT(a(1:n),b(1:n))
+  END FUNCTION inner_prod_2
 
   SUBROUTINE mat_vec_mult(m,n,A,b,Ab)
     INTEGER, INTENT(in) :: m,n, b(n)
