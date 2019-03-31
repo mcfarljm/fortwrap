@@ -417,9 +417,7 @@ class Argument(object):
         if self.exclude:
             return True
         if self.type.array and self.type.array.assumed_shape:
-            if self.type.array.d == 2 and opts.no_fmat:
-                return True
-            elif self.type.array.d > 2:
+            if self.type.array.d > 2:
                 return True
         if self.type.dt:
             if self.type.array:
@@ -455,7 +453,7 @@ class Argument(object):
         if self.type.is_str_len:
             return True
         elif self.type.is_assumed_shape_size:
-            if (not fortran_api) and self.type.is_assumed_shape_size==1 and opts.no_vector:
+            if (not fortran_api) and ((self.type.is_assumed_shape_size==1 and opts.no_vector) or (self.type.is_assumed_shape_size==2 and opts.no_fmat)):
                 # Size needed in C++ API
                 return False
             else:

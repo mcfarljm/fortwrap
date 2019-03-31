@@ -51,6 +51,16 @@ int main(void)
 	if (Xa[i] != Xa_test[i])
 	  return 10;
       }
+
+    // Assumed shape
+    int Xa2[3];
+    FortFuncs::mat_vec_mult(3,2,(int*)X,a,Xa2);
+    for (int i=0; i<3; i++) 
+      {
+	if (Xa2[i] != Xa_test[i])
+	  return 11;
+      }    
+    
   }
 
   // 3-D array test

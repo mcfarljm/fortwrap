@@ -33,6 +33,13 @@ CONTAINS
     Ab = MATMUL(A,b)
   END SUBROUTINE mat_vec_mult
 
+  SUBROUTINE mat_vec_mult_assumed_shape(A,b,Ab)
+    INTEGER, INTENT(in) :: b(:)
+    INTEGER, INTENT(in), DIMENSION(:,:) :: A
+    INTEGER, INTENT(out) :: Ab(:)
+    Ab = MATMUL(A,b)
+  END SUBROUTINE mat_vec_mult_assumed_shape
+
   SUBROUTINE three_d_array_test(A)
     INTEGER, INTENT(out) :: A(4,3,2)
 
