@@ -237,6 +237,71 @@ indicate expected behavior (0 means success).  For example:
 0
 ```
 
+## Nuances of the ISO_C_BINDING approach
+
+The original version of FortWrap did not use the `ISO_C_BINDING`
+module and instead generated C++ wrapper code that called directly
+into the user-written Fortran routines.  This required making certain
+assumptions about how the compiler generated code, including name
+mangling and string length handling.
+
+This version of FortWrap is intended to be more "portable" through the
+use of the `ISO_C_BINDING` module, which provides for a certain level
+of interoperability with C.  However, this approach results in
+significantly more complex wrapper code.  The basic idea is that an
+"interoperable" (`BIND_C`) version of each user function is created,
+and this interoperable version then calls the original function.  The
+remainder of this section discusses some of the challenges and quirks
+of this wrapping approach.
+
+### Modules
+
+FortWrap is designed to work with modern code, and this version of
+FortWrap only supports wrapping code within modules.  However, this
+means that in order for the "interoperable" wrapper functions to call
+the original functions, they must "`USE`" the associated module.  This
+was not needed in previous versions of FortWrap, since the C++ code
+called directly into the original user functions.
+
+There are several challenges with `USE`ing modules in the generated
+wrapper code.  First, consider the simplest approach of writing all of
+the wrapper code to a single new module, and then `USE`ing every user
+module necessary to access the original functions.  For a large
+project with many modules, it is possible that this will produce name
+conflicts (e.g. the same name is defined in more than one module).
+With the advent of type bound procedures, this becomes less of a
+problem, but not all code uses them.
+
+The next option is to create a separate wrapper module for each user
+module (this is currently the default in FortWrap).  This avoids the
+name conflict but creates a new issue: derived types defined in a
+different module may appear in the argument list of the module being
+wrapped.  The solution is to identify these cases and `USE` the module
+in which those derived types are defined.  FortWrap tries to do this,
+and it is demonstrated in the `modules` test case.  There may be edge
+cases that this does not fully cover though (one is abstract
+interfaces).  
+
+The other issue with using multiple modules is that they must be
+compiled in order.  Currently, FortWrap writes multiple modules to a
+single file, in the order in which it parses the source files.
+Modules that have to be `USE`d by the wrapper code of other modules
+must appear first.  The user can control the order of the modules
+through specifying the list of source files to wrap.  Future versions
+of FortWrap may provide the option to write the modules to separate
+files, in which case the makefile generator (e.g. CMake) is
+responsible for figuring out the correct order to compile the files.
+
+For these reasons, the `--single-module` option is provided to force
+FortWrap to use a single module.  This approach is more likely to
+produce wrapper code that will compile, provided that there are no
+name conflicts across all modules in the project that are being
+wrapped.
+
+### Logicals
+
+### Optional arguments
+
 ## The Configuration File
 
 The `-i` option can be used to specify a file to read
