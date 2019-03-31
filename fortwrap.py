@@ -1534,7 +1534,10 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                             # Chop of the * and add [] after the argname below
                             string = string[:-2] + ' '
                 elif arg.type.type=='CHARACTER' and not bind and not arg.intent=='in':
-                    string = string + string_object_type + ' *' # pass by ref not compat with optional
+                    if opts.string_out == 'c':
+                        string += 'char *'
+                    else:
+                        string = string + string_object_type + ' *' # pass by ref not compat with optional
                 else:
                     string = string + arg.cpp_type() + ' '
             else:
@@ -1614,7 +1617,11 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                     # with gfortran indicates that in case of not
                     # present it passes 0 for the length)
                     s = s + prefix + 'size_t ' + arg.name + '_len__ = 0;\n'
-                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = '+ arg.name + '->length();\n'
+                    if opts.string_out == 'c':
+                        getlen = 'strlen({})'.format(arg.name)
+                    else:
+                        getlen = arg.name + '->length()'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = '+ getlen + ';\n'
                 s = s + prefix + '// Declare memory to store output character data\n'
                 s = s + prefix + 'char *' + arg.name + '_c__ = new char[' + str_len_p1 + '];\n'
                 s = s + prefix + arg.name + '_c__[' + str_len + "] = '\\0';\n"
@@ -1684,7 +1691,12 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                 s = s + prefix + 'if ('+arg.name+') {\n'
                 s = s + prefix + '  // Trim trailing whitespace and assign character array to string:\n'
                 s = s + prefix + '  for (int i=' + str_len_m1 + '; ' + arg.name + "_c__[i]==' '; i--) " + arg.name + "_c__[i] = '\\0';\n"
-                s = s + prefix + '  ' + arg.name + '->assign(' + arg.name + '_c__);\n  }\n'
+                if opts.string_out == 'c':
+                    s = s + prefix + '  strncpy({}, {}, {});\n'.format(arg.name, arg.name+'_c__',str_len)
+                    s += prefix + "  {}[{}] = '\\0';\n".format(arg.name, str_len)
+                else:
+                    s = s + prefix + '  ' + arg.name + '->assign(' + arg.name + '_c__);\n'
+                s += '  }\n'
                 s = s + prefix + 'delete[] ' + arg.name + '_c__;'
         if proc.retval and proc.has_post_call_wrapper_code():
             s = s + '\n' + prefix + 'return __retval;'
@@ -1906,7 +1918,7 @@ def get_native_includes(object):
                     # The use of angle brackets is handled specially
                     # in the output code
                     includes.add('<string>')
-                else:
+                elif opts.string_out == 'wrapper':
                     includes.add(string_classname)
     # For inheritance:
     if object.extends:
@@ -2267,7 +2279,8 @@ class Options(object):
         parser.add_argument('--no-vector', action='store_true', help='wrap 1-D array arguments as C-style arrays instead of C++ std::vector containers')
         parser.add_argument('--no-fmat', action='store_true', help='do not wrap 2-D array arguments with the FortranMatrix type')
         parser.add_argument('--array-as-ptr', action='store_true', help="wrap 1-D arrays with '*' instead of '[]'.  Implies --no-vector")
-        parser.add_argument('--no-std-string', action='store_true', help='wrap character outputs using a wrapper class instead of std::string')
+        parser.add_argument('--string-out', choices=['c++','c','wrapper'], default='c++')
+        #parser.add_argument('--no-std-string', action='store_true', help='wrap character outputs using a wrapper class instead of std::string')
         parser.add_argument('--dummy-class', default='FortFuncs', help='use DUMMY_CLASS as the name of the dummy class used to wrap non-method procedures')
         parser.add_argument('--global-funcs', action='store_true', help='wrap non-method procedures as global functions instead of static methods of a dummy class')
         parser.add_argument('--no-orphans', action='store_true', help='do not by default wrap non-method procedures.  They can still be wrapped by using %%include directives')
@@ -2298,7 +2311,8 @@ class Options(object):
             self.no_vector = True
 
         self.global_orphans = self.global_funcs
-        self.std_string = not self.no_std_string
+        self.std_string = (self.string_out == 'c++')
+        self.c_string = (self.string_out == 'c')
         self.warn_not_wrapped = not self.no_W_not_wrapped
         if self.main_header != 'FortWrap':
             self.main_header = self.main_header.split('.h')[0]
@@ -2315,7 +2329,7 @@ class Options(object):
             include_output_dir = self.directory
             fort_output_dir = self.directory
 
-        if self.no_std_string:
+        if self.string_out == 'wrapper':
             string_object_type = string_classname
 
         constants_classname = self.constants_class
@@ -2381,7 +2395,7 @@ if __name__ == "__main__":
         write_global_header_file()
         write_misc_defs()
         write_matrix_class()
-        if not opts.std_string:
+        if opts.string_out == 'wrapper':
             write_string_class()
         if opts.single_module:
             write_fortran_iso_wrapper_single_module()
