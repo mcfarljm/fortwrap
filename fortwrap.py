@@ -640,11 +640,11 @@ class Procedure(object):
             if arg.type.array and arg.type.array.assumed_shape and not arg.fort_only():
                 arg.type.array.hidden_size_vars = []
                 for idim in range(arg.type.array.d):
-                    array_length_arg = Argument(arg.name + '_len__', pos, DataType('INTEGER(SIZE_)', is_assumed_shape_size=True))
+                    array_length_arg = Argument(arg.name + '_len__{}'.format(idim+1), pos, DataType('INTEGER(SIZE_)', is_assumed_shape_size=True))
                     new_args.append(array_length_arg)
                     self.args[ array_length_arg.name ] = array_length_arg
                     # Store reference to this arg in array definition:
-                    arg.type.array.add_assumed_shape_var(arg.name+'_len__')
+                    arg.type.array.add_assumed_shape_var(array_length_arg.name)
         # Now recreate args_by_pos with the new array size args at
         # front (need to be at front for strict Fortran conformance)
         if len(new_args) > 0:
@@ -1660,9 +1660,15 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                     s = s + prefix + '  for (size_t i=strlen('+arg.name+'_c__); i<'+str_len_p1+'; i++) '+arg.name+"_c__[i] = ' '; // Add whitespace for Fortran\n"
                     s = s + prefix + '}\n'
             elif arg.type.array and arg.type.array.assumed_shape and not arg.fort_only():
-                # Todo: handle --no-vector option
-                s += prefix + 'size_t ' + arg.name + '_len__ = 0;\n'
-                s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = '+ arg.name + '->size();\n'
+                if arg.type.array.d == 1:
+                    # Todo: handle --no-vector option
+                    s += prefix + 'size_t ' + arg.name + '_len__1 = 0;\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__1 = '+ arg.name + '->size();\n'
+                elif arg.type.array.d == 2:
+                    s += prefix + 'size_t ' + arg.name + '_len__1 = 0;\n'
+                    s += prefix + 'size_t ' + arg.name + '_len__2 = 0;\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__1 = '+ arg.name + '->num_rows();\n'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__2 = '+ arg.name + '->num_cols();\n'
                 
     # Add wrapper code for array size values
     if call:

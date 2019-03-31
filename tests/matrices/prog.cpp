@@ -15,6 +15,9 @@ int main(void)
   if (FortFuncs::one_norm(&X) != 6)
     return 1;
 
+  if (FortFuncs::one_norm_assumed(&X) != 6)
+    return 10;  
+
   // Test assumed size
   // if (FortFuncs::one_norm_2(&X) != 6)
   //   return 1;
