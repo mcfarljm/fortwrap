@@ -154,7 +154,9 @@ cpp_type_map = {'INTEGER':
                 {'':'bool*',
                  'C_BOOL':'bool*'}, 
                 'CHARACTER':
-                {'':'char*'}}
+                {'':'char*'},
+                'C_PTR':
+                {'':'void**'}}
 
 iso_c_type_map = {'INTEGER':
                   {'':'C_INT',
@@ -329,6 +331,9 @@ class DataType(object):
                 if m.group('dt_mode'):
                     self.dt = m.group('dt_mode').upper()
                     self.type = m.group('dt_spec')
+                    if self.type.upper() == 'C_PTR':
+                        # Don't treat like derived type
+                        self.dt = False
                 else:
                     raise FWTypeException(type)
 
@@ -457,7 +462,7 @@ class Argument(object):
             else:
                 prefix = ''
             string = prefix + cpp_type_map[self.type.type.upper()][self.type.kind]
-            if value:
+            if value or self.byval:
                 return string[:-1] # Strip "*"
             else:
                 return string
@@ -474,6 +479,8 @@ class Argument(object):
             raise FWTypeException(self.type.type)
 
     def get_iso_c_type(self, ignore_array=False):
+        if self.type.type.upper() == 'C_PTR':
+            return 'TYPE(C_PTR){}'.format(', VALUE' if self.byval else '')
         if self.type.dt:
             return 'TYPE(C_PTR), VALUE'
         if self.type.proc_pointer:
