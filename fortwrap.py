@@ -143,7 +143,7 @@ cpp_type_map = {'INTEGER':
                  '8':'long long*',
                  'C_INT':'int*',
                  'C_LONG':'long*',
-                 'CHARLEN_':'size_t'}, 
+                 'SIZE_':'size_t'}, 
                 'REAL':
                 {'':'float*',
                  '4':'float*',
@@ -164,7 +164,7 @@ iso_c_type_map = {'INTEGER':
                    '2':'C_SHORT',
                    '4':'C_INT',
                    '8':'C_LONG_LONG',
-                   'CHARLEN_':'C_SIZE_T'},
+                   'SIZE_':'C_SIZE_T'},
                   'REAL':
                   {'':'C_FLOAT',
                    '4':'C_FLOAT',
@@ -252,7 +252,6 @@ class Array(object):
         # vec=vector: 1-d array
         self.vec = self.d==1 and not self.assumed_shape
         self.matrix = self.d==2 and not self.assumed_shape
-        self.fort_only = self.assumed_shape
 
 class CharacterLength(object):
     """
@@ -316,7 +315,7 @@ class DataType(object):
                 warning(self.type+'('+self.kind+') not supported')
 
         if not primitive_data_match:
-            # (CHARLEN_ is used to represent the hidden length arguments,
+            # (SIZE_ is used to represent the hidden length arguments,
             # passed by value)
             if 'PROCEDURE' in type.upper():
                 # Matching broken b/c of "::'
@@ -382,8 +381,6 @@ class Argument(object):
             if type.array:
                 if type.array.vec:
                     self.comment.append('ARRAY')
-                elif type.array.fort_only:
-                    self.comment.append('FORTRAN_ONLY')
             if type.type=='CHARACTER' and intent!='in':
                 string_class_used = True
         if comment:
@@ -401,9 +398,7 @@ class Argument(object):
 
     def fort_only(self):
         """Whether argument is not wrappable"""
-        if self.type.array and self.type.array.fort_only:
-            return True
-        elif self.exclude:
+        if self.exclude:
             return True
         elif self.type.dt:
             if self.type.array:
@@ -496,7 +491,7 @@ class Argument(object):
             string += ', OPTIONAL'
         if self.type.array and not ignore_array:
             string += ', DIMENSION({})'.format(self.type.array.spec)
-        if self.type.kind == 'CHARLEN_':
+        if self.type.kind == 'SIZE_':
             string += ', VALUE'
         return string
 
@@ -620,7 +615,7 @@ class Procedure(object):
         for arg in self.args_by_pos.values():
             # Hidden length argument only needed for assumed length strings
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.type.str_len.assumed:
-                str_length_arg = Argument(arg.name + '_len__', pos, DataType('INTEGER(CHARLEN_)', str_len=arg.type.str_len, is_str_len=True))
+                str_length_arg = Argument(arg.name + '_len__', pos, DataType('INTEGER(SIZE_)', str_len=arg.type.str_len, is_str_len=True))
                 self.args[ str_length_arg.name ] = str_length_arg
                 args_by_pos_new[pos] = str_length_arg # Ordered add is correct since self.args_by_pos is ordered
                 pos = pos + 1
