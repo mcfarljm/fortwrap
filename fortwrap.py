@@ -141,7 +141,8 @@ nopass_tbps = dict() # (module.lower,procname.lower) -> TypeBoundProcedure, for 
 cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*','8':'long long*','C_INT':'int*', 'C_LONG':'long*'}, 
                 'REAL':{'':'float*', '4':'float*', '8':'double*', 'C_DOUBLE':'double*', 'C_FLOAT':'float*'},
                 'LOGICAL':{'':'int*', 'C_BOOL':'int*'}, 
-                'CHARACTER':{'':'char*'}, 
+                'CHARACTER':{'':'char*'},
+                'C_PTR':{'':'void**'},
                 'INT':{'':'fortran_charlen_t'}}
 
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
@@ -294,6 +295,9 @@ class DataType(object):
                 if m.group('dt_mode'):
                     self.dt = m.group('dt_mode').upper()
                     self.type = m.group('dt_spec')
+                    if self.type.upper() == 'C_PTR':
+                        # Don't treat like derived type
+                        self.dt = False
                 else:
                     raise FWTypeException(type)
 
@@ -417,7 +421,7 @@ class Argument(object):
             else:
                 prefix = ''
             string = prefix + cpp_type_map[self.type.type.upper()][self.type.kind]
-            if value:
+            if value or self.byval:
                 return string[:-1] # Strip "*"
             else:
                 return string
