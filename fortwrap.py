@@ -643,29 +643,27 @@ class Procedure(object):
     def add_hidden_array_len_args(self):
         """Add array length arguments for assumed shape
 
-        For strict conformance, these need to be at the front of the argument list"""
+        For strict conformance, array size needs to appear before the array it is used to define"""
         nargs = len(self.args)
         args_by_pos_new = collections.OrderedDict() # Track hidden str-len args
-        new_args = []
-        for pos,arg in self.args_by_pos.items():
+        pos = 1
+        for arg in self.args_by_pos.values():
             # Hidden length argument only needed for assumed shape arrays
             if arg.type.array and arg.type.array.assumed_shape and not arg.fort_only():
                 arg.type.array.hidden_size_vars = []
                 for idim in range(arg.type.array.d):
                     array_length_arg = Argument(arg.name + '_len__{}'.format(idim+1), pos, DataType('INTEGER(SIZE_)', is_assumed_shape_size=arg.type.array.d))
-                    new_args.append(array_length_arg)
                     self.args[ array_length_arg.name ] = array_length_arg
                     # Store reference to this arg in array definition:
                     arg.type.array.add_assumed_shape_var(array_length_arg.name)
-        # Now recreate args_by_pos with the new array size args at
-        # front (need to be at front for strict Fortran conformance)
-        if len(new_args) > 0:
-            new_args_by_pos = collections.OrderedDict()
-            for i, arg in enumerate(new_args):
-                new_args_by_pos[i+1] = arg
-            for pos,arg in self.args_by_pos.items():
-                new_args_by_pos[pos+len(new_args)] = arg
-            self.args_by_pos = new_args_by_pos
+                    # Place the array size arguments immediately
+                    # before the array argument, to facilitate
+                    # re-wrapping with swig
+                    args_by_pos_new[pos] = array_length_arg
+                    pos += 1
+            args_by_pos_new[pos] = arg
+            pos += 1
+        self.args_by_pos = args_by_pos_new
 
     def get_vec_size_parent(self,argname):
         """Get the first 1d array argument that uses the argument argname to

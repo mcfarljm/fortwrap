@@ -21,7 +21,7 @@ int main(void)
       return 2;
 
     // Test assumed shape:
-    if (FortFuncs::inner_prod_assumed_shape(3, 3, a, b) != 8)
+    if (FortFuncs::inner_prod_assumed_shape(3, a, 3, b) != 8)
       return 3;
   }
 

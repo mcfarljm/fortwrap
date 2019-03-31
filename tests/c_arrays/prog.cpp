@@ -23,7 +23,11 @@ int main(void)
 
   // Test assumed size
   if (FortFuncs::inner_prod_2(3,a,b) != 8)
-    return 6;  
+    return 6;
+
+  // Assumed shape with multiple args:
+  if (FortFuncs::inner_prod_assumed_shape(3, a, 3, b) != 8)
+    return 7;
 
   int v5[4] = {1,2,3,4};
   if (FortFuncs::assumed_shape_in(4, v5) != 10)

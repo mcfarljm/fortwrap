@@ -39,6 +39,13 @@ CONTAINS
     y = DOT_PRODUCT(a(1:n),b(1:n))
   END FUNCTION inner_prod_2
 
+  ! Test multiple assumed shape arguments
+  FUNCTION inner_prod_assumed_shape(a,b) RESULT(y)
+    INTEGER, INTENT(in), dimension(:) :: a, b
+    INTEGER :: y
+    y = DOT_PRODUCT(a,b)
+  END FUNCTION inner_prod_assumed_shape
+
   SUBROUTINE sizecontainer_ctor(c, n)
     TYPE (SizeContainer) :: c
     INTEGER, INTENT(in) :: n
