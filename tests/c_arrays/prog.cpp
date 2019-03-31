@@ -24,6 +24,10 @@ int main(void)
   int b[3] = { 1, 2, 3 };
   if (FortFuncs::inner_prod(3,a,b) != 8)
     return 5;
+
+  int v3[4] = {1,2,3,4};
+  if (FortFuncs::assumed_shape_in(4, v3) != 10)
+    return 10;
   
   return 0;
 }

@@ -284,6 +284,11 @@ class CharacterLength(object):
 class DataType(object):
     complex_warning_written = False
     def __init__(self, type, array=None, str_len=None, is_str_len=False, is_assumed_shape_size=False):
+        """is_assumed_shape_size - Whether the argument holds the size of an
+        assumed shape array.  If it does, then the value stores the
+        dimension of the array
+
+        """
         global stringh_used
         self.type = type
         self.kind = ''
@@ -412,9 +417,7 @@ class Argument(object):
         if self.exclude:
             return True
         if self.type.array and self.type.array.assumed_shape:
-            if self.type.array.d == 1 and opts.no_vector:
-                return True
-            elif self.type.array.d == 2 and opts.no_fmat:
+            if self.type.array.d == 2 and opts.no_fmat:
                 return True
             elif self.type.array.d > 2:
                 return True
@@ -452,7 +455,11 @@ class Argument(object):
         if self.type.is_str_len:
             return True
         elif self.type.is_assumed_shape_size:
-            return True
+            if (not fortran_api) and self.type.is_assumed_shape_size==1 and opts.no_vector:
+                # Size needed in C++ API
+                return False
+            else:
+                return True
         elif (not fortran_api) and (self.type.is_array_size or self.type.is_matrix_size):
             return True
         else:
@@ -647,7 +654,7 @@ class Procedure(object):
             if arg.type.array and arg.type.array.assumed_shape and not arg.fort_only():
                 arg.type.array.hidden_size_vars = []
                 for idim in range(arg.type.array.d):
-                    array_length_arg = Argument(arg.name + '_len__{}'.format(idim+1), pos, DataType('INTEGER(SIZE_)', is_assumed_shape_size=True))
+                    array_length_arg = Argument(arg.name + '_len__{}'.format(idim+1), pos, DataType('INTEGER(SIZE_)', is_assumed_shape_size=arg.type.array.d))
                     new_args.append(array_length_arg)
                     self.args[ array_length_arg.name ] = array_length_arg
                     # Store reference to this arg in array definition:
@@ -1667,11 +1674,11 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                     s = s + prefix + '  for (size_t i=strlen('+arg.name+'_c__); i<'+str_len_p1+'; i++) '+arg.name+"_c__[i] = ' '; // Add whitespace for Fortran\n"
                     s = s + prefix + '}\n'
             elif arg.type.array and arg.type.array.assumed_shape and not arg.fort_only():
-                if arg.type.array.d == 1:
+                if arg.type.array.d == 1 and not opts.no_vector:
                     # Todo: handle --no-vector option
                     s += prefix + 'size_t ' + arg.name + '_len__1 = 0;\n'
                     s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__1 = '+ arg.name + '->size();\n'
-                elif arg.type.array.d == 2:
+                elif arg.type.array.d == 2 and not opts.no_fmat:
                     s += prefix + 'size_t ' + arg.name + '_len__1 = 0;\n'
                     s += prefix + 'size_t ' + arg.name + '_len__2 = 0;\n'
                     s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__1 = '+ arg.name + '->num_rows();\n'
