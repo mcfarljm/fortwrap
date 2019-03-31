@@ -25,7 +25,7 @@ source function:
 
 ``` Fortran
   SUBROUTINE set_string(o, s)
-    TYPE (Object), INTENT(in) :: o
+    TYPE (Object) :: o
     CHARACTER(len=*), INTENT(in) :: s
   END SUBROUTINE set_string
 ```
