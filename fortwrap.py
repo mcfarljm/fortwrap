@@ -266,9 +266,9 @@ class CharacterLength(object):
     def set_assumed(self, argname):
         self.val = argname
         self.assumed = True
-    def as_string(self, name):
+    def as_string(self):
         if self.assumed:
-            return name + '_len__'
+            return self.val + '_len__'
         else:
             return str(self.val)        
 
@@ -518,7 +518,7 @@ class Argument(object):
         elif self.type.proc_pointer:
             return '    PROCEDURE({}), POINTER :: {}__p\n'.format(self.type.type, self.name)
         elif self.type.type == 'CHARACTER':
-            return '    CHARACTER({1}), POINTER :: {0}__p\n'.format(self.name, self.type.str_len.as_string(self.name))
+            return '    CHARACTER({1}), POINTER :: {0}__p\n'.format(self.name, self.type.str_len.as_string())
         elif self.type.array and self.type.array.assumed_shape:
             shape = '(' + ','.join(':' for i in range(self.type.array.d)) + ')'
             return '    ' + self.get_iso_c_type(True) + ', POINTER :: {}__p{}\n'.format(self.name, shape)
@@ -1500,7 +1500,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                     # val stores the arg name of the string itself.
                     # In wrapper code, length variable is declared as
                     # name+'_len__'
-                    string += arg.type.str_len.as_string(arg.type.str_len.val)
+                    string += arg.type.str_len.as_string()
                 elif arg.type.is_array_size or arg.type.is_matrix_size:
                     string = string + '&' + arg.name
                 if proc.has_args_past_pos(pos,True):
@@ -1602,7 +1602,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     if call:
         for arg in proc.args.values():
             if arg.type.type=='CHARACTER' and not arg.fort_only():
-                str_len = arg.type.str_len.as_string(arg.name)
+                str_len = arg.type.str_len.as_string()
                 str_len_p1 = str_len + '+1'
                 str_len_m1 = str_len + '-1'
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
