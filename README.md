@@ -20,6 +20,50 @@ This work can be followed on the `iso_c_binding` branch, which
 includes a test suite that covers essentially the same feature
 set as the current release version.
 
+Here is a preview of the `ISO_C_BINDING` wrapping.  Start with a
+source function:
+
+``` Fortran
+  SUBROUTINE set_string(o, s)
+    TYPE (Object), INTENT(in) :: o
+    CHARACTER(len=*), INTENT(in) :: s
+  END SUBROUTINE set_string
+```
+
+FortWrap generates the following Fortran C binding wrapper:
+
+``` Fortran
+  SUBROUTINE example__set_string_wrap(o, s, s_len__) BIND(C)
+    TYPE(C_PTR), VALUE :: o
+    TYPE(C_PTR), VALUE :: s
+    INTEGER(C_SIZE_T), VALUE :: s_len__
+    TYPE(Object), POINTER :: o__p
+    CHARACTER(s_len__), POINTER :: s__p
+    CALL C_F_POINTER(o, o__p)
+    CALL C_F_POINTER(s, s__p)
+    CALL set_string(o__p, s__p)
+  END SUBROUTINE example__set_string_wrap
+```
+
+As well as the associated C prototype:
+
+``` C
+void example__set_string_wrap(void* o, const char* s, size_t s_len__);
+```
+
+And the following C++ method of the C++ proxy class (notice that the C++ code passes the actual string length "behind the scenes"):
+
+``` C++
+void Object::set_string(const char* s) {
+  int s_len__ = 0;
+  if (s) s_len__ = strlen(s); // Protect Optional args
+  example__set_string_wrap(data_ptr, s, s_len__);
+}
+```
+
+Refer to the documentation and tests on the `iso_c_binding` branch for
+more information on this wrapping approach.
+
 ## Features
 
 * Fortran derived types wrapped in C++ proxy classes
