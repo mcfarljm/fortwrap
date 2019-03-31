@@ -11,8 +11,6 @@ import os
 import glob
 import subprocess
 
-active_tests = ['logicals', 'integers', 'reals', 'syntax', 'enumerations', 'arrays', 'matrices', 'c_arrays', 'derived_types', 'interface_file', 'optional_args', 'function_pointers', 'orphans', 'strings', 'strings2', 'classes', 'classes_debug', 'multidim_arrays']
-
 OPTS = '-g --clean -d wrap'     # FortWrap options
 
 # Add the executable to the command.  This way the tests are run with
@@ -33,7 +31,6 @@ excludes.append('no_module')
 tests_dir = os.path.abspath('tests')
 os.chdir('tests')
 tests = glob.glob('*')
-#tests = active_tests
 
 num_err = 0
 
