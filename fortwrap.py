@@ -618,7 +618,8 @@ class Procedure(object):
         pos = nargs + 1
         args_by_pos_new = collections.OrderedDict() # Track hidden str-len args
         for arg in self.args_by_pos.values():
-            if arg.type.type=='CHARACTER' and not arg.fort_only():
+            # Hidden length argument only needed for assumed length strings
+            if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.type.str_len.assumed:
                 str_length_arg = Argument(arg.name + '_len__', pos, DataType('INTEGER(CHARLEN_)', str_len=arg.type.str_len, is_str_len=True))
                 self.args[ str_length_arg.name ] = str_length_arg
                 args_by_pos_new[pos] = str_length_arg # Ordered add is correct since self.args_by_pos is ordered
