@@ -237,7 +237,7 @@ indicate expected behavior (0 means success).  For example:
 0
 ```
 
-## Nuances of the ISO_C_BINDING approach
+## Nuances of the ISO\_C\_BINDING approach
 
 The original version of FortWrap did not use the `ISO_C_BINDING`
 module and instead generated C++ wrapper code that called directly
@@ -298,7 +298,54 @@ produce wrapper code that will compile, provided that there are no
 name conflicts across all modules in the project that are being
 wrapped.
 
+### Data types
+
+FortWrap attempts to "match" the "kind" of primitive data types
+declared in the original code to a corresponding C interpoperable type
+in the wrapper code.  For example, the default `INTEGER` kind is
+matched to `INTEGER(C_INT)`.  The interoperable dummy arguments
+declared in the Fortran wrapper code are passed directly to the
+original function, without explicit conversion or copying.  The
+compiler will trap this as an error if the two types are not
+compatible (e.g. `LOGICAL` and `LOGICAL(C_BOOL)`).  Initial testing
+with gfortran indicates that the types mostly match up as expected.
+If needed, the type maps in fortwrap.py can be adjusted to work with
+certain compilers/platforms.  Longer term, these type maps may be
+handled via a configuration file.
+
 ### Logicals
+
+Where to start...
+
+As described above, FortWrap uses C interoperable dummy arguments in
+the generated Fortran wrapper code.  For most primitive types,
+non-interoperable kinds can be matched to a corresponding
+interoperable kind (at least with gfortran).  But this is not the case
+with the `LOGICAL` type.  The problem is that `ISO_C_BINDING` provides
+only one logical kind, `C_BOOL`.  And on gfortran this does not match
+the default logical kind.  So the `LOGICAL(C_BOOL)` dummy argument can
+not necessarily be passed directly to the user function without
+conversion.
+
+The second problem is that `LOGICAL(C_BOOL)` is defined to be
+interoperable with the C type `_Bool`.  However, equivalency of
+`_Bool` with the C++ type `bool` is not completely clear.  On gcc,
+these do seem to be the same, but it is unclear whether this should be
+relied on.
+
+The third problem is that FortWrap uses C++ `std::vector` to handle 1D
+array arguments.  But due to an unfortunate quirk in the C++ standard,
+`std::vector<bool>` is not actually a real container and is not
+compatible with the contiguous memory access that FortWrap expects.
+
+At this point, different options are being evaluated for wrapping
+logials.  One possibility is to wrap them as `int` in the C++ API.
+This provides portability, but complicates the wrapping code because
+the Fortran wrapper code must "manually" convert integers to and from
+logicals before calling into the original code (while properly
+handling cases such as arrays and optional arguments).  Another
+approach would be to wrap as `bool` and find an alternative to
+`std::vector<bool>`.
 
 ### Optional arguments
 
