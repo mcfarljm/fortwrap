@@ -54,7 +54,7 @@ int main(void)
 
     // Assumed shape
     int Xa2[3];
-    FortFuncs::mat_vec_mult(3,2,(int*)X,a,Xa2);
+    FortFuncs::mat_vec_mult_assumed_shape(3, 2, (int*)X, 2, a, 3, Xa2);
     for (int i=0; i<3; i++) 
       {
 	if (Xa2[i] != Xa_test[i])
