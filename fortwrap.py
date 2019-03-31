@@ -411,7 +411,14 @@ class Argument(object):
         """Whether argument is not wrappable"""
         if self.exclude:
             return True
-        elif self.type.dt:
+        if self.type.array and self.type.array.assumed_shape:
+            if self.type.array.d == 1 and opts.no_vector:
+                return True
+            elif self.type.array.d == 2 and opts.no_fmat:
+                return True
+            elif self.type.array.d > 2:
+                return True
+        if self.type.dt:
             if self.type.array:
                 return True
         elif self.type.proc_pointer:
