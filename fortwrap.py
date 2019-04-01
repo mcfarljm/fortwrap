@@ -34,7 +34,6 @@ from datetime import date
 import sys
 import os
 import traceback
-import collections
 
 
 VERSION = '2.2.2'
@@ -369,7 +368,7 @@ class Argument(object):
     def __init__(self,name,pos,type=None,optional=False,intent='inout',byval=False,allocatable=False,pointer=False,comment=[]):
         global string_class_used
         self.name = name
-        self.pos = pos
+        self.pos = pos # Zero-indexed
         self.type = type
         self.comment = []
         self.optional=optional
@@ -566,7 +565,6 @@ class Procedure(object):
         self.name = name
         self.retval = retval
         self.args = args # By name
-        self.args_by_pos = collections.OrderedDict()
         self.nargs = len(args)
         self.module = current_module
         self.comment = comment
@@ -587,12 +585,10 @@ class Procedure(object):
                     arg.exclude = True
                 else:
                     warning("Argument exclusions only valid for optional arguments: " + name + ', ' + arg.name)
-        # Make position map
-        for arg in self.args.values():
-            self.args_by_pos[arg.pos] = arg
-        self.args_by_pos = collections.OrderedDict(sorted(self.args_by_pos.items(), key=lambda item: item[1].pos))
+        # Make ordered argument list
+        self.arglist = sorted(self.args.values(), key=lambda arg: arg.pos)
         # Check for arguments that can have default values of NULL in C++
-        for arg in reversed(list(self.args_by_pos.values())):
+        for arg in reversed(self.arglist):
             # (Assumes the dictionary iteration order is sorted by key)
             if arg.optional:
                 arg.cpp_optional = True
@@ -611,12 +607,14 @@ class Procedure(object):
                 elif not opts.no_fmat and self.get_matrix_size_parent(arg.name):
                     arg.type.is_matrix_size = True
             
-    def has_args_past_pos(self, pos, include_hidden):
+    def has_args_past_pos(self, ipos, include_hidden):
         """Query whether or not the argument list continues past pos,
-        accounting for c++ optional args"""
+        accounting for c++ optional args
+
+        ipos - 0-indexed argument position"""
         has = False
-        for p,arg in self.args_by_pos.items():
-            if p > pos:
+        for i,arg in enumerate(self.arglist):
+            if i > ipos:
                 if arg.fort_only():
                     continue
                 if not arg.is_hidden():
@@ -628,26 +626,22 @@ class Procedure(object):
     def add_hidden_strlen_args(self):
         """Add Fortran-only string length arguments to end of argument list"""
         nargs = len(self.args)
-        pos = nargs + 1
-        args_by_pos_new = collections.OrderedDict() # Track hidden str-len args
-        for arg in self.args_by_pos.values():
+        pos = nargs
+        for arg in self.arglist:
             # Hidden length argument only needed for assumed length strings
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.type.str_len.assumed:
                 str_length_arg = Argument(arg.name + '_len__', pos, DataType('INTEGER(SIZE_)', str_len=arg.type.str_len, is_str_len=True))
                 self.args[ str_length_arg.name ] = str_length_arg
-                args_by_pos_new[pos] = str_length_arg # Ordered add is correct since self.args_by_pos is ordered
+                self.arglist.append(str_length_arg)
                 pos = pos + 1
-        # Have to add to self.args_by_pos outside of above loop b/c can't mutate dict during iteration
-        self.args_by_pos.update(args_by_pos_new)
 
     def add_hidden_array_len_args(self):
         """Add array length arguments for assumed shape
 
         For strict conformance, array size needs to appear before the array it is used to define"""
-        nargs = len(self.args)
-        args_by_pos_new = collections.OrderedDict() # Track hidden str-len args
-        pos = 1
-        for arg in self.args_by_pos.values():
+        arglist_new = []
+        pos = 0
+        for arg in self.arglist:
             # Hidden length argument only needed for assumed shape arrays
             if arg.type.array and arg.type.array.assumed_shape and not arg.fort_only():
                 arg.type.array.hidden_size_vars = []
@@ -659,16 +653,16 @@ class Procedure(object):
                     # Place the array size arguments immediately
                     # before the array argument, to facilitate
                     # re-wrapping with swig
-                    args_by_pos_new[pos] = array_length_arg
+                    arglist_new.append(array_length_arg)
                     pos += 1
-            args_by_pos_new[pos] = arg
+            arglist_new.append(arg)
             pos += 1
-        self.args_by_pos = args_by_pos_new
+        self.arglist = arglist_new
 
     def get_vec_size_parent(self,argname):
         """Get the first 1d array argument that uses the argument argname to
         define its size"""
-        for arg in self.args_by_pos.values():
+        for arg in self.arglist:
             if arg.type.vec and not arg.optional and arg.type.array.size_var==argname:
                 return arg.name
         return None
@@ -677,7 +671,7 @@ class Procedure(object):
         """Similar to get_vec_size_parent.  Returns (matname,0) if argname
         is the number of rows and (matname,1) if argname is the number of
         columns"""
-        for arg in self.args_by_pos.values():
+        for arg in self.arglist:
             if arg.type.matrix and not arg.optional and argname in arg.type.array.size_var:
                 if argname == arg.type.array.size_var[0]:
                     return arg.name,0
@@ -698,18 +692,18 @@ class Procedure(object):
         """Whether the procedure is a valid dtor.  Mainly this just
         checks that there are no required arguments"""
         for arg in self.args.values():
-            if arg.pos > 1 and not arg.optional:
+            if arg.pos > 0 and not arg.optional:
                 return False
         return True
 
     def fort_arg_list(self, call):
         s = ''
-        for p,arg in self.args_by_pos.items():
+        for ipos,arg in enumerate(self.arglist):
             if call and arg.is_hidden(fortran_api=True):
                 continue
             if arg.fort_only():
                 continue
-            if call and not (self.method and p==1) and self.has_fort_only_arg():
+            if call and not (self.method and ipos==0) and self.has_fort_only_arg():
                 # Use keyword passing, but not for "this" argument,
                 # which interferes with conversion to TBP call
                 s += arg.name + '='
@@ -723,7 +717,7 @@ class Procedure(object):
                         name += '%c'
             elif call and arg.type.type=='LOGICAL':
                 name += '__l'
-            s += name + (', ' if self.has_args_past_pos(p, not call) else '')
+            s += name + (', ' if self.has_args_past_pos(ipos, not call) else '')
         return s
 
     def c_binding_name(self):
@@ -733,7 +727,7 @@ class Procedure(object):
     def get_iso_c_select_type_code(self, indent=2):
         string = ''
         count = 0
-        for p,arg in self.args_by_pos.items():
+        for arg in self.arglist:
             if arg.type.dt:
                 obj = objects[arg.type.type.lower()]
                 if obj.is_class and obj.extends:
@@ -759,13 +753,13 @@ class Procedure(object):
         proc_type = 'FUNCTION' if self.retval else 'SUBROUTINE'
         line = '  {} {}({}) BIND(C)'.format(proc_type, proc_wrap_name, self.fort_arg_list(False))
         f.write(add_line_continuations(line, '  ') + '\n')
-        for p,arg in self.args_by_pos.items():
+        for arg in self.arglist:
             f.write(arg.get_iso_c_type_dec())
         if self.retval:
             f.write('    {} :: {}\n'.format(self.retval.get_iso_c_type(), proc_wrap_name))
-        for p,arg in self.args_by_pos.items():
+        for arg in self.arglist:
             f.write(arg.get_iso_c_type_local_decs())
-        for p,arg in self.args_by_pos.items():
+        for arg in self.arglist:
             f.write(arg.get_iso_c_setup_code())
         selector_setup, count = self.get_iso_c_select_type_code()
         f.write(selector_setup)
@@ -777,7 +771,7 @@ class Procedure(object):
             line += 'CALL '
         arg_list = self.fort_arg_list(True)
         try:
-            tbp = objects[self.args_by_pos[1].type.type.lower()].tbps[self.name.lower()].name
+            tbp = objects[self.arglist[0].type.type.lower()].tbps[self.name.lower()].name
         except:
             tbp = None
         if tbp:
@@ -793,7 +787,7 @@ class Procedure(object):
         # Close the select type statements
         for i in range(count,0,-1):
             f.write(2*(i+1)*' ' + 'END SELECT\n')
-        for p,arg in self.args_by_pos.items():
+        for arg in self.arglist:
             f.write(arg.get_iso_c_post_call_code())            
         f.write('  END {} {}\n\n'.format(proc_type, proc_wrap_name))        
                 
@@ -1101,7 +1095,7 @@ def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
                 # needed in the wrapper code
                 type.str_len = CharacterLength('*')
                 type.str_len.set_assumed(name)
-            args[name] = Argument(name,arg_list_lower.index(name.lower())+1,type,optional,intent,byval,allocatable,pointer,comment=comments)
+            args[name] = Argument(name,arg_list_lower.index(name.lower()),type,optional,intent,byval,allocatable,pointer,comment=comments)
         elif retval and name.lower()==retval.name.lower():
             retval.set_type(type)
     return count
@@ -1130,9 +1124,9 @@ def parse_proc(file,line,abstract=False):
     if re.match('^\s*function', line, re.IGNORECASE):
         m = result_name_def.match(line)
         if m:
-            retval = Argument(m.group(1),0)
+            retval = Argument(m.group(1), None) # pos not used
         else:
-            retval = Argument(proc_name,0)
+            retval = Argument(proc_name, None) # pos not used
     # Determine argument types
     method = False
     invalid = False
@@ -1185,7 +1179,7 @@ def parse_proc(file,line,abstract=False):
             # defined.  Make sure the Fortran source file that
             # contains those definitions is parsed first
             invalid = True
-        if arg.pos==1 and arg.type.dt:
+        if arg.pos==0 and arg.type.dt:
             method = True
     if retval:
         if retval.type:
@@ -1210,7 +1204,7 @@ def parse_proc(file,line,abstract=False):
         is_tbp = False
         if method:
             try:
-                if proc_name.lower() in objects[proc.args_by_pos[1].type.type.lower()].tbps:
+                if proc_name.lower() in objects[proc.arglist[0].type.type.lower()].tbps:
                     is_tbp = True
             except KeyError:
                 # Should mean that the derived type is not public
@@ -1410,8 +1404,8 @@ def associate_procedures():
     global fort_class_used
     def flag_native_args(proc):
         # Check for arguments to pass as native classes:
-        for pos,arg in proc.args_by_pos.items():
-            if pos>1 and arg.type.dt and not arg.type.array and arg.type.type.lower() in objects:
+        for ipos,arg in enumerate(proc.arglist):
+            if ipos>0 and arg.type.dt and not arg.type.array and arg.type.type.lower() in objects:
                 arg.native = True
 
     # Drop any procedures that aren't supported once we know what
@@ -1424,7 +1418,7 @@ def associate_procedures():
     for proc in procedures:
         # Associate methods
         if proc.method:
-            typename = proc.args_by_pos[1].type.type
+            typename = proc.arglist[0].type.type
             if typename.lower() in objects:
                 # print "Associating procedure:", typename +'.'+proc.name
                 objects[typename.lower()].procs.append(proc)
@@ -1456,7 +1450,7 @@ def associate_procedures():
                 warning('optional procedure pointer arguments will always be present - code should check ASSOCIATED status')    
             
 
-def write_cpp_dox_comments(file,comments,args_by_pos=None,prefix=0):
+def write_cpp_dox_comments(file,comments,arglist=None,prefix=0):
     # /// Style
     #for c in comments:
     #    file.write(prefix*' ' + '/// ' + c + '\n')
@@ -1469,9 +1463,8 @@ def write_cpp_dox_comments(file,comments,args_by_pos=None,prefix=0):
         else:
             file.write(prefix*' ' + ' *  ' + c + '\n')
     # Write parameter argument comments if provided
-    if args_by_pos:
-        for pos in range(1,len(args_by_pos)+1):
-            arg = args_by_pos[pos]
+    if arglist:
+        for arg in arglist:
             if arg.fort_only():
                 continue
             for i,c in enumerate(arg.comment):
@@ -1504,20 +1497,20 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     opposed to declared (prototype)
     """
     # dt check is necessary to handle orphan functions in the dummy class
-    if (not call) and (proc.nargs == 0 or (not bind and proc.nargs==1 and proc.args_by_pos[1].type.dt)):
+    if (not call) and (proc.nargs == 0 or (not bind and proc.nargs==1 and proc.arglist[0].type.dt)):
         return 'void'
     string = ''
     # Pass "data_ptr" as first arg, if necessary. dt check is necessary to
     # handle orphan functions in the dummy class correctly
-    if bind and call and proc.nargs>0 and proc.args_by_pos[1].type.dt:
+    if bind and call and proc.nargs>0 and proc.arglist[0].type.dt:
         string = 'data_ptr'        
         if proc.nargs==1:
             return string
         else:
             string = string + ', '
     # Add argument names and possibly types
-    for pos,arg in proc.args_by_pos.items():
-        if (call or not bind) and pos == 1 and proc.args_by_pos[1].type.dt:
+    for ipos,arg in enumerate(proc.arglist):
+        if (call or not bind) and ipos == 0 and arg.type.dt:
             # dt check above excludes the cases where this is an
             # orphan function in the dummy class
             continue
@@ -1543,7 +1536,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                     string = string + '&' + arg.name
                 elif arg.type.is_assumed_shape_size:
                     string += arg.name
-                if proc.has_args_past_pos(pos,True):
+                if proc.has_args_past_pos(ipos,True):
                     string = string + ', '
                 continue
             elif not bind:
@@ -1618,7 +1611,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                 string = string + '->data_ptr'
         elif not call and not bind and not definition and arg.cpp_optional:
             string = string + '=NULL'
-        if proc.has_args_past_pos(pos, bind or call):
+        if proc.has_args_past_pos(ipos, bind or call):
             string = string + ', '
     return string
     
@@ -1709,10 +1702,10 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     # Definition/declaration:
     if not bind:
         # Determine what the C++ method name will be
-        if len(proc.args_by_pos)>=1 and proc.args_by_pos[1].type.dt == 'CLASS' and proc.name.lower() in objects[proc.args_by_pos[1].type.type.lower()].tbps:
+        if proc.nargs>=1 and proc.arglist[0].type.dt == 'CLASS' and proc.name.lower() in objects[proc.arglist[0].type.type.lower()].tbps:
             # This is a type bound procedure, so name may different
             # from procedure name
-            method_name= objects[proc.args_by_pos[1].type.type.lower()].tbps[proc.name.lower()].name
+            method_name= objects[proc.arglist[0].type.type.lower()].tbps[proc.name.lower()].name
         elif dfrd_tbp:
             # proc is the abstract interface for a deferred tbp
             method_name = dfrd_tbp.name
@@ -1847,7 +1840,7 @@ def write_class(object):
     fort_ctors = object.ctor_list()
     if fort_ctors:
         for fort_ctor in fort_ctors:
-            write_cpp_dox_comments(file,fort_ctor.comment,fort_ctor.args_by_pos)
+            write_cpp_dox_comments(file,fort_ctor.comment,fort_ctor.arglist)
             file.write('  ' + object.cname + '(' + c_arg_list(fort_ctor,bind=False,call=False,definition=False) + ');\n')
     elif not object.name==orphan_classname and not object.abstract:
         # Don't declare default constructor (or destructor, below) for
@@ -1866,7 +1859,7 @@ def write_class(object):
         # enabled by adding an %include for the dtor
         if proc.ctor or (proc.dtor and not proc.name.lower() in name_inclusions):
             continue
-        write_cpp_dox_comments(file,proc.comment,proc.args_by_pos)
+        write_cpp_dox_comments(file,proc.comment,proc.arglist)
         file.write(function_def_str(proc) + '\n\n')
     # Check for pure virtual methods (which have no directly
     # associated procedure)
@@ -1972,10 +1965,10 @@ def get_required_modules(module):
     for proc in procedures:
         if proc.module != module:
             continue
-        for argname,arg in proc.args.items():
+        for arg in proc.arglist:
             if arg.native:
                 includes.add(objects[arg.type.type.lower()].module)
-            elif arg.pos==1 and arg.type.dt and arg.type.type.lower() in objects:
+            elif arg.pos==0 and arg.type.dt and arg.type.type.lower() in objects:
                 # This is needed for cases where the derived type
                 # "method" is defined in a separate module, and that
                 # module doesn't make the derived type public
