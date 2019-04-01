@@ -496,7 +496,7 @@ class Procedure(object):
     def add_hidden_strlen_args(self):
         """Add Fortran-only string length arguments to end of argument list"""
         nargs = len(self.args)
-        pos = nargs + 1
+        pos = nargs
         for arg in self.arglist:
             if arg.type.type=='CHARACTER' and not arg.fort_only():
                 str_length_arg = Argument(arg.name + '_len__', pos, DataType('INT', str_len=arg.type.str_len ,hidden=True))
@@ -824,9 +824,9 @@ def parse_proc(file,line,abstract=False):
     if re.match('^\s*function', line, re.IGNORECASE):
         m = result_name_def.match(line)
         if m:
-            retval = Argument(m.group(1),0)
+            retval = Argument(m.group(1), None) # pos not used
         else:
-            retval = Argument(proc_name,0)
+            retval = Argument(proc_name, None) # pos not used
     # Determine argument types
     method = False
     invalid = False
