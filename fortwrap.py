@@ -313,7 +313,7 @@ class Argument(object):
     def __init__(self,name,pos,type=None,optional=False,intent='inout',byval=False,allocatable=False,pointer=False,comment=[]):
         global string_class_used
         self.name = name
-        self.pos = pos
+        self.pos = pos # Zero-indexed
         self.type = type
         self.comment = []
         self.optional=optional
@@ -537,7 +537,7 @@ class Procedure(object):
         """Whether the procedure is a valid dtor.  Mainly this just
         checks that there are no required arguments"""
         for arg in self.args.values():
-            if arg.pos > 1 and not arg.optional:
+            if arg.pos > 0 and not arg.optional:
                 return False
         return True
         
@@ -795,7 +795,7 @@ def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
                 # needed in the wrapper code
                 type.str_len = CharacterLength('*')
                 type.str_len.set_assumed(name)
-            args[name] = Argument(name,arg_list_lower.index(name.lower())+1,type,optional,intent,byval,allocatable,pointer,comment=comments)
+            args[name] = Argument(name,arg_list_lower.index(name.lower()),type,optional,intent,byval,allocatable,pointer,comment=comments)
         elif retval and name.lower()==retval.name.lower():
             retval.set_type(type)
     return count
@@ -879,7 +879,7 @@ def parse_proc(file,line,abstract=False):
             # defined.  Make sure the Fortran source file that
             # contains those definitions is parsed first
             invalid = True
-        if arg.pos==1 and arg.type.dt:
+        if arg.pos==0 and arg.type.dt:
             method = True
     if retval:
         if retval.type:
