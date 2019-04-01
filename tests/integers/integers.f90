@@ -1,5 +1,6 @@
 MODULE integers
 
+  USE ISO_C_BINDING
   IMPLICIT NONE
 
 CONTAINS
@@ -53,4 +54,16 @@ CONTAINS
     y = a+b
   end function add_ints4_lower
 
+  FUNCTION add_iso_ints(a,b) RESULT(y)
+    INTEGER (C_INT) , INTENT(in) :: a, b
+    INTEGER (C_INT) :: y
+    y = a+b
+  END FUNCTION add_iso_ints
+
+  FUNCTION add_iso_longs(a,b) RESULT(y)
+    INTEGER (C_LONG) , INTENT(in) :: a, b
+    INTEGER (C_LONG) :: y
+    y = a+b
+  END FUNCTION add_iso_longs
+  
 END MODULE integers

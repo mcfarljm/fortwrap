@@ -137,9 +137,9 @@ name_inclusions = set()
 proc_arg_exclusions = set()
 
 # 'INT' is for the hidden name length argument
-cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*','8':'long long*','C_INT':'int*'}, 
+cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*','8':'long long*','C_INT':'int*', 'C_LONG':'long*'}, 
                 'REAL':{'':'float*', '4':'float*', '8':'double*', 'C_DOUBLE':'double*', 'C_FLOAT':'float*'},
-                'LOGICAL':{'':'int*'}, 
+                'LOGICAL':{'':'int*', 'C_BOOL':'int*'}, 
                 'CHARACTER':{'':'char*'}, 
                 'INT':{'':'fortran_charlen_t'}}
 
@@ -886,6 +886,8 @@ def parse_proc(file,line,abstract=False):
             if retval.type.dt or retval.type.array:
                 invalid = True
             elif retval.type.type == 'CHARACTER':
+                invalid = True
+            elif not retval.type.valid_primitive():
                 invalid = True
         else:
             error("Untyped return value in {}: {}".format(proc_name,retval.name))
