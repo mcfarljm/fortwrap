@@ -912,7 +912,7 @@ def parse_proc(file,line,abstract=False):
                 method = True
                 nopass = True
         proc = Procedure(proc_name,args,method,retval,proc_comments,nopass)
-        if method:
+        if method and not nopass:
             try:
                 if proc_name.lower() in objects[proc.args_by_pos[1].type.type.lower()].tbps:
                     is_tbp = True
