@@ -48,6 +48,10 @@ for test in tests:
     os.chdir(tests_dir)
     if test in excludes or (not os.path.isdir(test)):
         continue
+    if not os.path.exists(os.path.join(test, 'Makefile')):
+        # This can happen if there are leftover directories for tests
+        # that only exist on a different branch
+        continue
     print("Running test:", test, end=' ')
     os.chdir(test)
     # Create "wrap" directory if doesn't exist:

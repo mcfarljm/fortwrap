@@ -132,6 +132,7 @@ name_exclusions = set()
 name_inclusions = set()
 proc_arg_exclusions = set()
 interface_defs = dict() # module -> proc name -> generic interface
+nopass_tbps = dict() # (module.lower,procname.lower) -> TypeBoundProcedure, for all TBP's with NOPASS attribute
 
 # 'INT' is for the hidden name length argument
 cpp_type_map = {'INTEGER':
@@ -561,19 +562,21 @@ class Argument(object):
 
 
 class Procedure(object):
-    def __init__(self,name,args,method,retval=None,comment=None):
+    def __init__(self,name,args,method,retval=None,comment=None,nopass=False):
         self.name = name
-        self.retval = retval
         self.args = args # By name
+        self.method = method # None, 't' (TYPE), 'c' (CLASS)
+        self.retval = retval
+        self.comment = comment
+        self.nopass = nopass
+
         self.nargs = len(args)
         self.module = current_module
-        self.comment = comment
-        self.method = method # None, 't' (TYPE), 'c' (CLASS)
         self.num = module_proc_num
         self.ctor = False
         self.dtor = False
         self.in_orphan_class = False # Set in associate_procedures
-        if self.method:
+        if self.method and not nopass:
             if ctor_def.match(name):
                 self.ctor = True
             elif dtor_def.match(name) and self.valid_dtor():
@@ -856,13 +859,17 @@ class DerivedType(object):
         
 
 class TypeBoundProcedure(object):
-    def __init__(self, name, proc, interface, deferred):
+    def __init__(self, name, proc, interface, deferred, nopass):
+        global current_module, nopass_tbps
         self.name = name
         self.proc = proc
         # Initially False or a string, but the string gets changed to
         # a procedure instance in associate_procedures
         self.interface = interface
         self.deferred = deferred
+        self.nopass = nopass
+        if nopass:
+            nopass_tbps[current_module.lower(), proc.lower()] = self
 
 
 def object_allocator_binding_name(obj_name, deallocate=False):
@@ -1200,9 +1207,15 @@ def parse_proc(file,line,abstract=False):
     if invalid:
         not_wrapped.append(proc_name)
     else:
-        proc = Procedure(proc_name,args,method,retval,proc_comments)
         is_tbp = False
-        if method:
+        nopass = False
+        if not method:
+            if (current_module.lower(), proc_name.lower()) in nopass_tbps:
+                is_tbp = True
+                method = True
+                nopass = True
+        proc = Procedure(proc_name,args,method,retval,proc_comments,nopass)
+        if method and not nopass:
             try:
                 if proc_name.lower() in objects[proc.arglist[0].type.type.lower()].tbps:
                     is_tbp = True
@@ -1285,15 +1298,16 @@ def parse_type(file,line):
             attr_str = line.split('::')[0].upper()
             if 'POINTER' in attr_str:
                 continue # Not a TBP
-            if 'PASS' in attr_str:
-                warning('PASS and NOPASS not yet supported for type bound procedures')
-                continue
+            if 'NOPASS' in attr_str:
+                nopass = True
+            else:
+                nopass = False
             interface = tbp_match.group('interface')
             deferred = 'DEFERRED' in attr_str
             for tbp_def in line.split('::')[1].split(','):
                 name = tbp_def.split('=>')[0].strip()
                 proc = tbp_def.split('=>')[1].strip() if '=>' in tbp_def else name
-                tbp = TypeBoundProcedure(name, proc, interface, deferred)
+                tbp = TypeBoundProcedure(name, proc, interface, deferred, nopass)
                 objects[typename.lower()].add_tbp(tbp)
 
 
@@ -1418,13 +1432,28 @@ def associate_procedures():
     for proc in procedures:
         # Associate methods
         if proc.method:
-            typename = proc.arglist[0].type.type
-            if typename.lower() in objects:
-                # print "Associating procedure:", typename +'.'+proc.name
-                objects[typename.lower()].procs.append(proc)
-                flag_native_args(proc)
-            elif typename.lower() not in name_exclusions:
-                error("Method {} declared for unknown derived type {}".format(proc.name, typename))
+            if not proc.nopass:
+                typename = proc.arglist[0].type.type
+                if typename.lower() in objects:
+                    # print "Associating procedure:", typename +'.'+proc.name
+                    objects[typename.lower()].procs.append(proc)
+                    flag_native_args(proc)
+                elif typename.lower() not in name_exclusions:
+                    error("Method {} declared for unknown derived type {}".format(proc.name, typename))
+            else: # nopass
+                found = False
+                for obj in objects.values():
+                    # Only search for NOPASS procedures in the same
+                    # module as the TYPE definition.  Otherwise, there
+                    # is no way to ensure that the correct procedure
+                    # gets associated if the name is reused in other
+                    # modules.
+                    if (obj.module==proc.module) and proc.name.lower() in obj.tbps:
+                        objects[obj.name.lower()].procs.append(proc)
+                        found = True
+                        break
+                if not found:
+                    error("Unable to associate NOPASS type bound procedure {}".format(proc.name))
         # Associate orphan functions with a dummy class
         elif (not opts.no_orphans) or proc.name.lower() in name_inclusions:
             if not orphan_classname.lower() in objects:
@@ -1684,8 +1713,8 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                 s = s + prefix + 'int ' + arg.name + ' = ' + matrix_name + '->' + size_method + ';\n'
     s = s + prefix
     # Make dummy class members static (so class doesn't need to be
-    # instantiated)
-    if proc.in_orphan_class and not bind and not call and not obj and not opts.global_orphans:
+    # instantiated).  Also make NOPASS methods static.
+    if (proc.in_orphan_class or proc.nopass) and not bind and not call and not obj and not opts.global_orphans:
         s = s + 'static '        
     # Now write return type:
     if proc.retval:
@@ -1706,6 +1735,8 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
             # This is a type bound procedure, so name may different
             # from procedure name
             method_name= objects[proc.arglist[0].type.type.lower()].tbps[proc.name.lower()].name
+        elif proc.nopass and (proc.module.lower(), proc.name.lower()) in nopass_tbps:
+            method_name = nopass_tbps[(proc.module.lower(), proc.name.lower())].name
         elif dfrd_tbp:
             # proc is the abstract interface for a deferred tbp
             method_name = dfrd_tbp.name
@@ -1864,7 +1895,8 @@ def write_class(object):
     # Check for pure virtual methods (which have no directly
     # associated procedure)
     for tbp in object.tbps.values():
-        if tbp.deferred:
+        # C++ doesn't support static virtual methods, so don't write DEFERRED, NOPASS methods into the C++ wrapper
+        if tbp.deferred and not tbp.nopass:
             # Note: this lookup doesn't respect the module USE
             # hierarchy and could potentially point to wrong
             # abstract_interfaces if the project contains multiple
