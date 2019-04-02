@@ -444,7 +444,7 @@ class Procedure(object):
         self.nopass = nopass
 
         self.nargs = len(args)
-        self.mod = current_module
+        self.module = current_module
         self.num = module_proc_num
         self.ctor = False
         self.dtor = False
@@ -550,7 +550,7 @@ class DerivedType(object):
         self.name = name
         self.cname = translate_name(name) # Account for name renaming
         self.procs = []
-        self.mod = current_module
+        self.module = current_module
         self.comment = comment
 
         self.is_class = False
@@ -1117,7 +1117,7 @@ def associate_procedures():
                     # is no way to ensure that the correct procedure
                     # gets associated if the name is reused in other
                     # modules.
-                    if (obj.mod==proc.mod) and proc.name.lower() in obj.tbps:
+                    if (obj.module==proc.module) and proc.name.lower() in obj.tbps:
                         objects[obj.name.lower()].procs.append(proc)
                         found = True
                         break
@@ -1422,15 +1422,15 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
             # This is a type bound procedure, so name may different
             # from procedure name
             method_name= objects[proc.arglist[0].type.type.lower()].tbps[proc.name.lower()].name
-        elif proc.nopass and (proc.mod.lower(), proc.name.lower()) in nopass_tbps:
-            method_name = nopass_tbps[(proc.mod.lower(), proc.name.lower())].name
+        elif proc.nopass and (proc.module.lower(), proc.name.lower()) in nopass_tbps:
+            method_name = nopass_tbps[(proc.module.lower(), proc.name.lower())].name
         elif dfrd_tbp:
             # proc is the abstract interface for a deferred tbp
             method_name = dfrd_tbp.name
         else:
             method_name= translate_name(proc.name)        
     if bind:
-        s = s + mangle_name(proc.mod,proc.name)
+        s = s + mangle_name(proc.module,proc.name)
     elif obj and not opts.global_orphans:
         s = s + obj.cname + '::' + method_name
     else:
@@ -1471,7 +1471,7 @@ def write_constructor(file,object,fort_ctor=None):
     if object.is_class:
         # Class data must be set up before calling constructor, in
         # case constructor uses CLASS argument
-        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.mod, object.name)))
+        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.module, object.name)))
         file.write('  class_data.data = data_ptr;\n')
     # If present, call Fortran ctor
     if fort_ctor:
@@ -1492,7 +1492,7 @@ def write_destructor(file,object):
     for proc in object.procs:
         if proc.dtor:
             target = 'data_ptr' if proc.arglist[0].type.dt=='TYPE' else '&class_data'
-            file.write('  ' + 'if (initialized) ' + mangle_name(proc.mod,proc.name) + '(' + target)
+            file.write('  ' + 'if (initialized) ' + mangle_name(proc.module,proc.name) + '(' + target)
             # Add NULL for any optional arguments (only optional
             # arguments are allowed in the destructor call)
             for i in range(proc.nargs-1):
@@ -1535,7 +1535,7 @@ def write_class(object):
     # Declare external vtab data
     if object.is_class:
         file.write('\n// Declare external vtab data:\n')
-        file.write('extern int {0}; // int is dummy data type\n'.format(vtab_symbol(object.mod, object.name)))
+        file.write('extern int {0}; // int is dummy data type\n'.format(vtab_symbol(object.module, object.name)))
     # C Bindings
     file.write('\nextern "C" {\n')
     # Write bindings for allocate/deallocate funcs
@@ -1873,7 +1873,7 @@ def write_fortran_wrapper():
     use_mods = set()
     for obj in objects.values():
         if obj.name != orphan_classname:
-            use_mods.add(obj.mod)
+            use_mods.add(obj.module)
     f = open(fort_output_dir+'/' + fort_wrap_file + '.f90', "w")
     #f.write(HEADER_STRING + '\n') # Wrong comment style
     f.write('MODULE ' + fort_wrap_file + '\n\n')
