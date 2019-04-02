@@ -439,7 +439,7 @@ class Procedure(object):
         self.retval = retval
         self.args = args # By name
         self.nargs = len(args)
-        self.mod = current_module
+        self.module = current_module
         self.comment = comment
         self.method = method # None, 't' (TYPE), 'c' (CLASS)
         self.num = module_proc_num
@@ -547,7 +547,7 @@ class DerivedType(object):
         self.name = name
         self.cname = translate_name(name) # Account for name renaming
         self.procs = []
-        self.mod = current_module
+        self.module = current_module
         self.comment = comment
 
         self.is_class = False
@@ -1399,7 +1399,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
         else:
             method_name= translate_name(proc.name)        
     if bind:
-        s = s + mangle_name(proc.mod,proc.name)
+        s = s + mangle_name(proc.module,proc.name)
     elif obj and not opts.global_orphans:
         s = s + obj.cname + '::' + method_name
     else:
@@ -1440,7 +1440,7 @@ def write_constructor(file,object,fort_ctor=None):
     if object.is_class:
         # Class data must be set up before calling constructor, in
         # case constructor uses CLASS argument
-        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.mod, object.name)))
+        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.module, object.name)))
         file.write('  class_data.data = data_ptr;\n')
     # If present, call Fortran ctor
     if fort_ctor:
@@ -1461,7 +1461,7 @@ def write_destructor(file,object):
     for proc in object.procs:
         if proc.dtor:
             target = 'data_ptr' if proc.arglist[0].type.dt=='TYPE' else '&class_data'
-            file.write('  ' + 'if (initialized) ' + mangle_name(proc.mod,proc.name) + '(' + target)
+            file.write('  ' + 'if (initialized) ' + mangle_name(proc.module,proc.name) + '(' + target)
             # Add NULL for any optional arguments (only optional
             # arguments are allowed in the destructor call)
             for i in range(proc.nargs-1):
@@ -1504,7 +1504,7 @@ def write_class(object):
     # Declare external vtab data
     if object.is_class:
         file.write('\n// Declare external vtab data:\n')
-        file.write('extern int {0}; // int is dummy data type\n'.format(vtab_symbol(object.mod, object.name)))
+        file.write('extern int {0}; // int is dummy data type\n'.format(vtab_symbol(object.module, object.name)))
     # C Bindings
     file.write('\nextern "C" {\n')
     # Write bindings for allocate/deallocate funcs
@@ -1841,7 +1841,7 @@ def write_fortran_wrapper():
     use_mods = set()
     for obj in objects.values():
         if obj.name != orphan_classname:
-            use_mods.add(obj.mod)
+            use_mods.add(obj.module)
     f = open(fort_output_dir+'/' + fort_wrap_file + '.f90', "w")
     #f.write(HEADER_STRING + '\n') # Wrong comment style
     f.write('MODULE ' + fort_wrap_file + '\n\n')
