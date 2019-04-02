@@ -135,7 +135,7 @@ pattern_substitutions = [] # List of (regex,replace) tuples
 name_exclusions = set()
 name_inclusions = set()
 proc_arg_exclusions = set()
-nopass_tbps = dict() # lower case proc name -> TypeBoundProcedure, for all TBP's with NOPASS attribute
+nopass_tbps = dict() # (module.lower,procname.lower) -> TypeBoundProcedure, for all TBP's with NOPASS attribute
 
 # 'INT' is for the hidden name length argument
 cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*','8':'long long*','C_INT':'int*', 'C_LONG':'long*'}, 
@@ -571,6 +571,7 @@ class DerivedType(object):
 
 class TypeBoundProcedure(object):
     def __init__(self, name, proc, interface, deferred, nopass):
+        global current_module, nopass_tbps
         self.name = name
         self.proc = proc
         # Initially False or a string, but the string gets changed to
@@ -579,7 +580,7 @@ class TypeBoundProcedure(object):
         self.deferred = deferred
         self.nopass = nopass
         if nopass:
-            nopass_tbps[proc.lower()] = self
+            nopass_tbps[current_module.lower(), proc.lower()] = self
 
         
 def mangle_name(mod,func):
@@ -904,7 +905,7 @@ def parse_proc(file,line,abstract=False):
         is_tbp = False
         nopass = False
         if not method:
-            if proc_name.lower() in nopass_tbps:
+            if (current_module.lower(), proc_name.lower()) in nopass_tbps:
                 is_tbp = True
                 method = True
                 nopass = True
@@ -1110,13 +1111,13 @@ def associate_procedures():
                     error("Method {} declared for unknown derived type {}".format(proc.name, typename))
             else: # nopass
                 found = False
-                # Note that this association does not respect the
-                # Fortran namespace (USE definitions) for the TYPE
-                # definition, so if multiple procedures have the same
-                # name as the one used in the TBP definition, the
-                # wrong one could get associated
                 for obj in objects.values():
-                    if proc.name.lower() in obj.tbps:
+                    # Only search for NOPASS procedures in the same
+                    # module as the TYPE definition.  Otherwise, there
+                    # is no way to ensure that the correct procedure
+                    # gets associated if the name is reused in other
+                    # modules.
+                    if (obj.mod==proc.mod) and proc.name.lower() in obj.tbps:
                         objects[obj.name.lower()].procs.append(proc)
                         found = True
                         break
@@ -1421,8 +1422,8 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
             # This is a type bound procedure, so name may different
             # from procedure name
             method_name= objects[proc.arglist[0].type.type.lower()].tbps[proc.name.lower()].name
-        elif proc.nopass and proc.name.lower() in nopass_tbps:
-            method_name = nopass_tbps[proc.name.lower()].name
+        elif proc.nopass and (proc.mod.lower(), proc.name.lower()) in nopass_tbps:
+            method_name = nopass_tbps[(proc.mod.lower(), proc.name.lower())].name
         elif dfrd_tbp:
             # proc is the abstract interface for a deferred tbp
             method_name = dfrd_tbp.name
