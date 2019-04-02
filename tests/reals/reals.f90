@@ -1,5 +1,6 @@
 MODULE reals
 
+  USE ISO_C_BINDING
   IMPLICIT NONE
 
   INTEGER, PARAMETER :: wp = 4  ! Test named precision
@@ -38,4 +39,20 @@ CONTAINS
     y = a+b
   end function add_doubles_lower
 
+  ! ISO_C_BINDING
+
+  FUNCTION add_iso_floats(a,b) RESULT(y)
+    REAL (C_FLOAT), INTENT(in) :: a
+    REAL(C_FLOAT), INTENT(in) :: b
+    REAL(C_FLOAT) :: y
+    y = a+b
+  END FUNCTION add_iso_floats
+
+  FUNCTION add_iso_doubles(a,b) RESULT(y)
+    REAL (C_DOUBLE), INTENT(in) :: a
+    REAL(C_DOUBLE), INTENT(in) :: b
+    REAL(C_DOUBLE) :: y
+    y = a+b
+  END FUNCTION add_iso_doubles
+  
 END MODULE reals
