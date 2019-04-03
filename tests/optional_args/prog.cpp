@@ -31,6 +31,11 @@ int main(void)
 
   if (FortFuncs::add_mixed(a,b,&c,&d) != a+b+c+d)
     return 7;
+
+  if (FortFuncs::add_with_hidden(a) != a)
+    return 10;
+  if (FortFuncs::add_with_hidden(a,&b) != a+b)
+    return 11;
   
   return 0;
 }

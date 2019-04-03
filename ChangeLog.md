@@ -1,5 +1,8 @@
 # Changes
 
+## 2.2.2
+- Proper dynamic allocation of character arrays in string wrapper code
+	
 ## 2.2.1
 - Added DLLEXPORT macro so that wrapper code can be compiled with MSC
 	

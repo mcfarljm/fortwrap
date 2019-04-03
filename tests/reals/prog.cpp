@@ -17,5 +17,11 @@ int main(void)
   if (FortFuncs::add_doubles_lower(da,db) != da+db)
     return 4;
 
+  // ISO_C_BINDING
+  if (FortFuncs::add_iso_floats(fa,fb) != fa+fb)
+    return 100;
+  if (FortFuncs::add_iso_doubles(da,db) != da+db)
+    return 101;
+
   return 0;
 }
