@@ -902,12 +902,13 @@ def parse_proc(file,line,abstract=False):
             method = True
     if retval:
         if retval.type:
-            if retval.type.dt and not retval.pointer:
-                invalid = True
-            elif retval.type.array:
+            if retval.type.array:
                 invalid = True
             elif retval.type.type == 'CHARACTER':
                 invalid = True
+            elif retval.type.dt:
+                if not retval.pointer:
+                    invalid = True
             elif not retval.type.valid_primitive():
                 invalid = True
         else:
@@ -1676,7 +1677,7 @@ def write_class(object):
         file.write('  owns = memOwn;\n')
         # Class data must be set up before calling constructor, in
         # case constructor uses CLASS argument
-        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.mod, object.name)))
+        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.module, object.name)))
         file.write('  class_data.data = data_ptr;\n')
         file.write('  class_data_ptr = &class_data;\n')
         file.write('}\n\n')
