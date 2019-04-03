@@ -573,6 +573,7 @@ class Procedure(object):
         self.nargs = len(args)
         self.module = current_module
         self.num = module_proc_num
+        self.tbp = None
         self.ctor = False
         self.dtor = False
         self.in_orphan_class = False # Set in associate_procedures
@@ -740,12 +741,11 @@ class Procedure(object):
         return string, count
 
     def get_iso_c_local_decs(self):
-        if self.nopass:
+        if self.nopass and self.tbp:
             # Declare a local instance of the TYPE just to access the
             # NOPASS TBP.  An alternative would be to declare this as
             # a global variable in the module.
-            tbp = nopass_tbps[self.module.lower(),self.name.lower()]
-            return '    TYPE({0}) :: {0}__t\n'.format(tbp.obj.name)
+            return '    TYPE({0}) :: {0}__t\n'.format(self.tbp.obj.name)
         return ''
 
     def supported_args(self):
@@ -823,7 +823,7 @@ class DerivedType(object):
         self.tbps = dict() # lowercase procname => tbp instance
 
     def add_tbp(self, tbp):
-        self.tbps[tbp.proc.lower()] = tbp
+        self.tbps[tbp.procname.lower()] = tbp
 
     def ctor_list(self):
         """Return list of associated ctors"""
@@ -873,18 +873,18 @@ class DerivedType(object):
         
 
 class TypeBoundProcedure(object):
-    def __init__(self, name, obj, proc, interface, deferred, nopass):
+    def __init__(self, name, obj, procname, interface, deferred, nopass):
         global current_module, nopass_tbps
         self.name = name
         self.obj = obj
-        self.proc = proc
+        self.procname = procname
         # Initially False or a string, but the string gets changed to
         # a procedure instance in associate_procedures
         self.interface = interface
         self.deferred = deferred
         self.nopass = nopass
         if nopass:
-            nopass_tbps[current_module.lower(), proc.lower()] = self
+            nopass_tbps[current_module.lower(), procname.lower()] = self
 
 
 def object_allocator_binding_name(obj_name, deallocate=False):
@@ -1454,6 +1454,8 @@ def associate_procedures():
                 if typename.lower() in objects:
                     # print "Associating procedure:", typename +'.'+proc.name
                     objects[typename.lower()].procs.append(proc)
+                    if proc.arglist[0].type.dt == 'CLASS' and proc.name.lower() in objects[typename.lower()].tbps:
+                        proc.tbp = objects[typename.lower()].tbps[proc.name.lower()]
                     flag_native_args(proc)
                 elif typename.lower() not in name_exclusions:
                     error("Method {} declared for unknown derived type {}".format(proc.name, typename))
@@ -1467,6 +1469,7 @@ def associate_procedures():
                     # modules.
                     if (obj.module==proc.module) and proc.name.lower() in obj.tbps:
                         objects[obj.name.lower()].procs.append(proc)
+                        proc.tbp = obj.tbps[proc.name.lower()]
                         found = True
                         break
                 if not found:
@@ -1748,12 +1751,8 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     # Definition/declaration:
     if not bind:
         # Determine what the C++ method name will be
-        if proc.nargs>=1 and proc.arglist[0].type.dt == 'CLASS' and proc.name.lower() in objects[proc.arglist[0].type.type.lower()].tbps:
-            # This is a type bound procedure, so name may different
-            # from procedure name
-            method_name= objects[proc.arglist[0].type.type.lower()].tbps[proc.name.lower()].name
-        elif proc.nopass and (proc.module.lower(), proc.name.lower()) in nopass_tbps:
-            method_name = nopass_tbps[(proc.module.lower(), proc.name.lower())].name
+        if proc.tbp:
+            method_name = proc.tbp.name
         elif dfrd_tbp:
             # proc is the abstract interface for a deferred tbp
             method_name = dfrd_tbp.name
