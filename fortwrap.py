@@ -739,6 +739,15 @@ class Procedure(object):
                     count += 1
         return string, count
 
+    def get_iso_c_local_decs(self):
+        if self.nopass:
+            # Declare a local instance of the TYPE just to access the
+            # NOPASS TBP.  An alternative would be to declare this as
+            # a global variable in the module.
+            tbp = nopass_tbps[self.module.lower(),self.name.lower()]
+            return '    TYPE({0}) :: {0}__t\n'.format(tbp.obj.name)
+        return ''
+
     def supported_args(self):
         """For use after all source has been parsed, verify that all arguments are supported"""
         for arg in self.args.values():
@@ -760,6 +769,7 @@ class Procedure(object):
             f.write(arg.get_iso_c_type_dec())
         if self.retval:
             f.write('    {} :: {}\n'.format(self.retval.get_iso_c_type(), proc_wrap_name))
+        f.write(self.get_iso_c_local_decs())
         for arg in self.arglist:
             f.write(arg.get_iso_c_type_local_decs())
         for arg in self.arglist:
@@ -778,9 +788,13 @@ class Procedure(object):
         except:
             tbp = None
         if tbp:
+            # This is only TBP's that are not nopass
             arg1 = arg_list.split(',')[0]
             args = ','.join(arg_list.split(',')[1:])
             line += '{}%{}({})'.format(arg1, tbp, args)
+        elif self.nopass:
+            tbp = nopass_tbps[self.module.lower(),self.name.lower()]
+            line += '{}__t%{}({})'.format(tbp.obj.name, tbp.name, arg_list)
         else:
             # Use generic interface name if defined in INTERFACE
             # block, in case actual name is not public
@@ -859,9 +873,10 @@ class DerivedType(object):
         
 
 class TypeBoundProcedure(object):
-    def __init__(self, name, proc, interface, deferred, nopass):
+    def __init__(self, name, obj, proc, interface, deferred, nopass):
         global current_module, nopass_tbps
         self.name = name
+        self.obj = obj
         self.proc = proc
         # Initially False or a string, but the string gets changed to
         # a procedure instance in associate_procedures
@@ -1272,18 +1287,20 @@ def parse_type(file,line):
     m = fort_type_def.match(line)
     typename = m.group('name0') or m.group('name1')
     type_added = add_type(typename)
+    if type_added:
+        obj = objects[typename.lower()]
     # type_added checks below prevent KeyError's in objects[]
     if type_added and 'ABSTRACT' in line.upper():
-        objects[typename.lower()].abstract = True
-        objects[typename.lower()].is_class = True
+        obj.abstract = True
+        obj.is_class = True
         fort_class_used = True
     extends_match = fort_type_extends_def.search(line)
     if type_added and extends_match:
-        objects[typename.lower()].extends = extends_match.group(1)
-        objects[typename.lower()].is_class = True
+        obj.extends = extends_match.group(1)
+        obj.is_class = True
         fort_class_used = True
     # if type_added:
-    #     print "{} extends: {}".format(typename, objects[typename.lower()].extends)
+    #     print "{} extends: {}".format(typename, obj.extends)
     # Move to end of type and parse type bound procedure definitions
     while True:
         line = file.readline()
@@ -1307,8 +1324,8 @@ def parse_type(file,line):
             for tbp_def in line.split('::')[1].split(','):
                 name = tbp_def.split('=>')[0].strip()
                 proc = tbp_def.split('=>')[1].strip() if '=>' in tbp_def else name
-                tbp = TypeBoundProcedure(name, proc, interface, deferred, nopass)
-                objects[typename.lower()].add_tbp(tbp)
+                tbp = TypeBoundProcedure(name, obj, proc, interface, deferred, nopass)
+                obj.add_tbp(tbp)
 
 
 def parse_enum(file,line):
