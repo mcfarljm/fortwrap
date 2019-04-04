@@ -894,10 +894,6 @@ def object_allocator_binding_name(obj_name, deallocate=False):
     return prefix + obj_name.lower() + '_'
         
 
-def vtab_symbol(mod,name):
-    return '__{0}_MOD___vtab_{0}_{1}'.format(mod.lower(), name.capitalize())
-
-
 def get_proc(name):
     """Return the first procedure in the global list that matches name"""
     for proc in procedures:
@@ -1856,10 +1852,6 @@ def write_class(object):
             file.write('#include ' + include + '\n')
         else:
             file.write('#include "' + translate_name(include) + '.h"\n')
-    # Declare external vtab data
-    if object.is_class:
-        file.write('\n// Declare external vtab data:\n')
-        file.write('extern int {0}; // int is dummy data type\n'.format(vtab_symbol(object.module, object.name)))
     # C Bindings
     file.write('\nextern "C" {\n')
     # Write bindings for allocate/deallocate funcs
