@@ -864,7 +864,7 @@ class DerivedType(object):
         # Write deallocate function
         f.write('  SUBROUTINE ' + object_allocator_binding_name(self.name, True) + '(' + cptr + ') BIND(C)\n')
         f.write('    TYPE (C_PTR), VALUE :: ' + cptr + '\n\n')
-        f.write('    TYPE (' + self.name + '), POINTER :: ' + fptr + '\n\n')
+        f.write('    TYPE (' + obj_name + '), POINTER :: ' + fptr + '\n\n')
         f.write('    CALL C_F_POINTER(' + cptr + ', ' + fptr + ')\n')
         f.write('    DEALLOCATE( ' + fptr + ' )\n')
         f.write('  END SUBROUTINE ' + object_allocator_binding_name(self.name, True) + '\n\n')
