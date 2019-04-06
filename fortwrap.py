@@ -1485,6 +1485,7 @@ def associate_procedures():
             arg.in_abstract = True
         # Flag native args for abstrat interfacs, which is necessary when writing the prototypes for the virtual methods
         flag_native_args(proc)
+    proc_ptr_warning_written = False
     for proc in procedures:
         for arg in proc.args.values():
             # Flag all derived types that are passed using CLASS:
@@ -1493,8 +1494,9 @@ def associate_procedures():
                 if typename in objects:
                     objects[typename].is_class = True
                     fort_class_used = True
-            elif arg.type.proc_pointer and arg.optional:
-                warning('optional procedure pointer arguments will always be present - code should check ASSOCIATED status')    
+            elif not proc_ptr_warning_written and arg.type.proc_pointer and arg.optional:
+                warning('optional procedure pointer arguments will always be present - code should check ASSOCIATED status')
+                proc_ptr_warning_written = True
             
 
 def write_cpp_dox_comments(file,comments,arglist=None,prefix=0):
