@@ -360,8 +360,10 @@ class Argument(object):
             self.comment.append('ARRAY')
 
     def pass_by_val(self):
-        """Whether we can pass this argument by val in the C++ interface"""
-        return not self.optional and not self.type.dt and self.intent=='in' and not self.type.array and not self.type.type=='CHARACTER' and not self.in_abstract
+        """Whether we can pass this argument by val in the C++ interface
+
+        Don't count Fortran arguments having the VALUE attribute, since they are already passed by value"""
+        return not self.byval and not self.optional and not self.type.dt and self.intent=='in' and not self.type.array and not self.type.type=='CHARACTER' and not self.in_abstract
 
     def fort_only(self):
         if self.type.hidden:
@@ -406,7 +408,7 @@ class Argument(object):
         # FortranMatrix<const double>.  Exclude pass_by_val for
         # aesthetic reasons (to keep const from being applied to
         # non-pointer arguments in method definitions)
-        return self.intent=='in' and not self.pass_by_val() and not self.type.matrix
+        return self.intent=='in' and not self.byval and not self.pass_by_val() and not self.type.matrix
 
     def cpp_type(self, value=False):
         """
