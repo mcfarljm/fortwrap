@@ -60,11 +60,11 @@ o.process();
 * [**Derived Types**](#derived-types): Transparent
   translation of Fortran derived types into C++ classes.  This is the
   main objective of FortWrap.
-  * Translation of Fortran "ctor" functions into C++ constructors</li>
+  * Translation of Fortran "ctor" functions into C++ constructors
   * Fortran "dtor" functions automatically called by C++ destructor
 * [**Classes (experimental)**](#class-and-polymorphism-experimental): Translate Fortran CLASSes and
 	type bound procedures into C++ classes.  Fortran inheritance
-    structure and polymorphism are retained in C++.
+    structure and polymorphism are mapped into C++.
 * [**Optional arguments**](#optional-arguments): Fortran
     optional arguments are fully supported, with automatic NULL
     default values in C++.
@@ -72,10 +72,11 @@ o.process();
     C++ function pointers may be passed natively where Fortran expects
     a procedure pointer.  Right now this requires that the Fortran
     procedure pointer have an explicit `ABSTRACT INTERFACE`
-* [**Arrays**](#arrays): By default,
-    one-dimensional arrays are translated into C++ vector containers.
-    Subroutine arguments used to define the Fortran array size are
-    automatically calculated based on the C++ vector.
+* [**Arrays**](#arrays): By default, one-dimensional arrays are
+    translated into C++ vector containers.  Subroutine arguments used
+    to define the Fortran array size are automatically calculated
+    based on the C++ vector.  Wrapping of assumed size and assumed
+    shape are supported.
 * [**Matrices**](#matrices): A
     "FortranMatrix" C++ class is provided for interfacing with
     two-dimensional Fortran arrays (matrices).  This class takes care
@@ -86,10 +87,9 @@ o.process();
     (`len=*`) or a literal or named constant.
 * **Enumerations**: equivalent `enum` definitions are
     generated in the C++ wrapper code.
-* "Top-level" (a.k.a. global or non-module) procedures are wrapped
-* Name mangling support for the gfortran compiler
-* Where possible, pass by value is used in C++ (e.g. scalar
-  arguments that are not optional)</li>
+* Where possible, pass by value is used in C++ even if the Fortran
+  argument being wrapped does not use the `VALUE` attribute
+  (e.g. scalar arguments that are `intent(in)` and not optional)
 * **Doxygen comments**: Doxygen-style comments used for
     Fortran symbols (derived types, subroutines, arguments) are
     transferred to C++ doxygen comments in the wrapper code.
@@ -100,30 +100,24 @@ o.process();
 ## Unsupported Features
 
 Many features of Fortran 90/95/2003 are not supported by FortWrap.  In
-some cases (e.g. assumed shape arrays) this is because the Fortran
-language standard does not provide an interoperability mechanism.  In
-other cases, this is because there was not a need for certain features
-when the original version of FortWrap was being developed.
-
-In most situations, it is possible to get FortWrap to wrap these
-types of routines by providing a Fortran wrapper that is interoperable
-and calls the target routine.
+some cases, this is because there was not a need for certain features
+when the original version of FortWrap was being developed.  In most
+situations, it is possible to get FortWrap to wrap these types of
+routines by writing a Fortran procedure that is wrappable and calls
+the target routine.
 
 The following argument types/constructs/features are not
 supported:
 
 * `ALLOCATABLE` or `POINTER` arguments
-* Assumed shape arrays (a declaration that looks like `INTEGER:: X(:)`).
-  The Fortran standard does not provide an
-  interoperability mechanism for assumed shape arrays.
-* Strings with `INTENT(INOUT)`.  Arrays of strings
+* Strings with `INTENT(INOUT)` or arrays of strings
 * Arrays of a derived type.  These can be wrapped by creating a
   new derived type to contain an array of the derived type of
   interest.  Create an "append" function in Fortran that accepts
   only scalars but allows you to add items to the array container
   one at a time.
-* Fortran functions with non-primitive return types are not wrapped.
-* `COMPLEX` data type is not supported
+* Functions that return a derived type are onlyl wrapped if the return
+  value has the `POINTER` attribute
 
 Note that FortWrap can still wrap procedures that use unsupported
 arguments if those arguments are optional.  In these cases, the
@@ -151,13 +145,20 @@ Fortran source file(s) to be wrapped:
 
 ### Notes about the Fortran compiler
 
-Currently, FortWrap only supports the gfortran compiler.  The wrapper code 
-depends on the name-mangling and character argument conventions used by 
-gfortran.  To add support for other compilers, it may be as simple as 
-updating FortWrap to use the appropriate conventions.  The experimental 
-support for wrapping CLASS and polymorphic constructs is more dependent 
-on the type of code created by gfortran.  Extending support for this 
-functionality to other compilers is expected to require more effort.
+FortWrap version 2 and earlier was specifically developed to target
+the gfortran compiler.  With version 3, the wrapping approach was
+redone to use the `ISO_C_BINDING` module, to allow for greater
+portability.  FortWrap still makes certain assumptions about what C
+data type to use when wrapping Fortran data types that do not use
+`ISO_C_BINDING` kind specifiers.  For example, when wrapping `INTEGER`
+with no kind specification, FortWrap maps it to a C `int`.  These
+mappings have been tested with gcc/gfortran, and may or may not work
+with other compilers (incorrect mappings should generate code that
+fails to compile).  The best approach would be to re-work the original
+Fortran code to use `ISO_C_BINDING` data types, i.e. to replace
+`INTEGER` with `INTEGER(C_INT)`.  Alternatively, the mapping
+definitions in FortWrap could be adjusted to meet the specifications
+of a particular compiler.
 
 ## Walkthrough
 
