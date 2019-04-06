@@ -113,12 +113,13 @@ provides working examples of most of the main FortWrap features.
 The easiest way to get started is to look at the simple test programs
 in the tests directory.
 
-Before running the tests, make sure that gfortran is installed.  
-The root directory contains a python script
-`run_tests.py` to execute all tests.  For each test, the script will
-change to the individual test directory, execute fortwrap.py to
-generate wrapper code, execute make to compile and link a simple test
-program, and finally run the test program.
+The root directory contains a python script `run_tests.py` and
+Makefiles that are currently set up to run the tests using the
+`gfortran` compiler.  However, for the most part, the tests should be
+compatible with other compilers as well.  For each test, the script
+will change to the individual test directory, execute fortwrap.py to
+generate wrapper code, execute `make` to compile and link a simple
+test program, and finally run the test program.
 
 To manually run a test, first make sure the compiler specified in
 tests/Tests.mk is valid.  Then change to a test directory, for
