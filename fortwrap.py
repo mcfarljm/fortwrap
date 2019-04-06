@@ -158,7 +158,12 @@ cpp_type_map = {'INTEGER':
                 'C_PTR':
                 {'':'void**'},
                 'COMPLEX':
-                {'':'std::complex<float>*'}}
+                {'':'std::complex<float>*',
+                 '4':'std::complex<float>*',
+                 'C_FLOAT_COMPLEX':'std::complex<float>*',
+                 '8':'std::complex<double>*',
+                 'C_DOUBLE_COMPLEX':'std::complex<double>*'}}
+                
 
 iso_c_type_map = {'INTEGER':
                   {'':'C_INT',
@@ -176,7 +181,9 @@ iso_c_type_map = {'INTEGER':
                 'CHARACTER':
                   {'':'C_CHAR'},
                 'COMPLEX':
-                  {'':'C_FLOAT_COMPLEX'}}
+                  {'':'C_FLOAT_COMPLEX',
+                   '4':'C_FLOAT_COMPLEX',
+                   '8':'C_DOUBLE_COMPLEX'}}
 
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
 
@@ -1624,8 +1631,6 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                             string = string[:-2] + ' '
                 elif arg.type.type=='CHARACTER' and not bind and not arg.intent=='in':
                     string = string + string_object_type + ' *' # pass by ref not compat with optional
-                elif arg.type.type=='COMPLEX':
-                    string = string + 'std::complex<float>' + ' *'
                 else:
                     string = string + arg.cpp_type() + ' '
             else:
