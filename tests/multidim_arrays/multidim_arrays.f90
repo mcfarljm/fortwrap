@@ -53,4 +53,17 @@ CONTAINS
     END DO
   END SUBROUTINE three_d_array_test
 
+  SUBROUTINE three_d_array_test_assumed_shape(A)
+    INTEGER, INTENT(out) :: A(:,:,:)
+
+    INTEGER :: i,j,k
+    DO k=1,SIZE(A,3)
+      DO j=1,SIZE(A,2)
+        DO i=1,SIZE(A,1)
+          A(i,j,k) = (i+j)**k
+        END DO
+      END DO
+    END DO
+  END SUBROUTINE three_d_array_test_assumed_shape
+
 END MODULE multidim_arrays

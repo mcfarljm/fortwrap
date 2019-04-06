@@ -78,6 +78,21 @@ int main(void)
     }
   }
 
+  // 3-D array test with assumed shape
+  {
+    int X[2][3][4];
+    FortFuncs::three_d_array_test_assumed_shape(4,3,2,(int*)X);
+    // Check solution
+    for (int i=0; i<2; i++) {
+      for (int j=0; j<3; j++) {
+	for (int k=0; k<4; k++) {
+	  if (X[i][j][k] != pow(j+k+2,i+1))
+	    return 21;
+	}
+      }
+    }
+  }  
+
   return 0;
 }
 
