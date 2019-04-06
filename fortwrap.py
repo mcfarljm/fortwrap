@@ -409,8 +409,10 @@ class Argument(object):
             self.comment.append('ARRAY')
 
     def pass_by_val(self):
-        """Whether we can pass this argument by val in the C++ interface"""
-        return not self.optional and not self.type.dt and self.intent=='in' and not self.type.array and not self.type.type=='CHARACTER' and not self.in_abstract
+        """Whether we can pass this argument by val in the C++ interface
+
+        Procedure pointers are handled differently since the "present" status can't be stored in the Fortran argument, we allow by-val conversion even for optional arguments"""
+        return (not self.optional or self.type.proc_pointer) and not self.type.dt and self.intent=='in' and not self.type.array and not self.type.type=='CHARACTER' and not self.in_abstract
 
     def fort_only(self):
         """Whether argument is not wrappable"""
@@ -423,6 +425,7 @@ class Argument(object):
             if not self.type.type in abstract_interfaces:
                 return True
             elif not self.intent=='in':
+                # Todo: allow once post-call code added
                 return True
         elif self.type.proc:
             # PROCEDURE (without POINTER attribute) does not seem to be compatible with current wrapping approach (with gfortran)
@@ -490,7 +493,8 @@ class Argument(object):
                 string = proc.retval.cpp_type(value=True) + ' '
             else:
                 string = 'void '
-            string = string + '(*' + self.name + ')'
+            pointers = '*' if (value or self.byval) else '**'
+            string = string + '(' + pointers + self.name + ')'
             string = string + '(' + c_arg_list(proc,bind=True) + ')'
             return string
         else:
@@ -502,7 +506,7 @@ class Argument(object):
         if self.type.dt:
             return 'TYPE(C_PTR), VALUE'
         if self.type.proc_pointer:
-            return 'TYPE(C_FUNPTR), VALUE'
+            return 'TYPE(C_FUNPTR){}{}'.format(', VALUE' if self.byval else '', ', OPTIONAL' if self.optional else '')
         if self.type.type == 'CHARACTER':
             return 'TYPE(C_PTR), VALUE'
         if self.type.kind.upper().startswith('C_'):
@@ -534,7 +538,7 @@ class Argument(object):
                 typename = get_base_class(obj).name + '_container_'
             return '    TYPE(' + typename + '), POINTER :: {}__p\n'.format(self.name)
         elif self.type.proc_pointer:
-            return '    PROCEDURE({}), POINTER :: {}__p\n'.format(self.type.type, self.name)
+            return '    PROCEDURE({}), POINTER :: {}__p => NULL()\n'.format(self.type.type, self.name)
         elif self.type.type == 'CHARACTER':
             return '    CHARACTER({1}), POINTER :: {0}__p\n'.format(self.name, self.type.str_len.as_string())
         elif self.type.type == 'LOGICAL':
@@ -547,7 +551,8 @@ class Argument(object):
         if self.type.dt or self.type.type=='CHARACTER':
             return '    CALL C_F_POINTER({0}, {0}__p)\n'.format(self.name)
         elif self.type.proc_pointer:
-            return '    CALL C_F_PROCPOINTER({0}, {0}__p)\n'.format(self.name)
+            present = 'IF (PRESENT({})) '.format(self.name) if self.optional else ''
+            return '    {1}CALL C_F_PROCPOINTER({0}, {0}__p)\n'.format(self.name, present)
         elif self.type.type == 'LOGICAL':
             return '    {0}__l = {0}\n'.format(self.name)
         return ''
@@ -1615,7 +1620,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             else:
                 raise FWTypeException(arg.type.type)
         # Change pass-by-value to reference for Fortran
-        if call and bind and arg.pass_by_val() and not arg.type.proc_pointer:
+        if call and bind and arg.pass_by_val():
             string = string + '&'
         # Add argument name -------------------------
         if arg.type.proc_pointer and not call:
