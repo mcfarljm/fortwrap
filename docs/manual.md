@@ -149,7 +149,7 @@ FortWrap version 2 and earlier was specifically developed to target
 the gfortran compiler.  With version 3, the wrapping approach was
 redone to use the `ISO_C_BINDING` module, to allow for greater
 portability.  FortWrap still makes certain assumptions about what C
-data type to use when wrapping Fortran data types that do not use
+data types to use when wrapping Fortran data types that do not use
 `ISO_C_BINDING` kind specifiers.  For example, when wrapping `INTEGER`
 with no kind specification, FortWrap maps it to a C `int`.  These
 mappings have been tested with gcc/gfortran, and may or may not work
@@ -338,7 +338,7 @@ array arguments.  But due to an unfortunate quirk in the C++ standard,
 compatible with the contiguous memory access that FortWrap expects.
 
 At this point, different options are being evaluated for wrapping
-logials.  One possibility is to wrap them as `int` in the C++ API.
+logicals.  One possibility is to wrap them as `int` in the C++ API.
 This provides portability, but complicates the wrapping code because
 the Fortran wrapper code must "manually" convert integers to and from
 logicals before calling into the original code (while properly
@@ -347,6 +347,28 @@ approach would be to wrap as `bool` and find an alternative to
 `std::vector<bool>`.
 
 ### Optional arguments
+
+For the most part, wrapping optional arguments is straightforward.
+Optional arguments are "passed through" from the Fortran wrapper
+procedure to the target procedure.  That is, a formal argument value
+is always provided, but the "`PRESENT`" status of the argument in the
+target procedure depends on whether the value of the argument is a
+NULL pointer.
+
+The case where this becomes nuanced is wrapping Fortran types that
+have the `POINTER` attribute.  Currently, the only such type that
+FortWrap will wrap is a procedure pointer.  The problem is that the
+procedure pointer formal argument cannot itself distinguish present
+versus not present.  To properly handle this, the generated wrapper
+code would require separate cases for calling the target function with
+and without the procedure pointer argument.  As it stands, FortWrap
+generates Fortran wrapper code that always passes a value for the
+optional procedure pointer argument into the target code.  What this
+means for the user is that the target code should be written such that
+for `INTENT(IN)`, both the `PRESENT` and `ASSOCIATED` status should be
+checked before considering the argument "present".  This will produce
+the expected behavior when using NULL to indicate a non-present
+argument from C++.  See `tests/func_pointers`.
 
 ## The Configuration File
 
@@ -797,14 +819,13 @@ source code.
 This is a catch-all include file for all of the C++ wrapper code.
 Your C++ program only needs to include this.
 
-### `CppWrappers.f90`
+### `FortranISOWrappers.f90`
 
-This source file is generated when either derived types or
-procedure pointers are wrapped.  For each derived type that is being
-wrapped, corresponding "allocate" and "deallocate" wrapper functions
-are generated for creating C "handles" to the Fortran derived type.
-When applicable, this source file will also define a small
-procedure pointer conversion routine.
+This source file contains the C-interoperable Fortran wrapper code.
+For each procedure that is wrapped, a corresponding interoperable
+version is generated here with the `BIND(C)` attribute.  In addition,
+"allocate" and "deallocate" wrapper functions are created for each
+derived type that is wrapped.
 
 ### Class Wrappers
 
