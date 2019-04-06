@@ -193,8 +193,8 @@ the `wrap` directory:
 
 ```
 [derived_types]$ ls wrap/
-CppWrappers.f90  InterfaceDefs.h  ObjectA.h    ObjectB.h
-FortWrap.h       ObjectA.cpp      ObjectB.cpp
+FortranISOWrappers.f90  InterfaceDefs.h  ObjectA.h    ObjectB.h
+FortWrap.h              ObjectA.cpp      ObjectB.cpp
 ```
 
 These files are explained more [here](#generated-files).  The
@@ -213,12 +213,10 @@ running `make` produces the following commands:
 
 ```
 [derived_types]$ make
-g++ -I wrap   -c -o prog.o prog.cpp
-gfortran -I wrap -o DerivedTypes.o -c DerivedTypes.f90
-gfortran -I wrap -o wrap/CppWrappers.o -c wrap/CppWrappers.f90
-g++ -I wrap   -c -o wrap/ObjectA.o wrap/ObjectA.cpp
-g++ -I wrap   -c -o wrap/ObjectB.o wrap/ObjectB.cpp
-gfortran -o prog prog.o DerivedTypes.o wrap/CppWrappers.o wrap/ObjectA.o wrap/ObjectB.o -lstdc++
+g++ -Wall -g -I wrap -std=c++11 -pedantic-errors   -c -o prog.o prog.cpp
+gfortran -g -I wrap -std=f2008ts -o DerivedTypes.o -c DerivedTypes.f90
+gfortran -g -I wrap -std=f2008ts -o wrap/FortranISOWrappers.o -c wrap/FortranISOWrappers.f90
+g++ -Wall -g -I wrap -std=c++11 -pedantic-errors   -c -o wrap/ObjectA.o wrap/ObjectA.cppg++ -Wall -g -I wrap -std=c++11 -pedantic-errors   -c -o wrap/ObjectB.o wrap/ObjectB.cppgfortran -o prog prog.o DerivedTypes.o wrap/FortranISOWrappers.o wrap/ObjectA.o wrap/ObjectB.o -lstdc++
 ```
 
 In this case Fortran is used as the linker language and the
