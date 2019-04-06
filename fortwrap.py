@@ -156,7 +156,9 @@ cpp_type_map = {'INTEGER':
                 'CHARACTER':
                 {'':'char*'},
                 'C_PTR':
-                {'':'void**'}}
+                {'':'void**'},
+                'COMPLEX':
+                {'':'std::complex<float>*'}}
 
 iso_c_type_map = {'INTEGER':
                   {'':'C_INT',
@@ -172,7 +174,9 @@ iso_c_type_map = {'INTEGER':
                   'LOGICAL':
                   {'':'C_BOOL'},
                 'CHARACTER':
-                  {'':'C_CHAR'}}
+                  {'':'C_CHAR'},
+                'COMPLEX':
+                  {'':'C_FLOAT_COMPLEX'}}
 
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
 
@@ -196,6 +200,7 @@ matrix_used = False
 stringh_used = False            # Whether "string.h" is used (needed for strcpy)
 fort_class_used = False
 string_class_used = False # Whether string outputs are used, which involves wrapping using a string class (either std::string or the generated wrapper class)
+complex_used = False
 
 # Gets changed to string_classname if --no-std-string is set
 string_object_type = 'std::string'
@@ -282,14 +287,13 @@ class CharacterLength(object):
             return str(self.val)
 
 class DataType(object):
-    complex_warning_written = False
     def __init__(self, type, array=None, str_len=None, is_str_len=False, is_assumed_shape_size=False):
         """is_assumed_shape_size - Whether the argument holds the size of an
         assumed shape array.  If it does, then the value stores the
         dimension of the array
 
         """
-        global stringh_used
+        global stringh_used, complex_used
         self.type = type
         self.kind = ''
         self.array = array
@@ -305,9 +309,7 @@ class DataType(object):
         if type=='CHARACTER':
             stringh_used = True # Really only needed for intent(in)
         elif type.upper()=='COMPLEX':
-            if not DataType.complex_warning_written:
-                warning("COMPLEX data not supported")
-                DataType.complex_warning_written = True
+            complex_used = True
 
         primitive_data_match = primitive_data.match(type)
         if primitive_data_match:
@@ -435,8 +437,6 @@ class Argument(object):
             else:
                 return True
         if self.type.type in cpp_type_map and not self.type.valid_primitive():
-            return True
-        elif self.type.type.upper()=='COMPLEX':
             return True
         if self.byval and (self.optional or self.type.dt or self.type.type=='CHARACTER'):
             return True
@@ -1624,6 +1624,8 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                             string = string[:-2] + ' '
                 elif arg.type.type=='CHARACTER' and not bind and not arg.intent=='in':
                     string = string + string_object_type + ' *' # pass by ref not compat with optional
+                elif arg.type.type=='COMPLEX':
+                    string = string + 'std::complex<float>' + ' *'
                 else:
                     string = string + arg.cpp_type() + ' '
             else:
@@ -1854,6 +1856,8 @@ def write_class(object):
     file.write('#include <cstdlib>\n') # Needed for NULL
     if not opts.no_vector:
         file.write('#include <vector>\n')
+    if complex_used:
+        file.write('#include <complex>\n')
     file.write('#include "' + misc_defs_filename + '"\n')
     includes = get_native_includes(object)
     if object.name in includes:
