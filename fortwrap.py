@@ -378,7 +378,7 @@ class Argument(object):
         elif self.type.proc_pointer:
             if not self.type.type in abstract_interfaces:
                 return True
-            elif self.intent=='out':
+            elif not self.intent=='in':
                 return True
         elif self.type.proc:
             # PROCEDURE (without POINTER attribute) does not seem to be compatible with current wrapping approach (with gfortran)
@@ -1282,7 +1282,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             else:
                 raise FWTypeException(arg.type.type)
         # Change pass-by-value to reference for Fortran
-        if call and bind and arg.pass_by_val():
+        if call and bind and arg.pass_by_val() and not arg.type.proc_pointer:
             string = string + '&'
         # Native class arguments that are not optional need & before arg name
         if arg.type.dt=='CLASS' and call and arg.native and not (arg.optional and arg.cpp_optional):

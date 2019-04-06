@@ -18,7 +18,7 @@ MODULE func_pointers
 
     SUBROUTINE container_ctor(c,f,a,b)
       TYPE (Container) :: c
-      PROCEDURE(int_template), POINTER :: f
+      PROCEDURE(int_template), POINTER, INTENT(in) :: f
       INTEGER, INTENT(in) :: a,b
       c%f => f
       c%a = a
@@ -34,7 +34,7 @@ MODULE func_pointers
     END FUNCTION container_callf
 
     FUNCTION callf(f,a,b) RESULT(y)
-      PROCEDURE(int_template), POINTER :: f
+      PROCEDURE(int_template), POINTER, INTENT(in) :: f
       INTEGER, INTENT(in) :: a,b
       INTEGER :: y
       y = f(a,b)
@@ -42,7 +42,7 @@ MODULE func_pointers
 
     FUNCTION callf_opt(a,b,f) RESULT(y)
       INTEGER, INTENT(in) :: a,b
-      PROCEDURE(int_template), POINTER, OPTIONAL :: f
+      PROCEDURE(int_template), POINTER, OPTIONAL, INTENT(in) :: f
       INTEGER :: y
 
       IF (PRESENT(f)) THEN
