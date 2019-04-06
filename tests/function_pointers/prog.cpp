@@ -29,5 +29,18 @@ int main(void)
   if (FortFuncs::callf_opt(a, b) != -1)
     return 6;
 
+  // Function pointer output
+  int (*fptr)(const int *a, const int *b);
+  c.getf_sub(&fptr);
+  if ((*fptr)(&a,&b) != a + b)
+    return 10;
+
+  c.getf_opt(); // Verify no crash when not providing optional output
+
+  fptr = NULL;
+  c.getf_opt(&fptr);
+  if ((*fptr)(&a,&b) != a + b)
+    return 12;  
+
   return 0;
 }

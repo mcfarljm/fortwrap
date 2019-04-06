@@ -37,6 +37,22 @@ MODULE func_pointers
       y = f(c%a,c%b)
     END FUNCTION container_callf
 
+    SUBROUTINE getf_sub(c, f)
+      TYPE (Container) :: c
+      PROCEDURE(int_template), POINTER, INTENT(out) :: f
+      f => c%f
+    END SUBROUTINE getf_sub
+
+    SUBROUTINE getf_opt(c, f)
+      TYPE (Container) :: c
+      PROCEDURE(int_template), POINTER, INTENT(out), OPTIONAL :: f
+      ! Called from C++, f will always be present.  When a NULL (not
+      ! present) argument is used from C++, the Fortran wrapper still
+      ! declares and passes in a local variable, so accessing it in the case
+      ! of intent(out) is safe
+      IF (PRESENT(f)) f => c%f
+    END SUBROUTINE getf_opt
+
     FUNCTION callf(f,a,b) RESULT(y)
       PROCEDURE(int_template), POINTER, INTENT(in) :: f
       INTEGER, INTENT(in) :: a,b

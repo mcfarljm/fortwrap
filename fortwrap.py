@@ -424,9 +424,6 @@ class Argument(object):
         elif self.type.proc_pointer:
             if not self.type.type in abstract_interfaces:
                 return True
-            elif not self.intent=='in':
-                # Todo: allow once post-call code added
-                return True
         elif self.type.proc:
             # PROCEDURE (without POINTER attribute) does not seem to be compatible with current wrapping approach (with gfortran)
             return True    
@@ -550,7 +547,7 @@ class Argument(object):
             return ''
         if self.type.dt or self.type.type=='CHARACTER':
             return '    CALL C_F_POINTER({0}, {0}__p)\n'.format(self.name)
-        elif self.type.proc_pointer:
+        elif self.type.proc_pointer and (self.intent=='in' or self.intent=='inout'):
             present = 'IF (PRESENT({})) '.format(self.name) if self.optional else ''
             return '    {1}CALL C_F_PROCPOINTER({0}, {0}__p)\n'.format(self.name, present)
         elif self.type.type == 'LOGICAL':
@@ -560,6 +557,9 @@ class Argument(object):
     def get_iso_c_post_call_code(self):
         if self.type.type=='LOGICAL' and self.intent!='in':
             return '    {0} = {0}__l\n'.format(self.name)
+        elif self.type.proc_pointer and (self.intent=='out' or self.intent=='inout'):
+            present = 'IF (PRESENT({})) '.format(self.name) if self.optional else ''
+            return '    {1}{0} = C_FUNLOC({0}__p)\n'.format(self.name, present)
         return ''
 
 
