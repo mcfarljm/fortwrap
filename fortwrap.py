@@ -411,8 +411,10 @@ class Argument(object):
     def pass_by_val(self):
         """Whether we can pass this argument by val in the C++ interface
 
+        Don't count Fortran arguments having the VALUE attribute, since they are already passed by value
+
         Procedure pointers are handled differently since the "present" status can't be stored in the Fortran argument, we allow by-val conversion even for optional arguments"""
-        return (not self.optional or self.type.proc_pointer) and not self.type.dt and self.intent=='in' and not self.type.array and not self.type.type=='CHARACTER' and not self.in_abstract
+        return not self.byval and (not self.optional or self.type.proc_pointer) and not self.type.dt and self.intent=='in' and not self.type.array and not self.type.type=='CHARACTER' and not self.in_abstract
 
     def fort_only(self):
         """Whether argument is not wrappable"""
@@ -436,7 +438,7 @@ class Argument(object):
             return True
         elif self.type.type.upper()=='COMPLEX':
             return True
-        if self.byval and (self.optional or self.type.dt or self.type.type=='CHARACTER' or self.type.proc_pointer):
+        if self.byval and (self.optional or self.type.dt or self.type.type=='CHARACTER'):
             return True
         if self.allocatable:
             return True
@@ -465,7 +467,7 @@ class Argument(object):
         # FortranMatrix<const double>.  Exclude pass_by_val for
         # aesthetic reasons (to keep const from being applied to
         # non-pointer arguments in method definitions)
-        return self.intent=='in' and not self.pass_by_val() and not self.type.matrix
+        return self.intent=='in' and not self.byval and not self.pass_by_val() and not self.type.matrix
 
     def cpp_type(self, value=False):
         """
