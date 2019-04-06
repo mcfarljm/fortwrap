@@ -64,6 +64,21 @@ void Object::set_string(const char* s) {
 Refer to the documentation and tests on the `iso_c_binding` branch for
 more information on this wrapping approach.
 
+## Checklist
+
+Things to consider before using FortWrap:
+
+* No legacy code:
+  * All code to be wrapped must be contained in a module
+  * Procedure dummy arguments must be defined using `::` syntax
+* String wrapping:
+  * Strings must be either `INTENT(IN)` or `INTENT(OUT)`
+  * Arrays of strings are not supported (consider using a container type or a "get/set" API with scalar arguments)
+* Arguments can not have `POINTER` or `ALLOCATABLE` attribute
+  * Exception: Derived type (including `CLASS`) function return values may have the `POINTER` attribute
+* Arrays of derived types are not supported
+* Procedure pointer arguments must use an abstract interface
+
 ## Features
 
 * Fortran derived types wrapped in C++ proxy classes
