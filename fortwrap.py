@@ -569,6 +569,8 @@ class Argument(object):
         return ''
 
     def get_iso_c_post_call_code(self):
+        if self.fort_only():
+            return ''
         if self.type.type=='LOGICAL' and self.intent!='in':
             return '    {0} = {0}__l\n'.format(self.name)
         elif self.type.proc_pointer and (self.intent=='out' or self.intent=='inout'):
