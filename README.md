@@ -81,14 +81,15 @@ Things to consider before using FortWrap:
 
 ## Features
 
-* Fortran derived types wrapped in C++ proxy classes
+* Fortran derived types wrapped in C++ proxy classes using opaque pointer handling
 * Experimental support for polymorphism (CLASS variables)
-* Arrays wrapped with C++ vectors
+* Arrays wrapped with C++ vectors by default
+* Wrapping of assumed size and assumed shape arrays
 * Support for optional arguments
 * Support for wrapping procedure pointers
 * Support for string arguments
+* Support for `COMPLEX` arguments
 * Fortran doxygen comments transferred to C++ header files
-* Name mangling support for gfortran compiler
 * Wrappers respect Fortran public/private statements
 * Generated code can be re-wrapped with swig -c++
 
