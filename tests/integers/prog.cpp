@@ -25,6 +25,10 @@ int main(void)
   if (FortFuncs::add_ints8(a8,b8) != (a8+b8))
     return 7;
 
+  // By value:
+  if (FortFuncs::add_ints_byval(a4, b4) != a4+b4)
+    return 10;
+
   // ISO_C_BINDING
   if (FortFuncs::add_iso_ints(a4,b4) != a4+b4)
     return 100;

@@ -392,8 +392,7 @@ class Argument(object):
             return True
         elif self.type.type.upper()=='COMPLEX':
             return True
-        if self.byval and not self.type.type.upper()=='C_PTR':
-            # This could be supported for other cases if needed
+        if self.byval and (self.optional or self.type.dt or self.type.type=='CHARACTER' or self.type.proc_pointer):
             return True
         if self.allocatable:
             return True
@@ -1282,7 +1281,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             else:
                 raise FWTypeException(arg.type.type)
         # Change pass-by-value to reference for Fortran
-        if call and bind and arg.pass_by_val() and not arg.type.proc_pointer:
+        if call and bind and arg.pass_by_val() and not arg.byval and not arg.type.proc_pointer:
             string = string + '&'
         # Native class arguments that are not optional need & before arg name
         if arg.type.dt=='CLASS' and call and arg.native and not (arg.optional and arg.cpp_optional):
