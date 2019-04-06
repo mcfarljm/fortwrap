@@ -520,15 +520,14 @@ Here are some tips:
 
 ### Derived Types
 
-The main goal of FortWrap is to allow users to develop C++
-interfaces to Fortran code that applies object oriented techniques
-by making use of derived types.  In order to interface with
-Fortran derived types, FortWrap uses an object handle approach,
-where a pointer to the derived type is stored and passed to
-arguments that operate on that derived type.  Thus the derived
-type can not be directly inspected from C++, but the object handle
-(pointer) can be passed to Fortran routines that operate on
-it.
+The main goal of FortWrap is to allow users to develop C++ interfaces
+to Fortran code that applies object oriented techniques by making use
+of derived types.  In order to interface with Fortran derived types,
+FortWrap uses an object handle (opaque pointer) approach, where a
+pointer to the derived type is stored and passed to arguments that
+operate on that derived type.  Thus the derived type can not be
+directly inspected from C++, but the object handle (pointer) can be
+passed to Fortran routines that operate on it.
 
 FortWrap scans the Fortran source code for definitions of derived
 types and Fortran subroutines that operate on those derived types.
@@ -536,9 +535,9 @@ For each derived type it finds, it creates a corresponding C++
 class.  After parsing the Fortran source code, C++ methods are
 then created by associating Fortran subroutines with derived
 types.  The rule for this association process is
-simple: <span class="hl">each Fortran subroutine with a derived
+simple: ==each Fortran subroutine with a derived
 type as its first argument is translated into a method of the
-corresponding C++ class.</span>
+corresponding C++ class.==
 
 FortWrap also provides special mechanisms for wrapping certain
 Fortran routines as C++ constructors and destructors.  If a
@@ -557,13 +556,11 @@ configuration file.
     
 ### CLASS and polymorphism (experimental)
 
-FortWrap includes experimental support for wrapping CLASS data
+FortWrap includes experimental support for wrapping `CLASS` data
 structures, which support type bound procedures, inheritance, and
 polymorphism.  The objective is to create a set of C++ classes and
 methods that mirror the structure of the original Fortran code; this
-includes inheritance and polymorphism.  (Supporting these features requires 
-more assumptions about how the Fortran compiler generates code, so they may 
-be considered more fragile.)
+includes inheritance and polymorphism.
 
 A key distinction is the use of "type bound procedures", which
 look like:
@@ -606,24 +603,23 @@ examples in `tests/classes` of the FortWrap installation.
 ### Optional Arguments
 
 Fortran 90 provides for optional procedure arguments that may be
-passed by position or keyword from Fortran.  FortWrap takes advantage of the fact
-that gfortran implements optional
-arguments by passing a null pointer to indicate that the argument is not present.
-(it appears that as of Technical Specification ISO/IEC TS 29113:2012, this behavior
-is part of the Fortran standard for C interoperability).
+passed by position or keyword from Fortran.  FortWrap takes advantage
+of the fact that gfortran implements optional arguments by passing a
+null pointer to indicate that the argument is not present.  (it
+appears that as of Technical Specification ISO/IEC TS 29113:2012, this
+behavior is part of the Fortran standard for C interoperability).
 
-FortWrap exploits this by allowing the arguments to be optional
-from C++.  The usage is not quite as friendly as it would be from
-Fortran, though, since C++ does not support keyword arguments.
-However, FortWrap tries to make the usage as simple as possible by
-automatically giving all optional arguments default values
-of `NULL`.  Note also that one consequence of using
-optional arguments is that they may not be passed by value from
-C++.  Normally FortWrap will wrap primitive scalar types
-with `INTENT(IN)` as pass-by-value arguments from C++, but
-FortWrap must resort to pass-by-reference for optional arguments
-(however, see the [Swig tips](#swig-tips); if re-wrapping
-with Swig, this is not an issue).
+Interoperability of optional arguments is based on using a NULL
+pointer to indicate that the argument is not present.  FortWrap
+automatically sets up corresponding default `NULL` values for the
+optional arguments in the C++ API.  However, usage is not quite as
+friendly as when using the Fortran code, since C++ does not support
+keyword arguments.  Additionally, one consequence of using optional
+arguments is that they may not be passed by value from C++.  Normally
+FortWrap will wrap primitive scalar types with `INTENT(IN)` as
+pass-by-value arguments from C++, but FortWrap must resort to
+pass-by-reference for optional arguments (however, see the [Swig
+tips](#swig-tips); if re-wrapping with Swig, this is not an issue).
 
 Consider the following Fortran subroutine:
 
@@ -684,34 +680,16 @@ that are used to define the Fortran array size; these are hidden
 from the generated interface and are calculated automatically
 based on the size of the vector container that is passed in.
   
-  The option `--no-vector` can be used to create C-style
-  arrays, although with this option FortWrap can not hide the array
-  size arguments from the generated interface.
+The option `--no-vector` can be used to create C-style arrays,
+although with this option FortWrap can not hide the array
+size arguments from the generated interface.
 
-FortWrap does not currently support assumed shape
-(e.g. `X(:)`) array arguments.  However, these cases can be
-handled by writing a Fortran wrapper that FortWrap can wrap.  For
-example, in order to handle a subroutine like:
+FortWrap does support wrapping assumed shape (e.g. `X(:)`) array
+arguments.  This is done by passing the array sizes as hidden
+arguments to the Fortran wrapper code.  When C++ vector wrapping is
+enabled, the array sizes are determined automatically and do not show
+up in the C++ API.
 
-```Fortran
-SUBROUTINE bad_sub(x)
-  INTEGER :: x(:)
-  ...
-END SUBROUTINE bad_sub
-```
-
-write a Fortran wrapper that calls the original routine:
-
-```Fortran
-SUBROUTINE bad_sub_wrap(n,x)
-  INTEGER, INTENT(IN) :: n
-  INTEGER :: x(n)
-  CALL bad_sub(x)
-END SUBROUTINE bad_sub_wrap
-```
-
-There is the possibility of a future version of FortWrap creating
-these types of wrappers automatically.
 
 ### Matrices
 
@@ -755,14 +733,10 @@ callback target conforms to this prototype.
 
 ### Strings
 
-FortWrap provides powerful support for processing strings.  This
-is a difficult language feature to handle well, and the Fortran
-standard for string interoperability is not much help.
-
-FortWrap can wrap any scalar string arguments that are
-either `INTENT(IN)` or `INTENT(OUT)`.  The string
-length may be assumed (`len=*`), a literal constant, or a
-named constant from an `INTEGER, PARAMETER` declaration
+FortWrap provides powerful support for processing strings.  FortWrap
+can wrap any scalar string arguments that are either `INTENT(IN)` or
+`INTENT(OUT)`.  The string length may be assumed (`len=*`), a literal
+constant, or a named constant from an `INTEGER, PARAMETER` declaration
 that FortWrap has already parsed.
 
 Strings that are `INTENT(IN)` are wrapped as `const char*`: this
