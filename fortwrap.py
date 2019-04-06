@@ -436,8 +436,7 @@ class Argument(object):
             return True
         elif self.type.type.upper()=='COMPLEX':
             return True
-        if self.byval and not self.type.type.upper()=='C_PTR':
-            # This could be supported for other cases if needed
+        if self.byval and (self.optional or self.type.dt or self.type.type=='CHARACTER' or self.type.proc_pointer):
             return True
         if self.allocatable:
             return True
@@ -499,18 +498,24 @@ class Argument(object):
 
     def get_iso_c_type(self, ignore_array=False):
         if self.type.type.upper() == 'C_PTR':
-            return 'TYPE(C_PTR){}'.format(', VALUE' if self.byval else '')
-        if self.type.dt:
+            string = 'TYPE(C_PTR)'
+        elif self.type.dt:
+            # Immediate return so that OPTIONAL attribute is not added
             return 'TYPE(C_PTR), VALUE'
-        if self.type.proc_pointer:
-            return 'TYPE(C_FUNPTR){}{}'.format(', VALUE' if self.byval else '', ', OPTIONAL' if self.optional else '')
-        if self.type.type == 'CHARACTER':
+        elif self.type.proc_pointer:
+            string = 'TYPE(C_FUNPTR)'
+        elif self.type.type == 'CHARACTER':
+            # Immediate return so that OPTIONAl attribute is not added
             return 'TYPE(C_PTR), VALUE'
-        if self.type.kind.upper().startswith('C_'):
-            c_kind = self.type.kind
         else:
-            c_kind = iso_c_type_map[self.type.type][self.type.kind]
-        string = '{}({})'.format(self.type.type, c_kind)
+            if self.type.kind.upper().startswith('C_'):
+                c_kind = self.type.kind
+            else:
+                c_kind = iso_c_type_map[self.type.type][self.type.kind]
+            string = '{}({})'.format(self.type.type, c_kind)
+        
+        if self.byval:
+            string += ', VALUE'
         if self.optional:
             string += ', OPTIONAL'
         if self.type.array and not ignore_array:
@@ -1622,7 +1627,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             else:
                 raise FWTypeException(arg.type.type)
         # Change pass-by-value to reference for Fortran
-        if call and bind and arg.pass_by_val():
+        if call and bind and arg.pass_by_val() and not arg.byval:
             string = string + '&'
         # Add argument name -------------------------
         if arg.type.proc_pointer and not call:
