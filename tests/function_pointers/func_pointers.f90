@@ -39,5 +39,18 @@ MODULE func_pointers
       INTEGER :: y
       y = f(a,b)
     END FUNCTION callf
+
+    FUNCTION callf_opt(a,b,f) RESULT(y)
+      INTEGER, INTENT(in) :: a,b
+      PROCEDURE(int_template), POINTER, OPTIONAL :: f
+      INTEGER :: y
+
+      IF (PRESENT(f)) THEN
+        y = f(a,b)
+        RETURN
+      END IF
+      
+      y = -1
+    END FUNCTION callf_opt
   
 END MODULE func_pointers
