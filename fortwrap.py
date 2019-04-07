@@ -85,13 +85,13 @@ fort_contains = re.compile(r'\s*CONTAINS\s*$', re.IGNORECASE)
 # Data types
 primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>(\w+|\*))\s*\)))?'
 primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
-fort_data_str = r'\s*(' + primitive_data_str + '|(?P<dt_mode>TYPE|CLASS)\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)(\s*,\s*POINTER)?)'
+fort_data_str = r'\s*(' + primitive_data_str + '|(?P<dt_mode>TYPE|CLASS)\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\))'
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
-fort_data_def = re.compile(fort_data_str + '.*::',re.IGNORECASE)
-optional_def = re.compile('OPTIONAL.*::', re.IGNORECASE)
-byval_def = re.compile('VALUE.*::', re.IGNORECASE)
-allocatable_def = re.compile('ALLOCATABLE.*::',re.IGNORECASE)
-fort_pointer_def = re.compile('POINTER.*::',re.IGNORECASE)
+fort_data_def = re.compile(fort_data_str + '\s*(?P<attributes>,.*)?::',re.IGNORECASE)
+optional_def = re.compile('OPTIONAL', re.IGNORECASE)
+byval_def = re.compile('VALUE', re.IGNORECASE)
+allocatable_def = re.compile('ALLOCATABLE',re.IGNORECASE)
+fort_pointer_def = re.compile('POINTER',re.IGNORECASE)
 # CLASS: not yet supported, but print warnings
 fort_class_data_def = re.compile(r'\s*CLASS\s*\(\S*\).*::',re.IGNORECASE)
 
@@ -343,13 +343,12 @@ class DataType(object):
             # (SIZE_ is used to represent the hidden length arguments,
             # passed by value)
             if 'PROCEDURE' in type.upper():
-                # Matching broken b/c of "::'
                 m = fort_data.match(type)
                 self.type = m.group('proc_spec')
-                if 'POINTER' in type.upper():
-                    self.proc_pointer = True
-                else:
-                    self.proc = True
+                # Outside of this constructor, the pointer attribute
+                # is checked, in which case "proc" is reset to False
+                # and "proc_pointer" is set to True:
+                self.proc = True
             else:
                 m = fort_data.match(type)
                 if m.group('dt_mode'):
@@ -449,7 +448,7 @@ class Argument(object):
             return True
         if self.allocatable:
             return True
-        if self.pointer:
+        if self.pointer and not self.type.proc_pointer:
             return True
         return False
 
@@ -1057,26 +1056,31 @@ def add_type(t):
         return False
 
 def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
+    global proc_pointer_used
+    
     count = 0
 
     line = file.join_lines(line)
     line = line.split('!')[0]
 
-    m = fort_data.match(line)
+    m = fort_data_def.match(line)
+
+    attributes = m.group('attributes')
 
     # Attributes.
-    optional = True if optional_def.search(line) else False
-    byval = True if byval_def.search(line) else False
-    allocatable = True if allocatable_def.search(line) else False
-    pointer = False
-    if fort_pointer_def.search(line) and ('procedure' not in line.split('::')[0].lower()):
-        pointer = True
+    if not attributes:
+        # Change None to string so searching works
+        attributes = ''
+    optional = True if optional_def.search(attributes) else False
+    byval = True if byval_def.search(attributes) else False
+    allocatable = True if allocatable_def.search(attributes) else False
+    pointer = True if fort_pointer_def.search(attributes) else False
     # Check for DIMENSION statement
-    dimension = dimension_def.search(line)
+    dimension = dimension_def.search(attributes)
     intent = 'inout'
-    if intent_in_def.match(line):
+    if intent_in_def.match(attributes):
         intent = 'in'
-    elif intent_out_def.match(line):
+    elif intent_out_def.match(attributes):
         intent = 'out'
 
     # Get type string [e.g. INTEGER, TYPE(ErrorType),
@@ -1123,6 +1127,10 @@ def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
             array = Array(size_desc)
             name = name.split('(')[0]
         type = DataType(type_string,array,char_len)
+        if type.proc and pointer:
+            type.proc = False
+            type.proc_pointer = True
+            proc_pointer_used = True
         if name.lower() in arg_list_lower:
             count += 1
             if char_len and char_len.val=='*':
