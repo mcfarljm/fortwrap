@@ -1,5 +1,16 @@
 # Changes
 
+## 2.3.0
+- Added support for wrapping `NOPASS` type bound procedures as static methods
+- Added support for wrapping `COMPLEX` data type
+- Require `INTENT(IN)` for procedure pointers
+- Support wrapping `TYPE(C_PTR)`
+- Support wrapping `VALUE` attribute for additional argument types
+- Add gfortran version-specific typedef for hidden character length argument
+- Parsing fixes for type bound procedures with line continuation
+- Fix for wrapping virtual methods wtih class arguments
+- Minor improvements to argument parsing
+	
 ## 2.2.2
 - Proper dynamic allocation of character arrays in string wrapper code
 	
