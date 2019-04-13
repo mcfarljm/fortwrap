@@ -54,4 +54,10 @@ CONTAINS
     y = sum(x)
   END FUNCTION sum_with_dt_size
 
+  FUNCTION assumed_shape_in(x) RESULT(y)
+    INTEGER, INTENT(in) :: x(:)
+    INTEGER :: y
+    y = SUM(x)
+  END FUNCTION assumed_shape_in
+
 END MODULE arrays

@@ -14,11 +14,15 @@ int main(void)
 	b[i] = i+1;
       }
     if (FortFuncs::inner_prod(3,a,b) != 8)
-      return 0;
+      return 1;
 
     // Test assumed size
-    // if (FortFuncs::inner_prod_2(3,a,b) != 8)
-    //   return 1;
+    if (FortFuncs::inner_prod_2(3,a,b) != 8)
+      return 2;
+
+    // Test assumed shape:
+    if (FortFuncs::inner_prod_assumed_shape(3, a, 3, b) != 8)
+      return 3;
   }
 
   // 2-D array test:
@@ -45,8 +49,18 @@ int main(void)
     for (int i=0; i<3; i++) 
       {
 	if (Xa[i] != Xa_test[i])
-	  return 2;
+	  return 10;
       }
+
+    // Assumed shape
+    int Xa2[3];
+    FortFuncs::mat_vec_mult_assumed_shape(3, 2, (int*)X, 2, a, 3, Xa2);
+    for (int i=0; i<3; i++) 
+      {
+	if (Xa2[i] != Xa_test[i])
+	  return 11;
+      }    
+    
   }
 
   // 3-D array test
@@ -58,11 +72,26 @@ int main(void)
       for (int j=0; j<3; j++) {
 	for (int k=0; k<4; k++) {
 	  if (X[i][j][k] != pow(j+k+2,i+1))
-	    return 3;
+	    return 20;
 	}
       }
     }
   }
+
+  // 3-D array test with assumed shape
+  {
+    int X[2][3][4];
+    FortFuncs::three_d_array_test_assumed_shape(4,3,2,(int*)X);
+    // Check solution
+    for (int i=0; i<2; i++) {
+      for (int j=0; j<3; j++) {
+	for (int k=0; k<4; k++) {
+	  if (X[i][j][k] != pow(j+k+2,i+1))
+	    return 21;
+	}
+      }
+    }
+  }  
 
   return 0;
 }

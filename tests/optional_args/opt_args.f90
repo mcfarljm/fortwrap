@@ -24,9 +24,9 @@ MODULE opt_args
 
     FUNCTION add_with_hidden(a,b,c,d) RESULT(y)
       INTEGER, INTENT(in) :: a
-      INTEGER, INTENT(in), OPTIONAL :: b(:) ! Hidden
+      INTEGER, INTENT(in), POINTER, OPTIONAL :: b(:) ! Hidden
       INTEGER, INTENT(in), OPTIONAL :: c
-      INTEGER, INTENT(in), OPTIONAL :: d(:) ! Hidden
+      INTEGER, INTENT(in), POINTER, OPTIONAL :: d(:) ! Hidden
       INTEGER :: y
       y = a
       IF (PRESENT(b)) y = y + 1

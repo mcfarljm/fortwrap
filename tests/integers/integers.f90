@@ -32,6 +32,12 @@ CONTAINS
     y = a+b
   END FUNCTION add_ints8
 
+  FUNCTION add_ints_byval(a,b) RESULT(y)
+    INTEGER, INTENT(in), VALUE :: a, b
+    INTEGER :: y
+    y = a + b
+  END FUNCTION add_ints_byval
+  
   ! Test lower case parsing:
 
   function add_ints1_lower(a,b) result(y)

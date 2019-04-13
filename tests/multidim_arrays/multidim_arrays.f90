@@ -11,14 +11,20 @@ CONTAINS
     y = DOT_PRODUCT(a,b)
   END FUNCTION inner_prod
 
+  FUNCTION inner_prod_assumed_shape(a,b) RESULT(y)
+    INTEGER, INTENT(in) :: a(:), b(:)
+    INTEGER :: y
+    y = DOT_PRODUCT(a,b)
+  END FUNCTION inner_prod_assumed_shape
+
   ! Test assumed size
-!!$  FUNCTION inner_prod_2(n,a,b) RESULT(y)
-!!$    INTEGER, INTENT(in) :: n
-!!$    INTEGER, INTENT(in), DIMENSION(*) :: a
-!!$    INTEGER, INTENT(in) :: b(*)
-!!$    INTEGER :: y
-!!$    y = DOT_PRODUCT(a(1:n),b(1:n))
-!!$  END FUNCTION inner_prod_2
+  FUNCTION inner_prod_2(n,a,b) RESULT(y)
+    INTEGER, INTENT(in) :: n
+    INTEGER, INTENT(in), DIMENSION(*) :: a
+    INTEGER, INTENT(in) :: b(*)
+    INTEGER :: y
+    y = DOT_PRODUCT(a(1:n),b(1:n))
+  END FUNCTION inner_prod_2
 
   SUBROUTINE mat_vec_mult(m,n,A,b,Ab)
     INTEGER, INTENT(in) :: m,n, b(n)
@@ -26,6 +32,13 @@ CONTAINS
     INTEGER, INTENT(out) :: Ab(m)
     Ab = MATMUL(A,b)
   END SUBROUTINE mat_vec_mult
+
+  SUBROUTINE mat_vec_mult_assumed_shape(A,b,Ab)
+    INTEGER, INTENT(in) :: b(:)
+    INTEGER, INTENT(in), DIMENSION(:,:) :: A
+    INTEGER, INTENT(out) :: Ab(:)
+    Ab = MATMUL(A,b)
+  END SUBROUTINE mat_vec_mult_assumed_shape
 
   SUBROUTINE three_d_array_test(A)
     INTEGER, INTENT(out) :: A(4,3,2)
@@ -39,5 +52,18 @@ CONTAINS
       END DO
     END DO
   END SUBROUTINE three_d_array_test
+
+  SUBROUTINE three_d_array_test_assumed_shape(A)
+    INTEGER, INTENT(out) :: A(:,:,:)
+
+    INTEGER :: i,j,k
+    DO k=1,SIZE(A,3)
+      DO j=1,SIZE(A,2)
+        DO i=1,SIZE(A,1)
+          A(i,j,k) = (i+j)**k
+        END DO
+      END DO
+    END DO
+  END SUBROUTINE three_d_array_test_assumed_shape
 
 END MODULE multidim_arrays
