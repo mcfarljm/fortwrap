@@ -1795,6 +1795,9 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
         for arg in proc.args.values():
             # Special string handling for after the call
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
+                str_len = arg.type.str_len.as_string()
+                str_len_p1 = str_len + '+1'
+                str_len_m1 = str_len + '-1'                
                 s = s + '\n'
                 s = s + prefix + 'if ('+arg.name+') {\n'
                 s = s + prefix + '  // Trim trailing whitespace and assign character array to string:\n'
