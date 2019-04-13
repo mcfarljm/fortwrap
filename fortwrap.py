@@ -236,6 +236,11 @@ class CharacterLength(object):
     def set_assumed(self, argname):
         self.val = argname
         self.assumed = True
+    def as_string(self):
+        if self.assumed:
+            return self.val+'_len__'
+        else:
+            return str(self.val)
 
 class DataType(object):
     def __init__(self,type,array=None,str_len=None,hidden=False):
@@ -1236,13 +1241,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             # the four cases
             if bind and call:
                 if arg.type.hidden:
-                    if arg.type.str_len.assumed:
-                        # val stores the arg name of the string
-                        # itself.  In wrapper code, length variable is
-                        # declared as name+'_len__'
-                        string = string + arg.type.str_len.val + '_len__'
-                    else:
-                        string = string + str(arg.type.str_len.val)
+                    string += arg.type.str_len.as_string()
                 elif arg.type.is_array_size or arg.type.is_matrix_size:
                     string = string + '&' + arg.name
                 else:
@@ -1372,10 +1371,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     if call:
         for arg in proc.args.values():
             if arg.type.type=='CHARACTER' and not arg.fort_only():
-                if arg.type.str_len.assumed:
-                    str_len = arg.name+'_len__'
-                else:
-                    str_len = str(arg.type.str_len.val)
+                str_len = arg.type.str_len.as_string()
                 str_len_p1 = str_len + '+1'
                 str_len_m1 = str_len + '-1'
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
@@ -1451,6 +1447,9 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
         for arg in proc.args.values():
             # Special string handling for after the call
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
+                str_len = arg.type.str_len.as_string()
+                str_len_p1 = str_len + '+1'
+                str_len_m1 = str_len + '-1'                
                 s = s + '\n'
                 s = s + prefix + 'if ('+arg.name+') {\n'
                 s = s + prefix + '  // Trim trailing whitespace and assign character array to string:\n'
