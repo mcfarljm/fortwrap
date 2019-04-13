@@ -1813,6 +1813,9 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                 varname = arg.name
                 if not (arg.type.str_len.assumed and opts.string_out=='c'):
                     varname += '_c__'
+                str_len = arg.type.str_len.as_string()
+                str_len_p1 = str_len + '+1'
+                str_len_m1 = str_len + '-1'                
                 s = s + '\n'
                 s = s + prefix + 'if ('+arg.name+') {\n'
                 s = s + prefix + '  // Trim trailing whitespace and assign character array to string:\n'
