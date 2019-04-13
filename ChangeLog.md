@@ -9,6 +9,7 @@
 - Add gfortran version-specific typedef for hidden character length argument
 - Parsing fixes for type bound procedures with line continuation
 - Fix for wrapping virtual methods wtih class arguments
+- Fix for string output wrapping with multiple string arguments
 - Minor improvements to argument parsing
 	
 ## 2.2.2
