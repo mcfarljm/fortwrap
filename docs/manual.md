@@ -617,12 +617,12 @@ two-dimensional arrays are wrapped as pointers.
 
 ### Procedure Pointers
 
-The Fortran 2003 standard provides support for procedure pointers
-as well as mechanisms for interoperating with procedure pointers
-from C.  Procedure pointer arguments are wrapped by FortWrap with
-the limitation that the interface must be explicit and defined via
-an `ABSTRACT INTERFACE` block.
-See `tests/function_pointers` for example usage.
+The Fortran 2003 standard provides support for procedure pointers as
+well as mechanisms for interoperating with procedure pointers from C.
+Procedure pointer arguments that are `INTENT(IN)` are wrapped by
+FortWrap with the limitation that the interface must be explicit and
+defined via an `ABSTRACT INTERFACE` block.  See
+`tests/function_pointers` for example usage.
 
 FortWrap will parse the abstract interface definition to generate
 the corresponding C function pointer prototype.  Make sure that the
