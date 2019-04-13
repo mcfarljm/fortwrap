@@ -114,8 +114,6 @@ supported:
 
 * `ALLOCATABLE` or `POINTER` arguments
 * Assumed shape arrays (a declaration that looks like `INTEGER:: X(:)`).
-  The Fortran standard does not provide an
-  interoperability mechanism for assumed shape arrays.
 * Strings with `INTENT(INOUT)`.  Arrays of strings
 * Arrays of a derived type.  These can be wrapped by creating a
   new derived type to contain an array of the derived type of
@@ -123,13 +121,11 @@ supported:
   only scalars but allows you to add items to the array container
   one at a time.
 * Fortran functions with non-primitive return types are not wrapped.
-* `COMPLEX` data type is not supported
 
 Note that FortWrap can still wrap procedures that use unsupported
 arguments if those arguments are optional.  In these cases, the
 offending arguments are hidden from the generated interface
 code.
-
 
 
 ## Getting Started
