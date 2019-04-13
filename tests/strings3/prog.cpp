@@ -28,12 +28,10 @@ int main(void)
       strcmp(s3, "String C") != 0 || strcmp(s4, "String D") != 0)
     return 3;
 
-  char sa1[10], sa2[10];
-  // Note: assumed-length output arguments will determine the size of
-  // the temporary array (which actually gets passed to the Fortran
-  // code) based on the size of the input string.
+  const int CHARLEN2=10;
+  char sa1[CHARLEN2], sa2[CHARLEN2];
 
-  FortFuncs::string_out_assumed_len(sa1, 0, sa2);
+  FortFuncs::string_out_assumed_len(CHARLEN2, sa1, 0, CHARLEN2, sa2);
   printf("sa1, sa2: %s, %s\n", sa1, sa2);
   if (strcmp(sa1, "String A") != 0 || strcmp(sa2, "String B") != 0)
     return 4;  
@@ -74,11 +72,11 @@ int main(void)
   if (FortFuncs::optional_out() != 0) // Not present
     return 15;
 
-  if (FortFuncs::optional_out_assumed(s) != 1) // Present
+  if (FortFuncs::optional_out_assumed(CHARLEN, s) != 1) // Present
     return 16;
   if (strcmp(s, "Test String") != 0)
     return 17;
-  if (FortFuncs::optional_out_assumed() != 0) // Not present
+  if (FortFuncs::optional_out_assumed(CHARLEN) != 0) // Not present
     return 18;
 
   return 0;

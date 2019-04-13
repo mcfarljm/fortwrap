@@ -21,6 +21,7 @@ custom_opts = { 'c_arrays' : OPTS + ' --no-vector',
                 'interface_file' : OPTS + ' -i interface.i',
                 'multidim_arrays' : OPTS + ' --no-vector --no-fmat',
                 'strings2' : OPTS + ' --string-out=wrapper',
+                'strings3' : OPTS + ' --string-out=c',
                 'overloading' : OPTS + ' -i config.txt' }
 
 # Tests for demonstration purposes only:
