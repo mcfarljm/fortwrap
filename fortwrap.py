@@ -36,7 +36,7 @@ import os
 import traceback
 
 
-VERSION = '2.2.2'
+VERSION = '2.3.0'
 
 
 # SETTINGS ==========================================
@@ -91,13 +91,13 @@ fort_contains = re.compile(r'\s*CONTAINS\s*$', re.IGNORECASE)
 # Data types
 primitive_data_str = '(INTEGER|REAL|DOUBLE PRECISION|LOGICAL|CHARACTER|INT|COMPLEX)(\s*(\*(?P<old_kind_spec>[0-9]+)|\(\s*((KIND|len)\s*=)?\s*(?P<kind_spec>(\w+|\*))\s*\)))?'
 primitive_data = re.compile(primitive_data_str,re.IGNORECASE)
-fort_data_str = r'\s*(' + primitive_data_str + '|(?P<dt_mode>TYPE|CLASS)\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\)(\s*,\s*POINTER)?)'
+fort_data_str = r'\s*(' + primitive_data_str + '|(?P<dt_mode>TYPE|CLASS)\s*\((?P<dt_spec>\S*)\)|PROCEDURE\s*\((?P<proc_spec>\S*)\))'
 fort_data = re.compile(fort_data_str,re.IGNORECASE)
-fort_data_def = re.compile(fort_data_str + '.*::',re.IGNORECASE)
-optional_def = re.compile('OPTIONAL.*::', re.IGNORECASE)
-byval_def = re.compile('VALUE.*::', re.IGNORECASE)
-allocatable_def = re.compile('ALLOCATABLE.*::',re.IGNORECASE)
-fort_pointer_def = re.compile('POINTER.*::',re.IGNORECASE)
+fort_data_def = re.compile(fort_data_str + '\s*(?P<attributes>,.*)?::',re.IGNORECASE)
+optional_def = re.compile('OPTIONAL', re.IGNORECASE)
+byval_def = re.compile('VALUE', re.IGNORECASE)
+allocatable_def = re.compile('ALLOCATABLE',re.IGNORECASE)
+fort_pointer_def = re.compile('POINTER',re.IGNORECASE)
 # CLASS: not yet supported, but print warnings
 fort_class_data_def = re.compile(r'\s*CLASS\s*\(\S*\).*::',re.IGNORECASE)
 
@@ -121,6 +121,8 @@ enum_def = re.compile(r'\s*ENUM,\s*BIND',re.IGNORECASE)
 # Constructor and desctructor methods (these regexes are configurable):
 ctor_def = re.compile('.*_ctor', re.IGNORECASE)
 dtor_def = re.compile('.*_dtor', re.IGNORECASE)
+# Regular expression for "initialization" functions (configurable):
+init_func_def = None
 
 # ===================================================
 
@@ -141,7 +143,9 @@ nopass_tbps = dict() # (module.lower,procname.lower) -> TypeBoundProcedure, for 
 cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*','8':'long long*','C_INT':'int*', 'C_LONG':'long*'}, 
                 'REAL':{'':'float*', '4':'float*', '8':'double*', 'C_DOUBLE':'double*', 'C_FLOAT':'float*'},
                 'LOGICAL':{'':'int*', 'C_BOOL':'int*'}, 
-                'CHARACTER':{'':'char*'}, 
+                'CHARACTER':{'':'char*'},
+                'C_PTR':{'':'void**'},
+                'COMPLEX':{'':'std::complex<float>*','4':'std::complex<float>*','C_FLOAT_COMPLEX':'std::complex<float>*','8':'std::complex<double>*','C_DOUBLE_COMPLEX':'std::complex<double>*'},
                 'INT':{'':'fortran_charlen_t'}}
 
 special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
@@ -167,6 +171,7 @@ matrix_used = False
 stringh_used = False            # Whether "string.h" is used (needed for strcpy)
 fort_class_used = False
 string_class_used = False # Whether string outputs are used, which involves wrapping using a string class (either std::string or the generated wrapper class)
+complex_used = False
 
 # Gets changed to string_classname if --no-std-string is set
 string_object_type = 'std::string'
@@ -233,11 +238,15 @@ class CharacterLength(object):
     def set_assumed(self, argname):
         self.val = argname
         self.assumed = True
+    def as_string(self):
+        if self.assumed:
+            return self.val+'_len__'
+        else:
+            return str(self.val)
 
 class DataType(object):
-    complex_warning_written = False
     def __init__(self,type,array=None,str_len=None,hidden=False):
-        global proc_pointer_used, stringh_used
+        global stringh_used, complex_used
         self.type = type
         self.kind = ''
         self.array = array
@@ -252,9 +261,7 @@ class DataType(object):
         if type=='CHARACTER':
             stringh_used = True # Really only needed for intent(in)
         elif type.upper()=='COMPLEX':
-            if not DataType.complex_warning_written:
-                warning("COMPLEX data not supported")
-                DataType.complex_warning_written = True
+            complex_used = True
 
         primitive_data_match = primitive_data.match(type)
         if primitive_data_match:
@@ -281,19 +288,20 @@ class DataType(object):
             # (INT is used to represent the hidden length arguments,
             # passed by value)
             if 'PROCEDURE' in type.upper():
-                # Matching broken b/c of "::'
                 m = fort_data.match(type)
                 self.type = m.group('proc_spec')
-                if 'POINTER' in type.upper():
-                    self.proc_pointer = True
-                    proc_pointer_used = True
-                else:
-                    self.proc = True
+                # Outside of this constructor, the pointer attribute
+                # is checked, in which case "proc" is reset to False
+                # and "proc_pointer" is set to True:
+                self.proc = True
             else:
                 m = fort_data.match(type)
                 if m.group('dt_mode'):
                     self.dt = m.group('dt_mode').upper()
                     self.type = m.group('dt_spec')
+                    if self.type.upper() == 'C_PTR':
+                        # Don't treat like derived type
+                        self.dt = False
                 else:
                     raise FWTypeException(type)
 
@@ -356,8 +364,10 @@ class Argument(object):
             self.comment.append('ARRAY')
 
     def pass_by_val(self):
-        """Whether we can pass this argument by val in the C++ interface"""
-        return not self.optional and not self.type.dt and self.intent=='in' and not self.type.array and not self.type.type=='CHARACTER' and not self.in_abstract
+        """Whether we can pass this argument by val in the C++ interface
+
+        Don't count Fortran arguments having the VALUE attribute, since they are already passed by value"""
+        return not self.byval and not self.optional and not self.type.dt and self.intent=='in' and not self.type.array and not self.type.type=='CHARACTER' and not self.in_abstract
 
     def fort_only(self):
         if self.type.hidden:
@@ -374,7 +384,7 @@ class Argument(object):
         elif self.type.proc_pointer:
             if not self.type.type in abstract_interfaces:
                 return True
-            elif self.intent=='out':
+            elif not self.intent=='in':
                 return True
         elif self.type.proc:
             # PROCEDURE (without POINTER attribute) does not seem to be compatible with current wrapping approach (with gfortran)
@@ -386,14 +396,11 @@ class Argument(object):
                 return True
         if self.type.type in cpp_type_map and not self.type.valid_primitive():
             return True
-        elif self.type.type.upper()=='COMPLEX':
-            return True
-        if self.byval and not self.type.type.upper()=='C_PTR':
-            # This could be supported for other cases if needed
+        if self.byval and (self.optional or self.type.dt or self.type.type=='CHARACTER' or self.type.proc_pointer):
             return True
         if self.allocatable:
             return True
-        if self.pointer:
+        if self.pointer and not self.type.proc_pointer:
             return True
         return False
     
@@ -403,7 +410,7 @@ class Argument(object):
         # FortranMatrix<const double>.  Exclude pass_by_val for
         # aesthetic reasons (to keep const from being applied to
         # non-pointer arguments in method definitions)
-        return self.intent=='in' and not self.pass_by_val() and not self.type.matrix
+        return self.intent=='in' and not self.byval and not self.pass_by_val() and not self.type.matrix
 
     def cpp_type(self, value=False, native=False):
         """
@@ -420,7 +427,7 @@ class Argument(object):
             else:
                 prefix = ''
             string = prefix + cpp_type_map[self.type.type.upper()][self.type.kind]
-            if value:
+            if value or self.byval:
                 return string[:-1] # Strip "*"
             else:
                 return string
@@ -739,26 +746,31 @@ def add_type(t):
         return False
 
 def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
+    global proc_pointer_used
+    
     count = 0
 
     line = file.join_lines(line)
     line = line.split('!')[0]
 
-    m = fort_data.match(line)
+    m = fort_data_def.match(line)
+
+    attributes = m.group('attributes')
 
     # Attributes.
-    optional = True if optional_def.search(line) else False
-    byval = True if byval_def.search(line) else False
-    allocatable = True if allocatable_def.search(line) else False
-    pointer = False
-    if fort_pointer_def.search(line) and ('procedure' not in line.split('::')[0].lower()):
-        pointer = True
+    if not attributes:
+        # Change None to string so searching works
+        attributes = ''
+    optional = True if optional_def.search(attributes) else False
+    byval = True if byval_def.search(attributes) else False
+    allocatable = True if allocatable_def.search(attributes) else False
+    pointer = True if fort_pointer_def.search(attributes) else False
     # Check for DIMENSION statement
-    dimension = dimension_def.search(line)
+    dimension = dimension_def.search(attributes)
     intent = 'inout'
-    if intent_in_def.match(line):
+    if intent_in_def.match(attributes):
         intent = 'in'
-    elif intent_out_def.match(line):
+    elif intent_out_def.match(attributes):
         intent = 'out'
 
     # Get type string [e.g. INTEGER, TYPE(ErrorType),
@@ -805,6 +817,10 @@ def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
             array = Array(size_desc)
             name = name.split('(')[0]
         type = DataType(type_string,array,char_len)
+        if type.proc and pointer:
+            type.proc = False
+            type.proc_pointer = True
+            proc_pointer_used = True
         if name.lower() in arg_list_lower:
             count += 1
             if char_len and char_len.val=='*':
@@ -1246,13 +1262,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             # the four cases
             if bind and call:
                 if arg.type.hidden:
-                    if arg.type.str_len.assumed:
-                        # val stores the arg name of the string
-                        # itself.  In wrapper code, length variable is
-                        # declared as name+'_len__'
-                        string = string + arg.type.str_len.val + '_len__'
-                    else:
-                        string = string + str(arg.type.str_len.val)
+                    string += arg.type.str_len.as_string()
                 elif arg.type.is_array_size or arg.type.is_matrix_size:
                     string = string + '&' + arg.name
                 else:
@@ -1297,7 +1307,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             else:
                 raise FWTypeException(arg.type.type)
         # Change pass-by-value to reference for Fortran
-        if call and bind and arg.pass_by_val():
+        if call and bind and arg.pass_by_val() and not arg.byval and not arg.type.proc_pointer:
             string = string + '&'
         # Add argument name -------------------------
         if arg.type.proc_pointer and not bind:
@@ -1373,10 +1383,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     if call:
         for arg in proc.args.values():
             if arg.type.type=='CHARACTER' and not arg.fort_only():
-                if arg.type.str_len.assumed:
-                    str_len = arg.name+'_len__'
-                else:
-                    str_len = str(arg.type.str_len.val)
+                str_len = arg.type.str_len.as_string()
                 str_len_p1 = str_len + '+1'
                 str_len_m1 = str_len + '-1'
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
@@ -1459,6 +1466,9 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
         for arg in proc.args.values():
             # Special string handling for after the call
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
+                str_len = arg.type.str_len.as_string()
+                str_len_p1 = str_len + '+1'
+                str_len_m1 = str_len + '-1'                
                 s = s + '\n'
                 s = s + prefix + 'if ('+arg.name+') {\n'
                 s = s + prefix + '  // Trim trailing whitespace and assign character array to string:\n'
@@ -1500,9 +1510,11 @@ def write_constructor(file,object,fort_ctor=None):
     if fort_ctor:
         file.write(function_def_str(fort_ctor,bind=True,call=True) )
         file.write(' // Fortran Constructor\n')
-        file.write('  initialized = true;\n')
+        if init_func_def:
+            file.write('  initialized = true;\n')
     else:
-        file.write('  initialized = false;\n')
+        if init_func_def:
+            file.write('  initialized = false;\n')
     file.write('}\n\n')    
 
 def write_destructor(file,object):
@@ -1515,7 +1527,8 @@ def write_destructor(file,object):
     for proc in object.procs:
         if proc.dtor:
             target = 'data_ptr' if proc.arglist[0].type.dt=='TYPE' else 'class_data_ptr'
-            file.write('  ' + 'if (initialized) ' + mangle_name(proc.module,proc.name) + '(' + target)
+            prefix = 'if (initialized) ' if init_func_def else ''
+            file.write('  ' + prefix + mangle_name(proc.module,proc.name) + '(' + target)
             # Add NULL for any optional arguments (only optional
             # arguments are allowed in the destructor call)
             for i in range(proc.nargs-1):
@@ -1546,6 +1559,8 @@ def write_class(object):
     file.write('#include <cstdlib>\n') # Needed for NULL
     if not opts.no_vector:
         file.write('#include <vector>\n')
+    if complex_used:
+        file.write('#include <complex>\n')
     file.write('#include "' + misc_defs_filename + '"\n')
     includes = get_native_includes(object)
     if object.name in includes:
@@ -1642,7 +1657,9 @@ def write_class(object):
             file.write('  FClassContainer class_data;\n')
             file.write('  FClassContainer* class_data_ptr;\n')
         file.write('\nprotected:\n')
-        file.write('  bool initialized, owns;\n')
+        file.write('  bool owns;\n')
+        if init_func_def:
+            file.write('  bool initialized;\n')
     if not opts.global_orphans:
         file.write('};\n\n')
     if object.name == orphan_classname:
@@ -1705,12 +1722,12 @@ def write_class(object):
         if proc.ctor or (proc.dtor and not proc.name.lower() in name_inclusions):
             continue
         file.write(function_def_str(proc,obj=object,prefix='') + ' {\n')
-        if proc.dtor:
+        if proc.dtor and init_func_def:
             file.write('  if (initialized) ')
         file.write(function_def_str(proc,bind=True,call=True,prefix='  ') + '\n')
-        if proc.dtor:
+        if proc.dtor and init_func_def:
             file.write('  initialized = false;\n')
-        elif proc.name.lower().startswith('new_'):
+        elif init_func_def and init_func_def.match(proc.name):
             file.write('  initialized = true;\n')
         file.write('}\n\n')
 
@@ -2013,7 +2030,7 @@ class ConfigurationFile(object):
             self.process()
 
     def process(self):
-        global name_exclusions, name_inclusions, name_substitutions, ctor_def, dtor_def
+        global name_exclusions, name_inclusions, name_substitutions, ctor_def, dtor_def, init_func_def
         for line_num,line in enumerate(self.f):
             if not line.startswith('%'):
                 continue
@@ -2060,6 +2077,8 @@ class ConfigurationFile(object):
                 ctor_def = re.compile(line.strip().split('%ctor ')[1], re.IGNORECASE)
             elif words[0] == '%dtor':
                 dtor_def = re.compile(line.strip().split('%dtor ')[1], re.IGNORECASE)
+            elif words[0] == '%init':
+                init_func_def = re.compile(line.strip().split('%init ')[1], re.IGNORECASE)
             else:
                 error("Unrecognized declaration in interface file: {}".format(words[0]))
                 

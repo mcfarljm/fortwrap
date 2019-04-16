@@ -114,8 +114,6 @@ supported:
 
 * `ALLOCATABLE` or `POINTER` arguments
 * Assumed shape arrays (a declaration that looks like `INTEGER:: X(:)`).
-  The Fortran standard does not provide an
-  interoperability mechanism for assumed shape arrays.
 * Strings with `INTENT(INOUT)`.  Arrays of strings
 * Arrays of a derived type.  These can be wrapped by creating a
   new derived type to contain an array of the derived type of
@@ -123,13 +121,11 @@ supported:
   only scalars but allows you to add items to the array container
   one at a time.
 * Fortran functions with non-primitive return types are not wrapped.
-* `COMPLEX` data type is not supported
 
 Note that FortWrap can still wrap procedures that use unsupported
 arguments if those arguments are optional.  In these cases, the
 offending arguments are hidden from the generated interface
 code.
-
 
 
 ## Getting Started
@@ -261,6 +257,7 @@ The following directives are supported:
 * `%pattern <pattern> [replacement]`
 * `%ctor <regex>`
 * `%dtor <regex>`
+* `%init <regex>`
 
 ### Ignore directive
 
@@ -314,7 +311,19 @@ These directives allow custom regular expressions to be used for
 determining which procedures to be treated as constructors and
 destructors.  The search will be case insensitive, and the
 Python `re match` method is used, meaning the regular
-expression must match the beginning of the name
+expression must match the beginning of the name.
+
+### Initialization function directive
+
+The `%init` directive can be used to provide additional control over
+when the destructor is called.  It specifies the regular expression
+for "initialization" functions that must be called before the
+destructor.  Internally, this is tracked in the wrapper code through
+an `initialized` member variable.  The idea is that the initialization
+functions are similar to constructors, but for whatever reason they
+have not been assigned as actual constructors in the C++ code.  Note
+that user-provided constructors also set `initialized=true`, enabling
+the destructor to be called.
 
 
 ## Swig tips
@@ -617,12 +626,12 @@ two-dimensional arrays are wrapped as pointers.
 
 ### Procedure Pointers
 
-The Fortran 2003 standard provides support for procedure pointers
-as well as mechanisms for interoperating with procedure pointers
-from C.  Procedure pointer arguments are wrapped by FortWrap with
-the limitation that the interface must be explicit and defined via
-an `ABSTRACT INTERFACE` block.
-See `tests/function_pointers` for example usage.
+The Fortran 2003 standard provides support for procedure pointers as
+well as mechanisms for interoperating with procedure pointers from C.
+Procedure pointer arguments that are `INTENT(IN)` are wrapped by
+FortWrap with the limitation that the interface must be explicit and
+defined via an `ABSTRACT INTERFACE` block.  See
+`tests/function_pointers` for example usage.
 
 FortWrap will parse the abstract interface definition to generate
 the corresponding C function pointer prototype.  Make sure that the
