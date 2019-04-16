@@ -32,7 +32,6 @@ int main(void)
   char sa1[CHARLEN2], sa2[CHARLEN2];
 
   FortFuncs::string_out_assumed_len(CHARLEN2, sa1, 0, CHARLEN2, sa2);
-  printf("sa1, sa2: %s, %s\n", sa1, sa2);
   if (strcmp(sa1, "String A") != 0 || strcmp(sa2, "String B") != 0)
     return 4;  
 
