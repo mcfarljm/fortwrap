@@ -633,7 +633,7 @@ callback target conforms to this prototype.
 
 FortWrap provides powerful support for processing strings.  This
 is a difficult language feature to handle well, and the Fortran
-standard for string interoperability is no help.
+standard for string interoperability is not much help.
 
 FortWrap can wrap any scalar string arguments that are
 either `INTENT(IN)` or `INTENT(OUT)`.  The string
@@ -641,15 +641,14 @@ length may be assumed (`len=*`), a literal constant, or a
 named constant from an `INTEGER, PARAMETER` declaration
 that FortWrap has already parsed.
 
-Strings that are `INTENT(IN)` are wrapped as `const
-char*`: this allows for string literals to be passed directly
-from the C code (see the examples in the `tests`
-directory).  Strings that are `INTENT(OUT)` are wrapped as
-C++ `std::string`.  In all cases, the wrapper code declares
-a statically allocated temporary character array, which is passed
-to Fortran.  Conversion between the C null terminator and
-Fortran's trailing whitespace, as well as passing the hidden
-string length argument, are all handled automatically.
+Strings that are `INTENT(IN)` are wrapped as `const char*`: this
+allows for string literals to be passed directly from the C code (see
+the examples in the `tests` directory).  Strings that are
+`INTENT(OUT)` are wrapped as C++ `std::string` by default, but this is
+configurable.  In most cases, the wrapper code declares a temporary
+character array, which is passed to Fortran.  Conversion between the C
+null terminator and Fortran's trailing whitespace, as well as passing
+the hidden string length argument, are all handled automatically.
 
 Note that when wrapping a character argument that has assumed
 length and is `INTENT(OUT)`, FortWrap will determine the
@@ -659,6 +658,25 @@ using `std::string::resize`; otherwise, if an unitialized
 string of size 0 is passed from C++, the Fortran code will receive
 a character dummy argument with length 0.
 
+String output wrapping can be configured using the `--string-out`
+command argument.  The default is `c++`, which wraps string output
+arguments with `std::string`.  When the `wrapper` option is used, a
+small string class `FortranString` is created, which behaves similarly
+to `std::string`.  It provides `length`, `resize`, `assign`,
+`compare`, `data`, and `c_str` methods.  It can be used as an
+alternative to `std::string` to avoid library compatibility issues.
+
+The third option for `--string-out` is `c`, which uses C character
+arrays.  This option should be used carefully when wrapping string
+outputs that have a specified length in Fortran.  The wrapper code
+declares a temporary array of the specified length that is passed to
+Fortran and then uses `strncpy` on return to copy the temporary array
+into the dummy argument.  This could cause an access violation if the
+size of the dummy array is smaller than the size declared in the
+Fortran code.  For assumed length character outputs, temporary
+character arrays are not used.  A size argument is added to the
+generated C++ wrapper code, and the size is passed to Fortran through
+the `BIND(C)` wrapper.
 
 ### Doxygen Comments
 
