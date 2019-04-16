@@ -1527,7 +1527,7 @@ def write_destructor(file,object):
     for proc in object.procs:
         if proc.dtor:
             target = 'data_ptr' if proc.arglist[0].type.dt=='TYPE' else 'class_data_ptr'
-            prefix = 'if (initialized) ' if init_func_def else ''
+            prefix = 'if (owns && initialized) ' if init_func_def else 'if (owns) '
             file.write('  ' + prefix + mangle_name(proc.module,proc.name) + '(' + target)
             # Add NULL for any optional arguments (only optional
             # arguments are allowed in the destructor call)
@@ -1707,7 +1707,9 @@ def write_class(object):
         else:
             file.write('  data_ptr = p;\n')
             file.write('  owns = false;\n')
-        file.write('  initialized = false;\n}\n\n')
+        if init_func_def:
+            file.write('  initialized = false;\n')
+        file.write('}\n\n')
     # Constructor(s):
     if fort_ctors:
         for fort_ctor in fort_ctors:
@@ -1733,7 +1735,8 @@ def write_class(object):
 
     if object.has_pointer_ctor:
         file.write('void ' + object.cname + '::_disown() { owns = false; }\n')
-        file.write('void ' + object.cname + '::_acquire() { owns = true; initialized = true; }\n')
+        init = 'initialized = true; ' if init_func_def else ''
+        file.write('void ' + object.cname + '::_acquire() { owns = true; ' + init + '}\n')
 
     file.close()
 
