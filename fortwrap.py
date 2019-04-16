@@ -121,6 +121,8 @@ enum_def = re.compile(r'\s*ENUM,\s*BIND',re.IGNORECASE)
 # Constructor and desctructor methods (these regexes are configurable):
 ctor_def = re.compile('.*_ctor', re.IGNORECASE)
 dtor_def = re.compile('.*_dtor', re.IGNORECASE)
+# Regular expression for "initialization" functions (configurable):
+init_func_def = None
 
 # ===================================================
 
@@ -1485,9 +1487,11 @@ def write_constructor(file,object,fort_ctor=None):
     if fort_ctor:
         file.write(function_def_str(fort_ctor,bind=True,call=True) )
         file.write(' // Fortran Constructor\n')
-        file.write('  initialized = true;\n')
+        if init_func_def:
+            file.write('  initialized = true;\n')
     else:
-        file.write('  initialized = false;\n')
+        if init_func_def:
+            file.write('  initialized = false;\n')
     file.write('}\n\n')    
 
 def write_destructor(file,object):
@@ -1500,7 +1504,8 @@ def write_destructor(file,object):
     for proc in object.procs:
         if proc.dtor:
             target = 'data_ptr' if proc.arglist[0].type.dt=='TYPE' else '&class_data'
-            file.write('  ' + 'if (initialized) ' + mangle_name(proc.module,proc.name) + '(' + target)
+            prefix = 'if (initialized) ' if init_func_def else ''
+            file.write('  ' + prefix + mangle_name(proc.module,proc.name) + '(' + target)
             # Add NULL for any optional arguments (only optional
             # arguments are allowed in the destructor call)
             for i in range(proc.nargs-1):
@@ -1613,8 +1618,9 @@ def write_class(object):
         file.write('  ADDRESS data_ptr;\n')
         if object.is_class:
             file.write('  FClassContainer class_data;\n')
-        file.write('\nprotected:\n')
-        file.write('  bool initialized;\n')
+        if init_func_def:
+            file.write('\nprotected:\n')
+            file.write('  bool initialized;\n')
     if not opts.global_orphans:
         file.write('};\n\n')
     if object.name == orphan_classname:
@@ -1656,12 +1662,12 @@ def write_class(object):
         if proc.ctor or (proc.dtor and not proc.name.lower() in name_inclusions):
             continue
         file.write(function_def_str(proc,obj=object,prefix='') + ' {\n')
-        if proc.dtor:
+        if proc.dtor and init_func_def:
             file.write('  if (initialized) ')
         file.write(function_def_str(proc,bind=True,call=True,prefix='  ') + '\n')
-        if proc.dtor:
+        if proc.dtor and init_func_def:
             file.write('  initialized = false;\n')
-        elif proc.name.lower().startswith('new_'):
+        elif init_func_def and init_func_def.match(proc.name):
             file.write('  initialized = true;\n')
         file.write('}\n\n')
 
@@ -1958,7 +1964,7 @@ class ConfigurationFile(object):
             self.process()
 
     def process(self):
-        global name_exclusions, name_inclusions, name_substitutions, ctor_def, dtor_def
+        global name_exclusions, name_inclusions, name_substitutions, ctor_def, dtor_def, init_func_def
         for line_num,line in enumerate(self.f):
             if not line.startswith('%'):
                 continue
@@ -2005,6 +2011,8 @@ class ConfigurationFile(object):
                 ctor_def = re.compile(line.strip().split('%ctor ')[1], re.IGNORECASE)
             elif words[0] == '%dtor':
                 dtor_def = re.compile(line.strip().split('%dtor ')[1], re.IGNORECASE)
+            elif words[0] == '%init':
+                init_func_def = re.compile(line.strip().split('%init ')[1], re.IGNORECASE)
             else:
                 error("Unrecognized declaration in interface file: {}".format(words[0]))
                 

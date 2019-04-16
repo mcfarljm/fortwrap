@@ -257,6 +257,7 @@ The following directives are supported:
 * `%pattern <pattern> [replacement]`
 * `%ctor <regex>`
 * `%dtor <regex>`
+* `%init <regex>`
 
 ### Ignore directive
 
@@ -310,7 +311,19 @@ These directives allow custom regular expressions to be used for
 determining which procedures to be treated as constructors and
 destructors.  The search will be case insensitive, and the
 Python `re match` method is used, meaning the regular
-expression must match the beginning of the name
+expression must match the beginning of the name.
+
+### Initialization function directive
+
+The `%init` directive can be used to provide additional control over
+when the destructor is called.  It specifies the regular expression
+for "initialization" functions that must be called before the
+destructor.  Internally, this is tracked in the wrapper code through
+an `initialized` member variable.  The idea is that the initialization
+functions are similar to constructors, but for whatever reason they
+have not been assigned as actual constructors in the C++ code.  Note
+that user-provided constructors also set `initialized=true`, enabling
+the destructor to be called.
 
 
 ## Swig tips
