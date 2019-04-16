@@ -310,7 +310,9 @@ class DataType(object):
         self.proc_pointer = False
         self.proc = False # PROCEDURE without POINTER attribute
         self.dt = False      # False, 'TYPE', or 'CLASS'
-        self.is_str_len = is_str_len # string length arg
+        ## Whether it is a string length.  When not False, it stores a
+        ## reference to the original string argument.
+        self.is_str_len = is_str_len
         self.is_assumed_shape_size = is_assumed_shape_size
         # For array, name of argument used to pass the array length:
         self.is_array_size = False # integer defining an array size
@@ -456,7 +458,9 @@ class Argument(object):
 
     def is_hidden(self, fortran_api=False):
         """fortran_api: whether the argument is hidden from the call to the original Fortran function"""
-        if self.type.is_str_len:
+        if self.type.is_str_len and (fortran_api or not (self.type.is_str_len.intent=='out' and opts.string_out=='c')):
+            # (The above intent check is done on the character
+            # argument, not the character length argument)
             return True
         elif self.type.is_assumed_shape_size:
             if (not fortran_api) and ((self.type.is_assumed_shape_size==1 and opts.no_vector) or (self.type.is_assumed_shape_size==2 and opts.no_fmat) or self.type.is_assumed_shape_size>2):
@@ -648,15 +652,18 @@ class Procedure(object):
 
     def add_hidden_strlen_args(self):
         """Add Fortran-only string length arguments to end of argument list"""
-        nargs = len(self.args)
-        pos = nargs
+        arglist_new = []
+        pos = 0
         for arg in self.arglist:
             # Hidden length argument only needed for assumed length strings
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.type.str_len.assumed:
-                str_length_arg = Argument(arg.name + '_len__', pos, DataType('INTEGER(SIZE_)', str_len=arg.type.str_len, is_str_len=True))
+                str_length_arg = Argument(arg.name + '_len__', pos, DataType('INTEGER(SIZE_)', str_len=arg.type.str_len, is_str_len=arg))
                 self.args[ str_length_arg.name ] = str_length_arg
-                self.arglist.append(str_length_arg)
-                pos = pos + 1
+                arglist_new.append(str_length_arg)
+                pos += 1
+            arglist_new.append(arg)
+            pos += 1
+            self.arglist = arglist_new
 
     def add_hidden_array_len_args(self):
         """Add array length arguments for assumed shape
@@ -1642,7 +1649,10 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                             # Chop of the * and add [] after the argname below
                             string = string[:-2] + ' '
                 elif arg.type.type=='CHARACTER' and not bind and not arg.intent=='in':
-                    string = string + string_object_type + ' *' # pass by ref not compat with optional
+                    if opts.string_out == 'c':
+                        string += 'char *'
+                    else:
+                        string = string + string_object_type + ' *' # pass by ref not compat with optional
                 else:
                     string = string + arg.cpp_type() + ' '
             else:
@@ -1669,7 +1679,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             # For assumed-length intent(in) strings, no special
             # treatment needed here (we just pass along the character
             # array pointer)
-            if not (arg.intent=='in' and arg.type.str_len.assumed):
+            if not (arg.type.str_len.assumed and (arg.intent=='in' or opts.string_out=='c')):
                 # Pass NULL if optional arg not present
                 string = string + ' ? ' + arg.name + '_c__ : NULL'
         # Special handling for matrix arguments
@@ -1714,7 +1724,7 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                 str_len_p1 = str_len + '+1'
                 str_len_m1 = str_len + '-1'
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
-                if arg.type.str_len.assumed:
+                if arg.type.str_len.assumed and opts.string_out != 'c':
                     # Make sure to initialize the str_length arg to 0,
                     # in case of a not-present optional, since a
                     # character array is statically declared with this
@@ -1722,10 +1732,15 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
                     # with gfortran indicates that in case of not
                     # present it passes 0 for the length)
                     s = s + prefix + 'size_t ' + arg.name + '_len__ = 0;\n'
-                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = '+ arg.name + '->length();\n'
-                s = s + prefix + '// Declare memory to store output character data\n'
-                s = s + prefix + 'char *' + arg.name + '_c__ = new char[' + str_len_p1 + '];\n'
-                s = s + prefix + arg.name + '_c__[' + str_len + "] = '\\0';\n"
+                    if opts.string_out == 'c':
+                        getlen = 'strlen({})'.format(arg.name)
+                    else:
+                        getlen = arg.name + '->length()'
+                    s = s + prefix + 'if (' + arg.name + ') '+ arg.name + '_len__ = '+ getlen + ';\n'
+                if not (opts.string_out=='c' and arg.type.str_len.assumed):
+                    s = s + prefix + '// Declare memory to store output character data\n'
+                    s = s + prefix + 'char *' + arg.name + '_c__ = new char[' + str_len_p1 + '];\n'
+                    s = s + prefix + arg.name + '_c__[' + str_len + "] = '\\0';\n"
             elif arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='in':
                 if arg.type.str_len.assumed:
                     s = s + prefix + 'int ' + arg.name + '_len__ = 0;\n'
@@ -1797,15 +1812,25 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
         for arg in proc.args.values():
             # Special string handling for after the call
             if arg.type.type=='CHARACTER' and not arg.fort_only() and arg.intent=='out':
+                varname = arg.name
+                if not (arg.type.str_len.assumed and opts.string_out=='c'):
+                    varname += '_c__'
                 str_len = arg.type.str_len.as_string()
                 str_len_p1 = str_len + '+1'
                 str_len_m1 = str_len + '-1'                
                 s = s + '\n'
                 s = s + prefix + 'if ('+arg.name+') {\n'
                 s = s + prefix + '  // Trim trailing whitespace and assign character array to string:\n'
-                s = s + prefix + '  for (int i=' + str_len_m1 + '; ' + arg.name + "_c__[i]==' '; i--) " + arg.name + "_c__[i] = '\\0';\n"
-                s = s + prefix + '  ' + arg.name + '->assign(' + arg.name + '_c__);\n  }\n'
-                s = s + prefix + 'delete[] ' + arg.name + '_c__;'
+                s = s + prefix + '  for (int i=' + str_len_m1 + '; ' + varname + "[i]==' '; i--) " + varname + "[i] = '\\0';\n"
+                if opts.string_out == 'c':
+                    if not arg.type.str_len.assumed:
+                        s = s + prefix + '  strncpy({}, {}, {});\n'.format(arg.name, arg.name+'_c__',str_len)
+                        s += prefix + "  {}[{}] = '\\0';\n".format(arg.name, str_len)
+                else:
+                    s = s + prefix + '  ' + arg.name + '->assign(' + arg.name + '_c__);\n'
+                s += '  }'
+                if not (opts.string_out=='c' and arg.type.str_len.assumed):
+                    s += '\n' + prefix + 'delete[] ' + arg.name + '_c__;'
         if proc.retval and proc.has_post_call_wrapper_code():
             s = s + '\n' + prefix + 'return __retval;'
     return s
@@ -2029,7 +2054,7 @@ def get_native_includes(object):
                     # The use of angle brackets is handled specially
                     # in the output code
                     includes.add('<string>')
-                else:
+                elif opts.string_out == 'wrapper':
                     includes.add(string_classname)
     # For inheritance:
     if object.extends:
@@ -2392,7 +2417,8 @@ class Options(object):
         parser.add_argument('--no-vector', action='store_true', help='wrap 1-D array arguments as C-style arrays instead of C++ std::vector containers')
         parser.add_argument('--no-fmat', action='store_true', help='do not wrap 2-D array arguments with the FortranMatrix type')
         parser.add_argument('--array-as-ptr', action='store_true', help="wrap 1-D arrays with '*' instead of '[]'.  Implies --no-vector")
-        parser.add_argument('--no-std-string', action='store_true', help='wrap character outputs using a wrapper class instead of std::string')
+        parser.add_argument('--string-out', choices=['c++','c','wrapper'], default='c++')
+        #parser.add_argument('--no-std-string', action='store_true', help='wrap character outputs using a wrapper class instead of std::string')
         parser.add_argument('--dummy-class', default='FortFuncs', help='use DUMMY_CLASS as the name of the dummy class used to wrap non-method procedures')
         parser.add_argument('--global-funcs', action='store_true', help='wrap non-method procedures as global functions instead of static methods of a dummy class')
         parser.add_argument('--no-orphans', action='store_true', help='do not by default wrap non-method procedures.  They can still be wrapped by using %%include directives')
@@ -2423,7 +2449,8 @@ class Options(object):
             self.no_vector = True
 
         self.global_orphans = self.global_funcs
-        self.std_string = not self.no_std_string
+        self.std_string = (self.string_out == 'c++')
+        self.c_string = (self.string_out == 'c')
         self.warn_not_wrapped = not self.no_W_not_wrapped
         if self.main_header != 'FortWrap':
             self.main_header = self.main_header.split('.h')[0]
@@ -2440,7 +2467,7 @@ class Options(object):
             include_output_dir = self.directory
             fort_output_dir = self.directory
 
-        if self.no_std_string:
+        if self.string_out == 'wrapper':
             string_object_type = string_classname
 
         constants_classname = self.constants_class
@@ -2506,7 +2533,7 @@ if __name__ == "__main__":
         write_global_header_file()
         write_misc_defs()
         write_matrix_class()
-        if not opts.std_string:
+        if opts.string_out == 'wrapper':
             write_string_class()
         if opts.single_module:
             write_fortran_iso_wrapper_single_module()
