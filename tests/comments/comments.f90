@@ -42,5 +42,14 @@ CONTAINS
     REAL, INTENT(out) :: x_array_out(10)
   END SUBROUTINE foo
 
+  !> This is a function that operates on an object
+  FUNCTION bar(o, x) RESULT(y)
+    TYPE (Object) :: o
+    !> Function input value
+    INTEGER, INTENT(in) :: x
+    !> Documentation for function return value
+    INTEGER :: y
+  END FUNCTION bar
+
 
 END MODULE comments
