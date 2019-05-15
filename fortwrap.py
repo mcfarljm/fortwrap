@@ -1144,6 +1144,7 @@ def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
             args[name] = Argument(name,arg_list_lower.index(name.lower()),type,optional,intent,byval,allocatable,pointer,comment=comments)
         elif retval and name.lower()==retval.name.lower():
             retval.set_type(type)
+            retval.comment = comments
     return count
 
 def parse_proc(file,line,abstract=False):
@@ -1525,16 +1526,24 @@ def associate_procedures():
                 proc_ptr_warning_written = True
             
 
-def write_cpp_dox_comments(file,comments,arglist=None,prefix=0):
+def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
     # /// Style
     #for c in comments:
     #    file.write(prefix*' ' + '/// ' + c + '\n')
-    started = False
+    
+    class context:
+        # Workaround for Python 2 nonlocal access in open_comments function
+        started = False
+    
+    def open_comments():
+        file.write(prefix*' ' + '/*! ')
+        context.started = True
+        
     # First write primary symbol comments
     for i,c in enumerate(comments):
         if i == 0:
-            file.write(prefix*' ' + '/*! \\brief ' + c + '\n')
-            started = True
+            open_comments()
+            file.write('\\brief ' + c + '\n')
         else:
             file.write(prefix*' ' + ' *  ' + c + '\n')
     # Write parameter argument comments if provided
@@ -1543,7 +1552,7 @@ def write_cpp_dox_comments(file,comments,arglist=None,prefix=0):
             if arg.fort_only():
                 continue
             for i,c in enumerate(arg.comment):
-                if started:
+                if context.started:
                     # If we add an empty line to an existing \param
                     # comment, that will make the rest a detailed
                     # comment, so don't do this with OPTIONAL and
@@ -1552,8 +1561,7 @@ def write_cpp_dox_comments(file,comments,arglist=None,prefix=0):
                         file.write(prefix*' ' + ' *\n')
                     file.write(prefix*' ' + ' *  ')
                 else:
-                    file.write(prefix*' ' + '/*! ')
-                    started = True
+                    open_comments()
                 if i==0:
                     file.write('\\param')
                     if arg.intent=='in':
@@ -1562,7 +1570,17 @@ def write_cpp_dox_comments(file,comments,arglist=None,prefix=0):
                         file.write('[out]')
                     file.write(' ' + arg.name + ' ')
                 file.write(c + '\n')
-    if started:
+    if retval and retval.comment:
+        if context.started:
+            file.write(prefix*' ' + ' *\n')
+            file.write(prefix*' ' + ' *  ')
+        else:
+            open_comments()
+        file.write('\\return ')
+        for c in retval.comment:
+            file.write(c + '\n')
+    if context.started:
+        # Close comments
         file.write(prefix*' ' + '*/\n')
 
 
@@ -1936,7 +1954,7 @@ def write_class(object):
         # enabled by adding an %include for the dtor
         if proc.ctor or (proc.dtor and not proc.name.lower() in name_inclusions):
             continue
-        write_cpp_dox_comments(file,proc.comment,proc.arglist)
+        write_cpp_dox_comments(file,proc.comment,proc.arglist,proc.retval)
         file.write(function_def_str(proc) + '\n\n')
     # Check for pure virtual methods (which have no directly
     # associated procedure)
