@@ -7,7 +7,7 @@ int main(void)
   //              1, 2
   //              2, 3 ]
   FortranMatrix<int> X(3,2);
-  for (std::size_t i=0; i<3; i++) 
+  for (int i=0; i<3; i++) 
     {
       X(i,0) = i;
       X(i,1) = i+1;
@@ -28,7 +28,7 @@ int main(void)
   Xa_test[2] = 8;
 
   FortFuncs::multiply(&X,&a,&Xa);
-  for (std::size_t i=0; i<3; i++) 
+  for (int i=0; i<3; i++) 
     {
       if (Xa[i] != Xa_test[i])
 	return 3;
