@@ -379,8 +379,8 @@ class Argument(object):
         self.name = name
         self.pos = pos # Zero-indexed
         self.type = type
-        self.comment = []
-        self.optional=optional
+        self.comment = comment
+        self.optional = optional
         self.intent = intent
         self.byval = byval
         self.allocatable = allocatable
@@ -398,14 +398,17 @@ class Argument(object):
         # statements to show up in the func pointer defs, which don't
         # use pass_by_val)
         self.in_abstract = False
+        # Whether it represents the "self" argument of a method call
+        self.is_self_arg = False
 
         if type and type.type=='CHARACTER' and intent!='in':
                 string_class_used = True
-                
-        if comment:
-            for c in comment:
-                self.comment.append(c)
 
+        if opts.document_all_params and not self.comment:
+            # Add an empty comment, which will trigger a \param entry
+            # to be included in the generated doxygen comments
+            self.comment = ['']
+                
     def set_type(self,type):
         self.type = type
 
@@ -1219,6 +1222,7 @@ def parse_proc(file,line,abstract=False):
             invalid = True
         if arg.pos==0 and arg.type.dt:
             method = True
+            arg.is_self_arg = True
     if retval:
         if retval.type:
             if retval.type.dt or retval.type.array:
@@ -1541,6 +1545,9 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
     if arglist:
         for arg in arglist:
             if arg.fort_only():
+                continue
+            if arg.is_self_arg:
+                # This is important with opts.document_all_params
                 continue
             for i,c in enumerate(arg.comment):
                 if context.started:
@@ -2418,6 +2425,7 @@ class Options(object):
         parser.add_argument('--main-header', default='FortWrap', help='Use MAIN_HEADER as name of the main header file (default=%(default)s)')
         parser.add_argument('--constants-class', default='FortConstants', help='use CONSTANTS_CLASS as name of the class for wrapping enumerations (default=%(default)s)')
         parser.add_argument('--single-module', action='store_true', help='write all Fortran ISO_C_BINDING wrappers to single module')
+        parser.add_argument('--document-all-params', action='store_true', help='write doxygen \\param comment for all arguments')
         # Not documenting, as this option could be dangerous, although it is
         # protected from -d.  help='remove all wrapper-related files from
         # wrapper code directory before generating new code.  Requires -d.
