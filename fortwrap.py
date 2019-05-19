@@ -148,8 +148,6 @@ cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*',
                 'COMPLEX':{'':'std::complex<float>*','4':'std::complex<float>*','C_FLOAT_COMPLEX':'std::complex<float>*','8':'std::complex<double>*','C_DOUBLE_COMPLEX':'std::complex<double>*'},
                 'INT':{'':'fortran_charlen_t'}}
 
-special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
-
 current_module = ''
 module_proc_num = 1 # For keeping track of the order that the
                     # procedures are defined in the Fortran code.  Not
@@ -344,24 +342,15 @@ class Argument(object):
         # use pass_by_val)
         self.in_abstract = False
 
-        if self.optional:
-            self.comment.append('OPTIONAL')
-        if type:
-            if type.array:
-                if type.array.vec:
-                    self.comment.append('ARRAY')
-                elif type.array.fort_only:
-                    self.comment.append('FORTRAN_ONLY')
-            if type.type=='CHARACTER' and intent!='in':
+        if type and type.type=='CHARACTER' and intent!='in':
                 string_class_used = True
+                
         if comment:
             for c in comment:
                 self.comment.append(c)
 
     def set_type(self,type):
         self.type = type
-        if type.array and type.array.vec:
-            self.comment.append('ARRAY')
 
     def pass_by_val(self):
         """Whether we can pass this argument by val in the C++ interface
@@ -1198,7 +1187,7 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
                     # comment, that will make the rest a detailed
                     # comment, so don't do this with OPTIONAL and
                     # ARRAY
-                    if i==0: #or not (c.split()[0] in special_param_comments):
+                    if i==0:
                         file.write(prefix*' ' + ' *\n')
                     file.write(prefix*' ' + ' *  ')
                 else:
