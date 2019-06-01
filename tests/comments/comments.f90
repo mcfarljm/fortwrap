@@ -34,6 +34,8 @@ CONTAINS
   !> This is a subroutine that operates on an object
   !!
   !! Detailed procedure description goes here
+  !!   This line is indented
+  !! Back to normal indentation
   SUBROUTINE foo(o,i_in,i_out,x_array_in,x_array_out)
     TYPE (Object) :: o
     INTEGER, INTENT(in) :: n, i_in

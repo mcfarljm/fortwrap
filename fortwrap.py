@@ -680,7 +680,11 @@ class FileReader:
         while True:
             line = self.readline().strip()
             if line.startswith('!!'):
-                com.append(line.split('!!')[1].strip())
+                text = line.split('!!')[1]
+                # Preserve whitespace indentation:
+                if text.startswith(' '):
+                    text = text[1:]
+                com.append(text)
                 read_count+=1
             else:
                 # Back up a line, or all the way back to the comment start
