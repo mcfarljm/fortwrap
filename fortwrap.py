@@ -1181,6 +1181,7 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
         else:
             file.write(prefix*' ' + ' *  ' + c + '\n')
     # Write parameter argument comments if provided
+    param_started = False
     if arglist:
         for arg in arglist:
             if arg.fort_only():
@@ -1190,11 +1191,7 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
                 continue
             for i,c in enumerate(arg.comment):
                 if context.started:
-                    # If we add an empty line to an existing \param
-                    # comment, that will make the rest a detailed
-                    # comment, so don't do this with OPTIONAL and
-                    # ARRAY
-                    if i==0:
+                    if not param_started:
                         file.write(prefix*' ' + ' *\n')
                     file.write(prefix*' ' + ' *  ')
                 else:
@@ -1207,9 +1204,11 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
                         file.write('[out]')
                     file.write(' ' + arg.name + ' ')
                 file.write(c + '\n')
+                param_started = True
     if retval and retval.comment:
         if context.started:
-            file.write(prefix*' ' + ' *\n')
+            if not param_started:
+                file.write(prefix*' ' + ' *\n')
             file.write(prefix*' ' + ' *  ')
         else:
             open_comments()
