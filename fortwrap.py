@@ -1595,7 +1595,7 @@ def write_class(object):
     fort_ctors = object.ctor_list()
     if fort_ctors:
         for fort_ctor in fort_ctors:
-            write_cpp_dox_comments(file,fort_ctor.comment,fort_ctor.arglist)
+            write_cpp_dox_comments(file, fort_ctor.comment, fort_ctor.arglist, prefix=2)
             file.write('  ' + object.cname + '(' + c_arg_list(fort_ctor,bind=False,call=False,definition=False) + ');\n')
     elif not object.name==orphan_classname and not object.abstract:
         # Don't declare default constructor (or destructor, below) for
@@ -1614,7 +1614,7 @@ def write_class(object):
         # enabled by adding an %include for the dtor
         if proc.ctor or (proc.dtor and not proc.name.lower() in name_inclusions):
             continue
-        write_cpp_dox_comments(file,proc.comment,proc.arglist,proc.retval)
+        write_cpp_dox_comments(file, proc.comment, proc.arglist, proc.retval, prefix=2)
         file.write(function_def_str(proc) + '\n\n')
     # Check for pure virtual methods (which have no directly
     # associated procedure)
@@ -1777,25 +1777,25 @@ def write_matrix_class():
     f.write('\npublic:\n\n  ')    
     f.write('  T *data;\n\n')
     
-    write_cpp_dox_comments(f, ['Create a matrix with m rows and n columns','','Allocates new memory'])
+    write_cpp_dox_comments(f, ['Create a matrix with m rows and n columns','','Allocates new memory'], prefix=2)
     f.write('  ' + matrix_classname + '(int m, int n) {\n')
     f.write('    data = NULL;\n    assert(m>0 && n>0);\n    nrows=m; ncols=n;\n')
     f.write('    data = (T*) calloc( m*n, sizeof(T) );\n    owns = true;\n  }\n\n')
 
-    write_cpp_dox_comments(f, ['Set up a pointer to existing contiguous array data (in Fortran order)'])
+    write_cpp_dox_comments(f, ['Set up a pointer to existing contiguous array data (in Fortran order)'], prefix=2)
     f.write('  ' + matrix_classname + '(int m, int n, T *data_ptr) {\n')
     f.write('    data = data_ptr;\n    assert(m>0 && n>0);\n    nrows=m; ncols=n;\n')
     f.write('    owns = false;\n  }\n\n')
     
     f.write('  ~' + matrix_classname + '() { if(data && owns) free(data); }\n\n')    
-    write_cpp_dox_comments(f, ['Provides element access via the parentheses operator.','','The base index is 0'])
+    write_cpp_dox_comments(f, ['Provides element access via the parentheses operator.','','The base index is 0'], prefix=2)
     f.write('  T& operator()(int i, int j) {\n')
     f.write('    assert( i>=0 && i<nrows && j>=0 && j<ncols );\n')
     f.write('    // i--; j--; // Adjust base\n')
     f.write('    return data[j*nrows+i];\n  }\n\n')
-    write_cpp_dox_comments(f, ['Get number of rows'])
+    write_cpp_dox_comments(f, ['Get number of rows'], prefix=2)
     f.write('  inline int num_rows(void) const { return nrows; }\n\n')
-    write_cpp_dox_comments(f, ['Get number of columns'])
+    write_cpp_dox_comments(f, ['Get number of columns'], prefix=2)
     f.write('  inline int num_cols(void) const { return ncols; }\n\n')
     f.write('};\n\n')
     f.write('#endif /* ' + matrix_classname.upper() + '_H_ */\n')
