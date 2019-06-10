@@ -1168,13 +1168,17 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
     # /// Style
     #for c in comments:
     #    file.write(prefix*' ' + '/// ' + c + '\n')
+
+    # Prefix written on each line before comments
+    comment_prefix = prefix*' ' + ' * '
     
     class context:
         # Workaround for Python 2 nonlocal access in open_comments function
         started = False
     
     def open_comments():
-        file.write(prefix*' ' + '/*! ')
+        file.write(prefix*' ' + '/**\n')
+        file.write(comment_prefix)
         context.started = True
         
     # First write primary symbol comments
@@ -1183,7 +1187,7 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
             open_comments()
             file.write('\\brief ' + c + '\n')
         else:
-            file.write(prefix*' ' + ' *  ' + c + '\n')
+            file.write(comment_prefix + c + '\n')
     # Write parameter argument comments if provided
     param_started = False
     if arglist:
@@ -1196,8 +1200,8 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
             for i,c in enumerate(arg.comment):
                 if context.started:
                     if not param_started:
-                        file.write(prefix*' ' + ' *\n')
-                    file.write(prefix*' ' + ' *  ')
+                        file.write(comment_prefix[:-1] + '\n')
+                    file.write(comment_prefix)
                 else:
                     open_comments()
                 if i==0:
@@ -1212,8 +1216,8 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
     if retval and retval.comment:
         if context.started:
             if not param_started:
-                file.write(prefix*' ' + ' *\n')
-            file.write(prefix*' ' + ' *  ')
+                file.write(comment_prefix[:-1] + '\n')
+            file.write(comment_prefix)
         else:
             open_comments()
         file.write('\\return ')
@@ -1221,7 +1225,7 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
             file.write(c + '\n')
     if context.started:
         # Close comments
-        file.write(prefix*' ' + '*/\n')
+        file.write(prefix*' ' + ' */\n')
 
 
 def c_arg_list(proc,bind=False,call=False,definition=True):
