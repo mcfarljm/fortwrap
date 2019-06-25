@@ -1,5 +1,19 @@
 # Changes
 
+## 2.4.0
+- Added support for wrapping derived type pointer function return
+  values.  An ownership API is also provided for flagging whether the
+  caller owns the returned memory.
+- Various updates and improvements to doxygen comment translation:
+  - Document function return values
+  - Remove previously added special comments "ARRAY" and "OPTIONAL"
+  - Add new command option `--document-all-params`
+  - Improved whitespace handling
+  - Add special handling of comment ordering with `\par` command
+- Minor improvements to FortranMatrix class
+- Added `%init` keyword to configuration file for control over when
+  destructors are called.
+
 ## 2.3.0
 - Added support for wrapping `NOPASS` type bound procedures as static methods
 - Added support for wrapping `COMPLEX` data type
