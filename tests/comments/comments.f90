@@ -45,6 +45,20 @@ CONTAINS
   END SUBROUTINE foo
 
   !> This is a function that operates on an object
+  !!
+  !! This is the detailed description of the bar function
+  !!
+  !! \par Examples
+  !! Here is example usage after wrapping for Python:
+  !! \code{.py}
+  !! >>> o.bar(5)
+  !! 50
+  !! \endcode
+  !!
+  !! \par
+  !! Here is a second paragraph within the same section.  The `\par` command
+  !! tells doxygen to make a new paragraph without ending the previous
+  !! section.
   FUNCTION bar(o, x) RESULT(y)
     TYPE (Object) :: o
     !> Function input value
