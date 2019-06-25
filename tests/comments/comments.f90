@@ -34,6 +34,8 @@ CONTAINS
   !> This is a subroutine that operates on an object
   !!
   !! Detailed procedure description goes here
+  !!   This line is indented
+  !! Back to normal indentation
   SUBROUTINE foo(o,i_in,i_out,x_array_in,x_array_out)
     TYPE (Object) :: o
     INTEGER, INTENT(in) :: n, i_in
@@ -41,6 +43,29 @@ CONTAINS
     REAL, INTENT(in) :: x_array_in(10)
     REAL, INTENT(out) :: x_array_out(10)
   END SUBROUTINE foo
+
+  !> This is a function that operates on an object
+  !!
+  !! This is the detailed description of the bar function
+  !!
+  !! \par Examples
+  !! Here is example usage after wrapping for Python:
+  !! \code{.py}
+  !! >>> o.bar(5)
+  !! 50
+  !! \endcode
+  !!
+  !! \par
+  !! Here is a second paragraph within the same section.  The `\par` command
+  !! tells doxygen to make a new paragraph without ending the previous
+  !! section.
+  FUNCTION bar(o, x) RESULT(y)
+    TYPE (Object) :: o
+    !> Function input value
+    INTEGER, INTENT(in) :: x
+    !> Documentation for function return value
+    INTEGER :: y
+  END FUNCTION bar
 
 
 END MODULE comments
