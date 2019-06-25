@@ -148,8 +148,6 @@ cpp_type_map = {'INTEGER':{'':'int*','1':'signed char*','2':'short*','4':'int*',
                 'COMPLEX':{'':'std::complex<float>*','4':'std::complex<float>*','C_FLOAT_COMPLEX':'std::complex<float>*','8':'std::complex<double>*','C_DOUBLE_COMPLEX':'std::complex<double>*'},
                 'INT':{'':'fortran_charlen_t'}}
 
-special_param_comments = set( ['OPTIONAL', 'ARRAY', 'FORTRAN_ONLY'] )
-
 current_module = ''
 module_proc_num = 1 # For keeping track of the order that the
                     # procedures are defined in the Fortran code.  Not
@@ -324,8 +322,8 @@ class Argument(object):
         self.name = name
         self.pos = pos # Zero-indexed
         self.type = type
-        self.comment = []
-        self.optional=optional
+        self.comment = comment
+        self.optional = optional
         self.intent = intent
         self.byval = byval
         self.allocatable = allocatable
@@ -343,25 +341,19 @@ class Argument(object):
         # statements to show up in the func pointer defs, which don't
         # use pass_by_val)
         self.in_abstract = False
+        # Whether it represents the "self" argument of a method call
+        self.is_self_arg = False
 
-        if self.optional:
-            self.comment.append('OPTIONAL')
-        if type:
-            if type.array:
-                if type.array.vec:
-                    self.comment.append('ARRAY')
-                elif type.array.fort_only:
-                    self.comment.append('FORTRAN_ONLY')
-            if type.type=='CHARACTER' and intent!='in':
+        if type and type.type=='CHARACTER' and intent!='in':
                 string_class_used = True
-        if comment:
-            for c in comment:
-                self.comment.append(c)
 
+        if opts.document_all_params and not self.comment:
+            # Add an empty comment, which will trigger a \param entry
+            # to be included in the generated doxygen comments
+            self.comment = ['']
+                
     def set_type(self,type):
         self.type = type
-        if type.array and type.array.vec:
-            self.comment.append('ARRAY')
 
     def pass_by_val(self):
         """Whether we can pass this argument by val in the C++ interface
@@ -698,7 +690,11 @@ class FileReader:
         while True:
             line = self.readline().strip()
             if line.startswith('!!'):
-                com.append(line.split('!!')[1].strip())
+                text = line.split('!!')[1]
+                # Preserve whitespace indentation:
+                if text.startswith(' '):
+                    text = text[1:]
+                com.append(text)
                 read_count+=1
             else:
                 # Back up a line, or all the way back to the comment start
@@ -833,6 +829,7 @@ def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
         elif retval and name.lower()==retval.name.lower():
             retval.set_type(type)
             retval.pointer = pointer
+            retval.comment = comments
     return count
 
 def parse_proc(file,line,abstract=False):
@@ -916,6 +913,7 @@ def parse_proc(file,line,abstract=False):
             invalid = True
         if arg.pos==0 and arg.type.dt:
             method = True
+            arg.is_self_arg = True
     if retval:
         if retval.type:
             if retval.type.array:
@@ -1185,35 +1183,58 @@ def associate_procedures():
                     fort_class_used = True
             
 
-def write_cpp_dox_comments(file,comments,arglist=None,prefix=0):
+def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
     # /// Style
     #for c in comments:
     #    file.write(prefix*' ' + '/// ' + c + '\n')
-    started = False
-    # First write primary symbol comments
+
+    # Prefix written on each line before comments
+    comment_prefix = prefix*' ' + ' * '
+    
+    class context:
+        # Workaround for Python 2 nonlocal access in open_comments function
+        started = False
+    
+    def open_comments():
+        file.write(prefix*' ' + '/**\n')
+        file.write(comment_prefix)
+        context.started = True
+        
+    # First write primary symbol comments.  Capture any comments that
+    # come after a "\par" command so that they can be written after
+    # the \param comments.
+    par_comments = []
+    have_par_comments = False
     for i,c in enumerate(comments):
         if i == 0:
-            file.write(prefix*' ' + '/*! \\brief ' + c + '\n')
-            started = True
+            open_comments()
+            file.write('\\brief ' + c + '\n')
         else:
-            file.write(prefix*' ' + ' *  ' + c + '\n')
+            if not have_par_comments and c.strip().startswith(r'\par') and len(c.strip().split()) > 1:
+                have_par_comments = True
+            if have_par_comments:
+                par_comments.append(c)
+            else:
+                file.write(comment_prefix + c + '\n')
     # Write parameter argument comments if provided
+    param_started = False
     if arglist:
         for arg in arglist:
             if arg.fort_only():
                 continue
+            if arg.is_self_arg:
+                # This is important with opts.document_all_params
+                continue
             for i,c in enumerate(arg.comment):
-                if started:
-                    # If we add an empty line to an existing \param
-                    # comment, that will make the rest a detailed
-                    # comment, so don't do this with OPTIONAL and
-                    # ARRAY
-                    if i==0: #or not (c.split()[0] in special_param_comments):
-                        file.write(prefix*' ' + ' *\n')
-                    file.write(prefix*' ' + ' *  ')
+                if context.started:
+                    if not param_started and not have_par_comments:
+                        # Don't add line if have_par_comments b/c
+                        # assume that we already pulled in a blank
+                        # line just before the \par command
+                        file.write(comment_prefix[:-1] + '\n')
+                    file.write(comment_prefix)
                 else:
-                    file.write(prefix*' ' + '/*! ')
-                    started = True
+                    open_comments()
                 if i==0:
                     file.write('\\param')
                     if arg.intent=='in':
@@ -1222,8 +1243,26 @@ def write_cpp_dox_comments(file,comments,arglist=None,prefix=0):
                         file.write('[out]')
                     file.write(' ' + arg.name + ' ')
                 file.write(c + '\n')
-    if started:
-        file.write(prefix*' ' + '*/\n')
+                param_started = True
+    if retval and retval.comment:
+        if context.started:
+            if not param_started:
+                file.write(comment_prefix[:-1] + '\n')
+            file.write(comment_prefix)
+        else:
+            open_comments()
+        file.write('\\return ')
+        for c in retval.comment:
+            file.write(c + '\n')
+    # Now write the \par comments, so that they show after the \param
+    # section
+    if have_par_comments:
+        file.write(comment_prefix[:-1] + '\n')
+        for c in par_comments:
+            file.write(comment_prefix + c + '\n')
+    if context.started:
+        # Close comments
+        file.write(prefix*' ' + ' */\n')
 
 
 def c_arg_list(proc,bind=False,call=False,definition=True):
@@ -1612,7 +1651,7 @@ def write_class(object):
     fort_ctors = object.ctor_list()
     if fort_ctors:
         for fort_ctor in fort_ctors:
-            write_cpp_dox_comments(file,fort_ctor.comment,fort_ctor.arglist)
+            write_cpp_dox_comments(file, fort_ctor.comment, fort_ctor.arglist, prefix=2)
             file.write('  ' + object.cname + '(' + c_arg_list(fort_ctor,bind=False,call=False,definition=False) + ');\n')
     elif not object.name==orphan_classname and not object.abstract:
         # Don't declare default constructor (or destructor, below) for
@@ -1631,7 +1670,7 @@ def write_class(object):
         # enabled by adding an %include for the dtor
         if proc.ctor or (proc.dtor and not proc.name.lower() in name_inclusions):
             continue
-        write_cpp_dox_comments(file,proc.comment,proc.arglist)
+        write_cpp_dox_comments(file, proc.comment, proc.arglist, proc.retval, prefix=2)
         file.write(function_def_str(proc) + '\n\n')
     # Check for pure virtual methods (which have no directly
     # associated procedure)
@@ -1824,21 +1863,30 @@ def write_matrix_class():
     f.write('#include <cstdlib>\n#include <cassert>\n\n')
     write_cpp_dox_comments(f, comments)
     f.write('template <class T>\nclass ' + matrix_classname + '{\n\n')
-    f.write('  int nrows, ncols;\n\npublic:\n\n  ')
+    f.write('  int nrows, ncols;\n')
+    f.write('  bool owns;\n')
+    f.write('\npublic:\n\n  ')    
     f.write('  T *data;\n\n')
-    write_cpp_dox_comments(f, ['Create a matrix with m rows and n columns'])
+    
+    write_cpp_dox_comments(f, ['Create a matrix with m rows and n columns','','Allocates new memory'], prefix=2)
     f.write('  ' + matrix_classname + '(int m, int n) {\n')
     f.write('    data = NULL;\n    assert(m>0 && n>0);\n    nrows=m; ncols=n;\n')
-    f.write('    data = (T*) calloc( m*n, sizeof(T) );\n  }\n\n')
-    f.write('  ~' + matrix_classname + '() { if(data) free(data); }\n\n')
-    write_cpp_dox_comments(f, ['Provides element access via the parentheses operator.','','The base index is 0'])
+    f.write('    data = (T*) calloc( m*n, sizeof(T) );\n    owns = true;\n  }\n\n')
+
+    write_cpp_dox_comments(f, ['Set up a pointer to existing contiguous array data (in Fortran order)'], prefix=2)
+    f.write('  ' + matrix_classname + '(int m, int n, T *data_ptr) {\n')
+    f.write('    data = data_ptr;\n    assert(m>0 && n>0);\n    nrows=m; ncols=n;\n')
+    f.write('    owns = false;\n  }\n\n')
+    
+    f.write('  ~' + matrix_classname + '() { if(data && owns) free(data); }\n\n')    
+    write_cpp_dox_comments(f, ['Provides element access via the parentheses operator.','','The base index is 0'], prefix=2)
     f.write('  T& operator()(int i, int j) {\n')
     f.write('    assert( i>=0 && i<nrows && j>=0 && j<ncols );\n')
     f.write('    // i--; j--; // Adjust base\n')
     f.write('    return data[j*nrows+i];\n  }\n\n')
-    write_cpp_dox_comments(f, ['Get number of rows'])
+    write_cpp_dox_comments(f, ['Get number of rows'], prefix=2)
     f.write('  inline int num_rows(void) const { return nrows; }\n\n')
-    write_cpp_dox_comments(f, ['Get number of columns'])
+    write_cpp_dox_comments(f, ['Get number of columns'], prefix=2)
     f.write('  inline int num_cols(void) const { return ncols; }\n\n')
     f.write('};\n\n')
     f.write('#endif /* ' + matrix_classname.upper() + '_H_ */\n')
@@ -2118,6 +2166,7 @@ class Options(object):
         parser.add_argument('--no-W-not-wrapped', action='store_true', help='do not warn about procedures that were not wrapped')
         parser.add_argument('--main-header', default='FortWrap', help='Use MAIN_HEADER as name of the main header file (default=%(default)s)')
         parser.add_argument('--constants-class', default='FortConstants', help='use CONSTANTS_CLASS as name of the class for wrapping enumerations (default=%(default)s)')
+        parser.add_argument('--document-all-params', action='store_true', help='write doxygen \\param comment for all arguments')
         # Not documenting, as this option could be dangerous, although it is
         # protected from -d.  help='remove all wrapper-related files from
         # wrapper code directory before generating new code.  Requires -d.
