@@ -404,12 +404,15 @@ class Argument(object):
         # non-pointer arguments in method definitions)
         return self.intent=='in' and not self.byval and not self.pass_by_val() and not self.type.matrix
 
-    def cpp_type(self, value=False):
+    def cpp_type(self, value=False, native=False):
         """
         Convert a Fortran type to a C++ type.
         """
         if self.type.dt:
-            return 'ADDRESS'
+            if native:
+                return self.type.type + '*'
+            else:
+                return 'ADDRESS'
         elif self.type.valid_primitive():
             if self.cpp_const():
                 prefix = 'const '
@@ -552,6 +555,8 @@ class DerivedType(object):
         self.procs = []
         self.module = current_module
         self.comment = comment
+        self.pointer_return_types = set() # Objects that methods of this type can return using pointers
+        self.has_pointer_ctor = False
 
         self.is_class = False
         self.abstract = False
@@ -568,6 +573,11 @@ class DerivedType(object):
             if proc.ctor:
                 ctors.append(proc)
         return ctors
+
+    def get_pointer_return_types(self):
+        for proc in self.procs:
+            if proc.retval and proc.retval.pointer and proc.retval.type.dt and proc.retval.type.type.lower() in objects and proc.retval.type.type.lower() != self.name.lower():
+                self.pointer_return_types.add(proc.retval.type.type)
 
 class TypeBoundProcedure(object):
     def __init__(self, name, procname, interface, deferred, nopass):
@@ -818,6 +828,7 @@ def parse_argument_defs(line,file,arg_list_lower,args,retval,comments):
             args[name] = Argument(name,arg_list_lower.index(name.lower()),type,optional,intent,byval,allocatable,pointer,comment=comments)
         elif retval and name.lower()==retval.name.lower():
             retval.set_type(type)
+            retval.pointer = pointer
             retval.comment = comments
     return count
 
@@ -905,10 +916,13 @@ def parse_proc(file,line,abstract=False):
             arg.is_self_arg = True
     if retval:
         if retval.type:
-            if retval.type.dt or retval.type.array:
+            if retval.type.array:
                 invalid = True
             elif retval.type.type == 'CHARACTER':
                 invalid = True
+            elif retval.type.dt:
+                if not retval.pointer:
+                    invalid = True
             elif not retval.type.valid_primitive():
                 invalid = True
         else:
@@ -1112,6 +1126,9 @@ def associate_procedures():
         for ipos,arg in enumerate(proc.arglist):
             if ipos>0 and arg.type.dt and not arg.type.array and arg.type.type.lower() in objects:
                 arg.native = True
+        if proc.retval and proc.retval.pointer and proc.retval.type.dt and proc.retval.type.type.lower() in objects:
+            proc.retval.native = True
+            objects[proc.retval.type.type.lower()].has_pointer_ctor = True
 
     for proc in procedures:
         # Associate methods
@@ -1154,6 +1171,8 @@ def associate_procedures():
             arg.in_abstract = True
         # Flag native args for abstrat interfacs, which is necessary when writing the prototypes for the virtual methods
         flag_native_args(proc)
+    for obj in objects.values():
+        obj.get_pointer_return_types()
     # Flag all derived types that are passed using CLASS:
     for proc in procedures:
         for arg in proc.args.values():
@@ -1258,7 +1277,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
     # Pass "data_ptr" as first arg, if necessary. dt check is necessary to
     # handle orphan functions in the dummy class correctly
     if bind and call and proc.nargs>0 and proc.arglist[0].type.dt:
-        string = 'data_ptr' if proc.arglist[0].type.dt=='TYPE' else '&class_data'        
+        string += 'data_ptr' if proc.arglist[0].type.dt=='TYPE' else 'class_data_ptr'        
         if proc.nargs==1:
             return string
         else:
@@ -1329,9 +1348,6 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # Change pass-by-value to reference for Fortran
         if call and bind and arg.pass_by_val() and not arg.byval and not arg.type.proc_pointer:
             string = string + '&'
-        # Native class arguments that are not optional need & before arg name
-        if arg.type.dt=='CLASS' and call and arg.native and not (arg.optional and arg.cpp_optional):
-            string = string + '&'
         # Add argument name -------------------------
         if arg.type.proc_pointer and not bind:
             # Arg name is already part of the C function pointer definition
@@ -1366,15 +1382,9 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
         # Special native handling of certain types:
         if call and arg.native:
             if arg.optional and arg.cpp_optional:
-                if arg.type.dt == 'TYPE':
-                    string = string + ' ? ' + arg.name + '->data_ptr : NULL'
-                else:
-                    string = string + ' ? &' + arg.name + '->class_data : NULL'
+                string = string + ' ? ' + arg.name + '->{} : NULL'.format('data_ptr' if arg.type.dt == 'TYPE' else 'class_data_ptr')
             else:
-                if arg.type.dt == 'TYPE':
-                    string = string + '->data_ptr'
-                else:
-                    string = string + '->class_data'
+                string = string + '->{}'.format('data_ptr' if arg.type.dt == 'TYPE' else 'class_data_ptr')
         elif not call and not bind and not definition and arg.cpp_optional:
             string = string + '=NULL'
         if proc.has_args_past_pos(ipos,bind):
@@ -1454,15 +1464,20 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     if (proc.in_orphan_class or proc.nopass) and not bind and not call and not obj and not opts.global_orphans:
         s = s + 'static '        
     # Now write return type:
-    if proc.retval:
+    if proc.retval and not (proc.retval.type.dt and bind and not proc.retval.pointer):
         if call:
             if not proc.has_post_call_wrapper_code():
                 s = s + 'return '
             else:
                 # Save return value and return after wrapper code below
-                s = s + proc.retval.cpp_type(value=True) + ' __retval = '
+                s = s + proc.retval.cpp_type(value=True,native=True) + ' __retval = '
+            if proc.retval and proc.retval.pointer:
+                s += 'new ' + proc.retval.type.type + '('
         else:
-            s = s + proc.retval.cpp_type(value=True) + ' '
+            if proc.retval.native and not bind:
+                s += proc.retval.type.type + '* '
+            else:
+                s += proc.retval.cpp_type(value=True) + ' '
     elif not call:
         s = s + 'void '
     # Definition/declaration:
@@ -1482,6 +1497,8 @@ def function_def_str(proc,bind=False,obj=None,call=False,dfrd_tbp=None,prefix=' 
     else:
         s = s + method_name
     s = s + '(' + c_arg_list(proc,bind,call,obj!=None) + ')'
+    if call and proc.retval and proc.retval.pointer:
+            s += ')'
     if not obj:
         s = s + ';'
     if call:
@@ -1514,14 +1531,20 @@ def write_constructor(file,object,fort_ctor=None):
     else:
         file.write('()')
     file.write(' {\n')
-    file.write('  data_ptr = NULL;\n')
-    # Allocate storage for Fortran derived type
-    file.write('  ' + mangle_name(fort_wrap_file, 'allocate_' + object.name) + '(&data_ptr); // Allocate Fortran derived type\n')
     if object.is_class:
-        # Class data must be set up before calling constructor, in
-        # case constructor uses CLASS argument
-        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.module, object.name)))
-        file.write('  class_data.data = data_ptr;\n')
+        # Use local variable and pass to _init
+        pointer_name = '_data_ptr'
+        file.write('  ADDRESS ' + pointer_name + ' = NULL;\n')
+    else:
+        # Use member variable
+        pointer_name = 'data_ptr'
+        file.write('  {} = NULL;\n'.format(pointer_name))
+    # Allocate storage for Fortran derived type
+    file.write('  ' + mangle_name(fort_wrap_file, 'allocate_' + object.name) + '(&{}); // Allocate Fortran derived type\n'.format(pointer_name))
+    if object.is_class:
+        file.write('  _init(_data_ptr, true);\n')
+    else:
+        file.write('  owns = true;\n')
     # If present, call Fortran ctor
     if fort_ctor:
         file.write(function_def_str(fort_ctor,bind=True,call=True) )
@@ -1542,8 +1565,8 @@ def write_destructor(file,object):
     # Check for Fortran destructor
     for proc in object.procs:
         if proc.dtor:
-            target = 'data_ptr' if proc.arglist[0].type.dt=='TYPE' else '&class_data'
-            prefix = 'if (initialized) ' if init_func_def else ''
+            target = 'data_ptr' if proc.arglist[0].type.dt=='TYPE' else 'class_data_ptr'
+            prefix = 'if (owns && initialized) ' if init_func_def else 'if (owns) '
             file.write('  ' + prefix + mangle_name(proc.module,proc.name) + '(' + target)
             # Add NULL for any optional arguments (only optional
             # arguments are allowed in the destructor call)
@@ -1551,7 +1574,7 @@ def write_destructor(file,object):
                 file.write(', NULL')
             file.write('); // Fortran Destructor\n')
     # Deallocate Fortran derived type
-    file.write('  ' + mangle_name(fort_wrap_file,'deallocate_'+object.name) + '(data_ptr); // Deallocate Fortran derived type\n')
+    file.write('  if (owns) ' + mangle_name(fort_wrap_file,'deallocate_'+object.name) + '(data_ptr); // Deallocate Fortran derived type\n')
     file.write('}\n\n')    
 
 def write_class(object):
@@ -1612,6 +1635,17 @@ def write_class(object):
         file.write('{\n\n')
         if object.abstract:
             file.write('protected:\n  // {0} can not be instantiated\n  {0}() {{}}\n\n'.format(object.cname))
+        if object.is_class and not object.abstract:
+            file.write('private:\n')
+            file.write('  void _init(ADDRESS p, bool memOwn);\n\n')
+        # Special pointer constructor:
+        if object.has_pointer_ctor and not object.abstract:
+            file.write('private:\n')
+            file.write('  ' + object.cname + '(ADDRESS p);\n')
+            for other in objects.values():
+                if object.name in other.pointer_return_types:
+                    file.write('  friend class ' + other.name+ '; // For accessing pointer constructor\n')
+            file.write('\n')
         file.write('public:\n')
     # Constructor:
     fort_ctors = object.ctor_list()
@@ -1653,12 +1687,17 @@ def write_class(object):
             else:
                 file.write('  virtual ' + function_def_str(abstract_interfaces[tbp.interface], dfrd_tbp=tbp, prefix='')[:-1] + ' = 0;\n\n')
     #file.write('\nprivate:\n')
+    if object.has_pointer_ctor:
+        file.write('  void _disown();\n')
+        file.write('  void _acquire();\n\n')
     if object.name!=orphan_classname and not object.extends:
         file.write('  ADDRESS data_ptr;\n')
         if object.is_class:
             file.write('  FClassContainer class_data;\n')
+            file.write('  FClassContainer* class_data_ptr;\n')
+        file.write('\nprotected:\n')
+        file.write('  bool owns;\n')
         if init_func_def:
-            file.write('\nprotected:\n')
             file.write('  bool initialized;\n')
     if not opts.global_orphans:
         file.write('};\n\n')
@@ -1687,6 +1726,29 @@ def write_class(object):
     if stringh_used:
         file.write('#include <cstring> // For strcpy\n')
     file.write('#include "' + object.cname + '.h"\n\n')
+    if object.is_class and not object.abstract:
+        file.write('// Initialization code to set up class pointers\n')
+        file.write('void ' + object.cname + '::' + '_init(ADDRESS p, bool memOwn) {\n')
+        file.write('  data_ptr = p;\n')
+        file.write('  owns = memOwn;\n')
+        # Class data must be set up before calling constructor, in
+        # case constructor uses CLASS argument
+        file.write('  class_data.vptr = &{0}; // Get pointer to vtab\n'.format(vtab_symbol(object.module, object.name)))
+        file.write('  class_data.data = data_ptr;\n')
+        file.write('  class_data_ptr = &class_data;\n')
+        file.write('}\n\n')
+    # Write special pointer constructor:
+    if object.has_pointer_ctor and not object.abstract:
+        file.write('// Pointer constructor:\n')
+        file.write(object.cname + '::' + object.cname + '(ADDRESS p) {\n')
+        if object.is_class:
+            file.write('  _init(p, false);\n')
+        else:
+            file.write('  data_ptr = p;\n')
+            file.write('  owns = false;\n')
+        if init_func_def:
+            file.write('  initialized = false;\n')
+        file.write('}\n\n')
     # Constructor(s):
     if fort_ctors:
         for fort_ctor in fort_ctors:
@@ -1709,6 +1771,11 @@ def write_class(object):
         elif init_func_def and init_func_def.match(proc.name):
             file.write('  initialized = true;\n')
         file.write('}\n\n')
+
+    if object.has_pointer_ctor:
+        file.write('void ' + object.cname + '::_disown() { owns = false; }\n')
+        init = 'initialized = true; ' if init_func_def else ''
+        file.write('void ' + object.cname + '::_acquire() { owns = true; ' + init + '}\n')
 
     file.close()
 
@@ -1733,6 +1800,8 @@ def get_native_includes(object):
                     includes.add('<string>')
                 else:
                     includes.add(string_classname)
+        if proc.retval and proc.retval.type.dt and proc.retval.pointer:
+            includes.add(proc.retval.type.type)
     # For inheritance:
     if object.extends:
         includes.add(object.extends)
