@@ -1542,13 +1542,22 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
         file.write(comment_prefix)
         context.started = True
         
-    # First write primary symbol comments
+    # First write primary symbol comments.  Capture any comments that
+    # come after a "\par" command so that they can be written after
+    # the \param comments.
+    par_comments = []
+    have_par_comments = False
     for i,c in enumerate(comments):
         if i == 0:
             open_comments()
             file.write('\\brief ' + c + '\n')
         else:
-            file.write(comment_prefix + c + '\n')
+            if not have_par_comments and c.strip().startswith(r'\par') and len(c.strip().split()) > 1:
+                have_par_comments = True
+            if have_par_comments:
+                par_comments.append(c)
+            else:
+                file.write(comment_prefix + c + '\n')
     # Write parameter argument comments if provided
     param_started = False
     if arglist:
@@ -1560,7 +1569,10 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
                 continue
             for i,c in enumerate(arg.comment):
                 if context.started:
-                    if not param_started:
+                    if not param_started and not have_par_comments:
+                        # Don't add line if have_par_comments b/c
+                        # assume that we already pulled in a blank
+                        # line just before the \par command
                         file.write(comment_prefix[:-1] + '\n')
                     file.write(comment_prefix)
                 else:
@@ -1584,6 +1596,12 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
         file.write('\\return ')
         for c in retval.comment:
             file.write(c + '\n')
+    # Now write the \par comments, so that they show after the \param
+    # section
+    if have_par_comments:
+        file.write(comment_prefix[:-1] + '\n')
+        for c in par_comments:
+            file.write(comment_prefix + c + '\n')
     if context.started:
         # Close comments
         file.write(prefix*' ' + ' */\n')
