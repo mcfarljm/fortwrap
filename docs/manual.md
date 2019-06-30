@@ -60,7 +60,7 @@ o.process();
 * [**Derived Types**](#derived-types): Transparent
   translation of Fortran derived types into C++ classes.  This is the
   main objective of FortWrap.
-  * Translation of Fortran "ctor" functions into C++ constructors</li>
+  * Translation of Fortran "ctor" functions into C++ constructors
   * Fortran "dtor" functions automatically called by C++ destructor
 * [**Classes (experimental)**](#class-and-polymorphism-experimental): Translate Fortran CLASSes and
 	type bound procedures into C++ classes.  Fortran inheritance
@@ -89,7 +89,7 @@ o.process();
 * "Top-level" (a.k.a. global or non-module) procedures are wrapped
 * Name mangling support for the gfortran compiler
 * Where possible, pass by value is used in C++ (e.g. scalar
-  arguments that are not optional)</li>
+  arguments that are not optional)
 * **Doxygen comments**: Doxygen-style comments used for
     Fortran symbols (derived types, subroutines, arguments) are
     transferred to C++ doxygen comments in the wrapper code.
@@ -121,7 +121,8 @@ supported:
   interest.  Create an "append" function in Fortran that accepts
   only scalars but allows you to add items to the array container
   one at a time.
-* Fortran functions with non-primitive return types are not wrapped.
+* Functions with non-primitive return types are not wrapped (with the
+  exception of derived type pointers, which are supported).
 
 Note that FortWrap can still wrap procedures that use unsupported
 arguments if those arguments are optional.  In these cases, the
@@ -712,7 +713,7 @@ Note that when wrapping a character argument that has assumed
 length and is `INTENT(OUT)`, FortWrap will determine the
 size of the temporary array to be allocated based on the size of
 the `std::string` input.  Thus, consider
-using `std::string::resize`; otherwise, if an unitialized
+using `std::string::resize`; otherwise, if an uninitialized
 string of size 0 is passed from C++, the Fortran code will receive
 a character dummy argument with length 0.
 
