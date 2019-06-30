@@ -116,7 +116,7 @@ supported:
   interest.  Create an "append" function in Fortran that accepts
   only scalars but allows you to add items to the array container
   one at a time.
-* Functions that return a derived type are onlyl wrapped if the return
+* Functions that return a derived type are only wrapped if the return
   value has the `POINTER` attribute
 
 Note that FortWrap can still wrap procedures that use unsupported
@@ -300,7 +300,7 @@ wrapped.
 ### Data types
 
 FortWrap attempts to "match" the "kind" of primitive data types
-declared in the original code to a corresponding C interpoperable type
+declared in the original code to a corresponding C interoperable type
 in the wrapper code.  For example, the default `INTEGER` kind is
 matched to `INTEGER(C_INT)`.  The interoperable dummy arguments
 declared in the Fortran wrapper code are passed directly to the
@@ -774,7 +774,7 @@ Note that when wrapping a character argument that has assumed
 length and is `INTENT(OUT)`, FortWrap will determine the
 size of the temporary array to be allocated based on the size of
 the `std::string` input.  Thus, consider
-using `std::string::resize`; otherwise, if an unitialized
+using `std::string::resize`; otherwise, if an uninitialized
 string of size 0 is passed from C++, the Fortran code will receive
 a character dummy argument with length 0.
 
