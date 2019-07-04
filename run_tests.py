@@ -63,7 +63,7 @@ for test in tests:
         subprocess.call('make clean', stdout=FNULL, shell=True)
     p = subprocess.Popen(cmd + ' ' + opts, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = p.communicate()
-    if p.returncode != 0 or 'Error:' in stderr:
+    if p.returncode != 0 or 'Error:' in stderr.decode():
         num_err += 1
         failed_tests.append((test,'wrapper'))
         print("[FAIL: wrapper]")
