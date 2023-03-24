@@ -375,10 +375,17 @@ class DataType(object):
         type_map = cpp_type_map.get(self.type)
         return type_map and self.kind.upper() in type_map
 
+def sanitize_argument_name(name):
+    illegal_names = ['this', 'float', 'double', 'int', 'long', 'nullptr', 'struct', 'new', 'delete']
+    if name in illegal_names:
+        warnings.warn('\n"' + name + '" is an illegal argument name in C++, changing it to "_' + name + '"', RuntimeWarning)
+        name = '_' + name
+    return name
+
 class Argument(object):
     def __init__(self,name,pos,type=None,optional=False,intent='inout',byval=False,allocatable=False,pointer=False,comment=[]):
         global string_class_used
-        self.name = name
+        self.name = sanitize_argument_name(name)
         self.pos = pos # Zero-indexed
         self.type = type
         self.comment = comment

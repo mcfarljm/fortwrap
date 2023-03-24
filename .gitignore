@@ -3,3 +3,4 @@
 wrap/
 prog
 *.exe
+venv/
