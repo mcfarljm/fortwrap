@@ -34,18 +34,19 @@ from datetime import date
 import sys
 import os
 import traceback
+import warnings
 
 
 VERSION = '2.2.2'
 
-
 # SETTINGS ==========================================
+opts, configs, file_list = None, None, None # To be set by argv when calling wrap()
 
 ERROR_FILE_NAME = 'FortWrap-error.txt'
 
-code_output_dir = '.'
-include_output_dir = '.'
-fort_output_dir = '.'
+code_output_dir = ''
+include_output_dir = ''
+fort_output_dir = ''
 
 HEADER_STRING = '/* This source file automatically generated on ' + str(date.today()) + ' using \n   FortWrap wrapper generator version ' + VERSION + ' */\n'
 
@@ -378,7 +379,8 @@ class DataType(object):
 def sanitize_argument_name(name):
     illegal_names = ['this', 'float', 'double', 'int', 'long', 'nullptr', 'struct', 'new', 'delete']
     if name in illegal_names:
-        warnings.warn('\n"' + name + '" is an illegal argument name in C++, changing it to "_' + name + '"', RuntimeWarning)
+        warnings.warn('\n"' + name + '" is an illegal argument name in C++, changing it to "_' + name + '"',
+                      RuntimeWarning, stacklevel=2)
         name = '_' + name
     return name
 
@@ -2532,52 +2534,62 @@ class Options(object):
 
 
 
+# Setting global options
+try:
+    file_list = []
+
+    opts = Options()
+
+    configs = ConfigurationFile(opts.config_file)
+
+    if opts.clean:
+        clean_directories()
+
+    if opts.file_list:
+        try:
+            f = open(opts.file_list)
+        except IOError:
+            error('Unable to open file list: ' + opts.file_list)
+            sys.exit(3)
+        for line in f:
+            if not line.strip().startswith('#') and re.search('\w', line):
+                file_list.append(line.strip())
+        f.close()
+        print("LOADED", len(file_list), 'FILES FROM LIST')
+
+    if opts.glob:
+        file_list += glob.glob('*.[fF]90')
+
+    if not file_list:
+        error("No source files")
+        sys.exit(3)
+
+    fcount = 0  # Counts valid files
+    for f in file_list:
+        fcount += parse_file(f)
+    if fcount == 0:
+        error("No source files")
+        sys.exit(3)
+
+    # Prevent writing any files if there is nothing to wrap
+    if len(procedures) == 0:
+        error("No procedures to wrap")
+        sys.exit(4)
+
+except SystemExit:
+    # Raised by sys.exit
+    raise
+
+except NotImplementedError:
+    # NotImplementedError used to bypass error handling
+    internal_error()
+
+
 # COMMANDS ==========================================
 
-if __name__ == "__main__":
-
+def wrap():
+    global opts, configs, file_list
     try:
-
-        file_list = []
-
-        opts = Options()
-
-        configs = ConfigurationFile(opts.config_file)
-
-        if opts.clean:
-            clean_directories()
-
-        if opts.file_list:
-            try:
-                f = open(opts.file_list)
-            except IOError:
-                error('Unable to open file list: ' + opts.file_list)
-                sys.exit(3)
-            for line in f:
-                if not line.strip().startswith('#') and re.search('\w', line):
-                    file_list.append( line.strip() )
-            f.close()
-            print("LOADED", len(file_list), 'FILES FROM LIST')
-
-        if opts.glob:
-            file_list += glob.glob('*.[fF]90')
-
-        if not file_list:
-            error("No source files")
-            sys.exit(3)
-
-        fcount = 0  # Counts valid files
-        for f in file_list:
-            fcount += parse_file(f)
-        if fcount==0:
-            error("No source files")
-            sys.exit(3)
-
-        # Prevent writing any files if there is nothing to wrap
-        if len(procedures)==0:
-            error("No procedures to wrap")
-            sys.exit(4)
-
         associate_procedures()
 
         if opts.warn_not_wrapped and len(not_wrapped) > 0:
@@ -2610,3 +2622,7 @@ if __name__ == "__main__":
     except NotImplementedError:
         # NotImplementedError used to bypass error handling
         internal_error()
+
+
+if __name__ == "__main__":
+    wrap()
