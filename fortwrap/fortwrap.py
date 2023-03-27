@@ -136,6 +136,14 @@ name_inclusions = set()
 proc_arg_exclusions = set()
 interface_defs = dict() # module -> proc name -> generic interface
 nopass_tbps = dict() # (module.lower,procname.lower) -> TypeBoundProcedure, for all TBP's with NOPASS attribute
+include_files = set()
+include_files_pattern = re.compile('')
+exclude_files = set()
+exclude_files_pattern = re.compile('')
+include_procedures = set()
+include_procedures_pattern = re.compile('')
+exclude_procedures = set()
+exclude_procedures_pattern = re.compile('')
 
 # 'INT' is for the hidden name length argument
 cpp_type_map = {'INTEGER':
@@ -376,12 +384,16 @@ class DataType(object):
         type_map = cpp_type_map.get(self.type)
         return type_map and self.kind.upper() in type_map
 
+    def __repr__(self):
+        return self.type
+
+    def __str__(self):
+        return self.__repr__()
+
 def sanitize_argument_name(name):
     illegal_names = ['this', 'float', 'double', 'int', 'long', 'nullptr', 'struct', 'new', 'delete']
     if name in illegal_names:
-        warnings.warn('\n"' + name + '" is an illegal argument name in C++, changing it to "_' + name + '"',
-                      RuntimeWarning, stacklevel=2)
-        name = '_' + name
+        name = 'c_' + name
     return name
 
 class Argument(object):
@@ -428,8 +440,11 @@ class Argument(object):
 
         Don't count Fortran arguments having the VALUE attribute, since they are already passed by value
 
-        Procedure pointers are handled differently since the "present" status can't be stored in the Fortran argument, we allow by-val conversion even for optional arguments"""
-        return not self.byval and (not self.optional or self.type.proc_pointer) and not self.type.dt and self.intent=='in' and not self.type.array and not self.type.type=='CHARACTER' and not self.in_abstract
+        Procedure pointers are handled differently since the "present" status can't be stored in the Fortran argument,
+        we allow by-val conversion even for optional arguments"""
+        return not self.byval and (not self.optional or self.type.proc_pointer) and (not self.type.dt) \
+                and self.intent=='in' and (not self.type.array) and (not self.type.type=='CHARACTER')#  \
+                # and (not self.in_abstract)
 
     def fort_only(self):
         """Whether argument is not wrappable"""
@@ -482,7 +497,10 @@ class Argument(object):
         # FortranMatrix<const double>.  Exclude pass_by_val for
         # aesthetic reasons (to keep const from being applied to
         # non-pointer arguments in method definitions)
-        return self.intent=='in' and not self.byval and not self.pass_by_val() and not self.type.matrix
+        is_const = (self.intent=='in' and not self.byval and not self.pass_by_val() and not self.type.matrix)
+        if self.name.lower() in ('t', 'v'):
+            print('Checking const : ', self.name, self.intent, self.byval, self.pass_by_val(), self.type.matrix, ' :: ', is_const)
+        return is_const
 
     def cpp_type(self, value=False):
         """
@@ -586,6 +604,12 @@ class Argument(object):
             return '    {1}{0} = C_FUNLOC({0}__p)\n'.format(self.name, present)
         return ''
 
+    def __repr__(self):
+        return '[' + str(self.type) + ', intent(' + self.intent + ') :: ' + self.name + '] => [' \
+               + self.cpp_type() + ' ' + self.name + ']'
+
+    def __str(self):
+        return self.__repr__()
 
 class Procedure(object):
     def __init__(self,name,args,method,retval=None,comment=None,nopass=False):
@@ -1167,8 +1191,7 @@ def parse_proc(file,line,abstract=False):
     """
     global dox_comments, abstract_interfaces, module_proc_num, not_wrapped
     # Store in case decide to overwrite them when parsing arg comments
-    proc_comments = dox_comments 
-
+    proc_comments = dox_comments
     # First check for line continuation:
     line = file.join_lines(line)
     proc_name = line.split('(')[0].split()[-1]
@@ -1180,7 +1203,6 @@ def parse_proc(file,line,abstract=False):
     else:
         arg_list_lower = []
     args = dict()
-    #print arg_list_lower
     retval = None
     if re.match('^\s*function', line, re.IGNORECASE):
         m = result_name_def.match(line)
@@ -2388,20 +2410,33 @@ def internal_error():
 
 # Class for parsing the configuration file
 class ConfigurationFile(object):
-    def __init__(self,fname):
-        self.fname = fname
-        if fname:
+    def __init__(self, opts):
+        global include_files, include_procedures, exclude_files, exclude_procedures,\
+                include_files_pattern, include_procedures_pattern, exclude_files_pattern, exclude_procedures_pattern
+        self.opts = opts
+        self.fname = opts.config_file
+        if self.fname is not None:
             try:
-                self.f = open(fname)
+                self.f = open(self.fname)
             except:
-                error("Error opening interface file: " + fname)
+                error("Error opening interface file: " + self.fname)
                 return
             self.process()
+        else:
+            include_files.add('[\s\S]*')
+            include_procedures.add('[\s\S]*')
+
+        include_files_pattern = re.compile('|'.join(include_files))
+        include_procedures_pattern = re.compile('|'.join(include_procedures))
+        exclude_files_pattern = re.compile('|'.join(exclude_files))
+        exclude_procedures_pattern = re.compile('|'.join(exclude_procedures))
+
 
     def process(self):
-        global name_exclusions, name_inclusions, name_substitutions, ctor_def, dtor_def, init_func_def
+        global name_exclusions, name_inclusions, name_substitutions, ctor_def, dtor_def, init_func_def, \
+                include_files, exclude_files, include_procedures, exclude_procedures
         for line_num,line in enumerate(self.f):
-            if not line.startswith('%'):
+            if not (line.startswith('%') or line.startswith('-') or line.startswith('--')):
                 continue
             words = [w.lower() for w in line.split()]
             if words[0] == '%ignore':
@@ -2410,6 +2445,30 @@ class ConfigurationFile(object):
                 else:
                     self.bad_decl(line_num+1)
                     continue
+            elif words[0] == '%include_files':
+                if len(words) > 1:
+                    for w in words[1:]:
+                        include_files.add(w)
+                else:
+                    include_files.add('')
+            elif words[0] == '%exclude_files':
+                if len(words) > 1:
+                    for w in words[1:]:
+                        exclude_files.add(w)
+                else:
+                    exclude_files.add('')
+            elif words[0] == '%include_procedures':
+                if len(words) > 1:
+                    for w in words[1:]:
+                        include_procedures.add(w)
+                else:
+                    include_procedures.add('')
+            elif words[0] == '%exclude_procedures':
+                if len(words) > 1:
+                    for w in words[1:]:
+                        include_procedures.add(w)
+                else:
+                    include_procedures.add('')
             elif words[0] == '%hide':
                 if len(words) == 3:
                     proc_arg_exclusions.add( tuple(words[1:]) )
@@ -2448,8 +2507,22 @@ class ConfigurationFile(object):
                 dtor_def = re.compile(line.strip().split('%dtor ')[1], re.IGNORECASE)
             elif words[0] == '%init':
                 init_func_def = re.compile(line.strip().split('%init ')[1], re.IGNORECASE)
+            elif words[0] in ('-d', '--directory'):
+                if len(words) != 2:
+                    self.bad_decl(line_num + 1)
+                    continue
+                elif opts.directory == '.':
+                    opts.directory = words[1]
             else:
                 error("Unrecognized declaration in interface file: {}".format(words[0]))
+
+        if len(include_files) == 0:
+            include_files.add('[\s\S]*')
+        else:
+            opts.glob = True
+        if len(include_procedures) == 0:
+            include_procedures.add('[\s\S]*')
+
                 
     def bad_decl(self,line_num):
         error("{}, line {} <-- bad declaration".format(self.fname, line_num))
@@ -2539,9 +2612,9 @@ try:
     file_list = []
 
     opts = Options()
-
-    configs = ConfigurationFile(opts.config_file)
-
+    configs = ConfigurationFile(opts)
+    opts.check_args()
+    opts.assign_globals()
     if opts.clean:
         clean_directories()
 
@@ -2560,9 +2633,22 @@ try:
     if opts.glob:
         file_list += glob.glob('*.[fF]90')
 
+    # If any patterns are given to the %include_files option of the configuration file, only files that match
+    # at least one of the patters will be parsed.
+    # If any patterns are given to the %exclude_files option, files that match any of the patterns will be excluded.
+    # By default, include_files_pattern = '[\s\S]*' (matches everything), and exclude_files_pattern = ''.
+    i = 0
+    while i < len(file_list):
+        if include_files_pattern.search(file_list[i]) and not exclude_files_pattern.search(file_list[i]):
+            i += 1
+            continue
+        file_list.pop(i)
+
     if not file_list:
         error("No source files")
         sys.exit(3)
+
+    opts.file_list = file_list
 
     fcount = 0  # Counts valid files
     for f in file_list:
@@ -2588,7 +2674,7 @@ except NotImplementedError:
 # COMMANDS ==========================================
 
 def wrap():
-    global opts, configs, file_list
+    global opts, configs, file_list, objects
     try:
         associate_procedures()
 
