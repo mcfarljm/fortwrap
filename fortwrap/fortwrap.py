@@ -12,6 +12,9 @@
 # Run fortwrap.py -h for usage information
 
 from __future__ import print_function
+
+import copy
+
 # These imports were added by futurize.  In Python 2, the builtins
 # module requires the "future" package.  These imports allow python 2
 # to use the newer versions of the functions.  However, the code will
@@ -498,8 +501,6 @@ class Argument(object):
         # aesthetic reasons (to keep const from being applied to
         # non-pointer arguments in method definitions)
         is_const = (self.intent=='in' and not self.byval and not self.pass_by_val() and not self.type.matrix)
-        if self.name.lower() in ('t', 'v'):
-            print('Checking const : ', self.name, self.intent, self.byval, self.pass_by_val(), self.type.matrix, ' :: ', is_const)
         return is_const
 
     def cpp_type(self, value=False):
@@ -923,7 +924,11 @@ class DerivedType(object):
         f.write('  END SUBROUTINE ' + object_allocator_binding_name(self.name, True) + '\n\n')
 
         return comment_written
-        
+
+    def __eq__(self, other):
+        if not isinstance(other, DerivedType):
+            return False
+        return (self.name == other.name) & (self.module == other.module)
 
 class TypeBoundProcedure(object):
     def __init__(self, name, obj, procname, interface, deferred, nopass):
@@ -2149,7 +2154,17 @@ def get_required_modules(module):
                 # "method" is defined in a separate module, and that
                 # module doesn't make the derived type public
                 includes.add(objects[arg.type.type.lower()].module)
-                
+
+    for obj in objects.values():
+        if obj.module != module:
+            continue
+        if obj.extends is None:
+            continue
+        for ext in objects.values():
+            if (obj.extends == ext.name) and (ext.module != module):
+                includes.add(ext.module)
+                includes.add(ext.module + '_wrap_')
+
     return includes
 
 def write_global_header_file():
@@ -2344,12 +2359,58 @@ def write_fortran_iso_wrapper_single_module():
         
         f.write('END MODULE ' + 'FortranISOWrappers' + '\n')
 
+def sort_module_list(module_list):
+    """
+    Sort module list based on USE statement dependency
+
+    :param module_list: list[str], list of module names
+    :return: sorted module list. The first module USE'es no other modules, successive modules are guaranteed to only
+            USE modules that appear previously in the list.
+    """
+
+    class Module:
+        def __init__(self, module_str):
+            self.name = module_str
+            self.includes = list(set(get_required_modules(self.name)) - set([self.name]))
+
+        def __lt__(self, other):
+            if self.name in other.includes:
+                if other.name in self.includes:
+                    raise RecursionError('Circular USE statemetns in: {' + self.name
+                                         + '.f90, ' + other.name + '.f90}')
+                return True
+
+            return False
+
+        def __str__(self):
+            return self.name
+
+    # Need custom sorting algorithm to handle the fact that we can have
+    # c <= b <= a, while c > a if only a USE'es c. Tested with Pythons sorting algorithm, it didn't work.
+    sorted_modules = [Module(mstr) for mstr in module_list]
+    is_sorted = False
+    while is_sorted is False:
+        is_sorted = True
+        i = 0
+        while i < len(sorted_modules):
+            for j in range(i, len(sorted_modules)):
+                if sorted_modules[j] < sorted_modules[i]:
+                    sorted_modules[i], sorted_modules[j] = sorted_modules[j], sorted_modules[i]
+                    is_sorted = False
+                    i = j
+                    break
+            else:
+                i += 1
+
+    return [str(module) for module in sorted_modules]
+
 def write_fortran_iso_wrapper_multiple_modules():
+    global module_list
     with open(os.path.join(fort_output_dir,'FortranISOWrappers.f90'), 'w') as f:
+        module_list = sort_module_list(module_list)
         for module in module_list:
             f.write('MODULE ' + '{}_wrap_'.format(module) + '\n\n')
             f.write('  USE ISO_C_BINDING\n')
-            f.write('  USE ' + module + '\n')
             includes = get_required_modules(module)
             for include in includes:
                 f.write('  USE ' + include + '\n')
@@ -2423,8 +2484,10 @@ class ConfigurationFile(object):
                 return
             self.process()
         else:
-            include_files.add('[\s\S]*')
-            include_procedures.add('[\s\S]*')
+            include_files.add('.*')
+            include_procedures.add('.*')
+            exclude_files.add('a^')
+            exclude_procedures.add('a^')
 
         include_files_pattern = re.compile('|'.join(include_files))
         include_procedures_pattern = re.compile('|'.join(include_procedures))
@@ -2517,11 +2580,13 @@ class ConfigurationFile(object):
                 error("Unrecognized declaration in interface file: {}".format(words[0]))
 
         if len(include_files) == 0:
-            include_files.add('[\s\S]*')
-        else:
-            opts.glob = True
+            include_files.add('.*')
         if len(include_procedures) == 0:
-            include_procedures.add('[\s\S]*')
+            include_procedures.add('.*')
+        if len(exclude_procedures) == 0:
+            exclude_procedures.add('a^')
+        if len(exclude_files) == 0:
+            exclude_files.add('a^')
 
                 
     def bad_decl(self,line_num):
