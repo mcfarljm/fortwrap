@@ -63,7 +63,7 @@ constants_classname = 'FortConstants'
 
 SWIG = True  # Whether or not to include preprocessor defs that will
              # be used by swig
-
+PYBIND11_LIB_NAME = 'libnoname'
 # Macros to define DLLEXPORT, needed with MSC compiler
 DLLEXPORT_MACRO = """#ifdef _MSC_VER
 #define DLLEXPORT __declspec(dllexport)
@@ -925,6 +925,83 @@ class DerivedType(object):
 
         return comment_written
 
+    def write_pybind_macro(self, f, inherited_methods):
+
+        contains_methods = []
+        write_str = '#define ' + self.cname + '_bindings(Model) \\' + '\n'
+        for proc in self.procs:
+            if proc.ctor or (proc.dtor and not proc.name.lower() in name_inclusions):
+                continue
+            # Get the C++ method name
+            if proc.tbp:
+                method_name = proc.tbp.name
+            elif dfrd_tbp:
+                # proc is the abstract interface for a deferred tbp
+                method_name = dfrd_tbp.name
+            else:
+                method_name = translate_name(proc.name)
+
+            if method_name in inherited_methods:
+                continue
+
+            contains_methods.append(method_name)
+            write_str += '    .def("' + method_name + '", &Model::' + method_name + ') \\' + '\n'
+
+        for tbp in self.tbps.values():
+            # C++ doesn't support static virtual methods, so don't write DEFERRED, NOPASS methods into the C++ wrapper
+            if not (tbp.deferred and not tbp.nopass):
+                # Note: this lookup doesn't respect the module USE
+                # hierarchy and could potentially point to wrong
+                # abstract_interfaces if the project contains multiple
+                # abstract_interfaces with different names, in different
+                # modules
+                continue
+            if tbp.interface not in abstract_interfaces:
+                error(
+                    'abstract interface {0} for type bound procedure {1} not found (may not be interoperable)'.format(
+                        tbp.interface, tbp.name))
+            else:
+                if tbp.name in inherited_methods:
+                    continue
+                contains_methods.append(tbp.name)
+                write_str += '    .def("' + tbp.name + '", &Model::' + tbp.name + ') \\' + '\n'
+
+        write_str = write_str[:-2] + '\n' # Remove the last line continuation (backslash)
+        if len(contains_methods) > 0:
+            f.write(write_str)
+
+        return contains_methods
+
+    def write_pybind_binding(self, f, use_macros):
+        if self.abstract:
+            return
+        f.write('    py::class_<' + self.cname + '>(handle, "' + self.cname + '") \n')
+        fort_ctors = self.ctor_list()
+        if fort_ctors:
+            for fort_ctor in fort_ctors:
+                args = c_arg_list(fort_ctor, bind=False, call=False,definition=False)
+                arglist = args.split(',')
+                print('args are : ', arglist)
+                typelist = [t for t, n in [arg.strip(' ').split(' ') for arg in arglist]]
+                namelist = [n for t, n in [arg.strip(' ').split(' ') for arg in arglist]]
+                f.write('        .def(py::init<' + ', '.join(typelist) + '>(), '
+                        + ', '.join(['py::arg("' + n + '")' for n in namelist]) + ') \n')
+                # file.write('  ' + object.cname + '(' + c_arg_list(fort_ctor, bind=False, call=False,
+                #                                                   definition=False) + ');\n')
+
+        for parent in use_macros[:-1]:
+            f.write('        ' + parent + '_bindings(' + self.cname + ') \n')
+        f.write('        ' + use_macros[-1] + '_bindings(' + self.cname + '); \n\n') # Macro for methods defined in this
+
+    def __repr__(self):
+        return self.cname
+
+    def __str__(self):
+        return self.__repr__()
+    def __lt__(self, other):
+        if self.cname == other.extends:
+            return True
+        return False
     def __eq__(self, other):
         if not isinstance(other, DerivedType):
             return False
@@ -1960,6 +2037,67 @@ def write_destructor(file,object):
     file.write('  ' + object_allocator_binding_name(object.name, True) + '(data_ptr); // Deallocate Fortran derived type\n')
     file.write('}\n\n')    
 
+def write_pybind11_bindings(classes):
+    file = open(include_output_dir + '/pybind11_bindings.cpp', 'w')
+    file.write('#include <pybind11/pybind11.h>\n')
+    file.write('#include <pybind11/stl.h>\n')
+
+    for cls in classes:
+        if cls.name.lower() in name_exclusions:
+            classes.remove(cls)
+
+    # Resolve inheritance structure:
+    # classes is ordered such that children always appear after their parent
+    # class dict is a mapping from class.cname to the class object
+    # class_inheritance_chains is a mapping from class.cname to list(parent1.cname, parent2.cname, ...)
+    # inherited_methods is a mapping from class.cname to list(methods defined in parent classes)
+    classes = sort_inheritance_tree(classes)
+    class_dict = {}
+    for cls in classes:
+        class_dict[cls.cname] = cls
+    inheritance_chains = {}
+    inherited_methods = {}
+    contains_methods_dict = {}
+    for cls in classes:
+        inherited_methods[cls.name] = []
+        inheritance_chains[cls.cname] = []
+        contains_methods_dict[cls.name] = []
+        this_cls = cls
+        while this_cls.extends is not None:
+            inheritance_chains[cls.cname].append(class_dict[this_cls.extends].cname)
+            this_cls = class_dict[this_cls.extends]
+
+    # Include the neccesary headers
+    for cls in classes:
+        if cls.abstract:
+            continue
+        file.write('#include "' + cls.cname + '.h"\n' )
+
+    # Write the macros used to write the pybind11 bindings
+    file.write('\n\n')
+    for cls in classes:
+        contains_methods = cls.write_pybind_macro(file, inherited_methods[cls.name])
+        if len(contains_methods) > 0:
+            file.write('\n')
+        contains_methods_dict[cls.cname] = contains_methods
+        for child, parents in inheritance_chains.items():
+            if cls.cname in parents:
+                inherited_methods[child].extend(contains_methods)
+
+    file.write('\n')
+    # Write the PYBIND11_MODULE definition
+    file.write('namespace py = pybind11;\n')
+    file.write('PYBIND11_MODULE(' + PYBIND11_LIB_NAME + ', handle){\n')
+    file.write('    handle.doc() = "Is this documentation? I have been told it is the best.";\n\n')
+    for cls in classes:
+        use_macros = []
+        use_macros.extend(inheritance_chains[cls.cname])
+        if len(contains_methods_dict[cls.cname]) > 0:
+            use_macros.append(cls.cname)
+        cls.write_pybind_binding(file, use_macros)
+    file.write('}\n')
+    file.close()
+
 def write_class(object):
 
     # Skip over objects in the exclusion list:
@@ -2359,6 +2497,50 @@ def write_fortran_iso_wrapper_single_module():
         
         f.write('END MODULE ' + 'FortranISOWrappers' + '\n')
 
+def sort_inheritance_tree(tree):
+    """
+    Sort a list of elements with the __lt__(self, other) method defined, but where
+        (c < b) & (b < d) != (c < d)
+    This is useful when sorting a list of modules or classes with an inheritance, or USE-structure as e.g.
+            c
+           / \
+          a   b
+              |
+              d
+    Where each element only knows its own parent, and returns (self < other) = False, if 'other' is the
+    elements parent.
+
+    In the above tree, the elements of the list [a, b, c, d] will give
+        c < a : True
+        b < a : True
+        c < d : True
+        b < d : True
+    While *all other comparisons*
+        return False.
+    The corresponding list is ordered as
+        [c, a, b, d] # Order of (a, b) is arbitrary
+    """
+    # Need custom sorting algorithm to handle the fact that we can have
+    # c <= b <= a, while c > a if only a USE'es c. Tested with Pythons sorting algorithm, it didn't work.
+    sorted_tree = [t for t in tree]
+    is_sorted = False
+    while is_sorted is False:
+        is_sorted = True
+        i = 0
+        while i < len(sorted_tree):
+            for j in range(i, len(sorted_tree)):
+                if j == i:
+                    continue
+                if sorted_tree[j] < sorted_tree[i]:
+                    sorted_tree[i], sorted_tree[j] = sorted_tree[j], sorted_tree[i]
+                    is_sorted = False
+                    i = j
+                    break
+            else:
+                i += 1
+
+    return sorted_tree
+
 def sort_module_list(module_list):
     """
     Sort module list based on USE statement dependency
@@ -2387,21 +2569,7 @@ def sort_module_list(module_list):
 
     # Need custom sorting algorithm to handle the fact that we can have
     # c <= b <= a, while c > a if only a USE'es c. Tested with Pythons sorting algorithm, it didn't work.
-    sorted_modules = [Module(mstr) for mstr in module_list]
-    is_sorted = False
-    while is_sorted is False:
-        is_sorted = True
-        i = 0
-        while i < len(sorted_modules):
-            for j in range(i, len(sorted_modules)):
-                if sorted_modules[j] < sorted_modules[i]:
-                    sorted_modules[i], sorted_modules[j] = sorted_modules[j], sorted_modules[i]
-                    is_sorted = False
-                    i = j
-                    break
-            else:
-                i += 1
-
+    sorted_modules = sort_inheritance_tree([Module(mstr) for mstr in module_list])
     return [str(module) for module in sorted_modules]
 
 def write_fortran_iso_wrapper_multiple_modules():
@@ -2574,8 +2742,13 @@ class ConfigurationFile(object):
                 if len(words) != 2:
                     self.bad_decl(line_num + 1)
                     continue
-                elif opts.directory == '.':
-                    opts.directory = words[1]
+                elif self.opts.directory == '.':
+                    self.opts.directory = words[1]
+            elif words[0] in ('-pybind11', '--pybind11-lib-name'):
+                if len(words) != 2:
+                    self.bad_decl(line_num + 1)
+                else:
+                    self.opts.pybind11_lib_name = words[1]
             else:
                 error("Unrecognized declaration in interface file: {}".format(words[0]))
 
@@ -2624,6 +2797,7 @@ class Options(object):
         parser.add_argument('--constants-class', default='FortConstants', help='use CONSTANTS_CLASS as name of the class for wrapping enumerations (default=%(default)s)')
         parser.add_argument('--single-module', action='store_true', help='write all Fortran ISO_C_BINDING wrappers to single module')
         parser.add_argument('--document-all-params', action='store_true', help='write doxygen \\param comment for all arguments')
+        parser.add_argument('-pybind11', '--pybind11-lib-name', default='libnoname', help='Name of the library generated by Pybind11')
         # Not documenting, as this option could be dangerous, although it is
         # protected from -d.  help='remove all wrapper-related files from
         # wrapper code directory before generating new code.  Requires -d.
@@ -2655,7 +2829,8 @@ class Options(object):
 
     def assign_globals(self):
         """Assign certain options to global variables"""
-        global code_output_dir, include_output_dir, fort_output_dir, string_object_type, constants_classname, orphan_classname, file_list
+        global code_output_dir, include_output_dir, fort_output_dir, string_object_type, constants_classname, \
+            orphan_classname, file_list, PYBIND11_LIB_NAME
 
         file_list = self.files
         orphan_classname = self.dummy_class
@@ -2668,6 +2843,7 @@ class Options(object):
         if self.string_out == 'wrapper':
             string_object_type = string_classname
 
+        PYBIND11_LIB_NAME = self.pybind11_lib_name
         constants_classname = self.constants_class
 
 
@@ -2678,6 +2854,7 @@ try:
 
     opts = Options()
     configs = ConfigurationFile(opts)
+    opts = configs.opts
     opts.check_args()
     opts.assign_globals()
     if opts.clean:
@@ -2751,6 +2928,7 @@ def wrap():
         for obj in objects.values():
             write_class(obj)
 
+        write_pybind11_bindings(objects.values())
         write_global_header_file()
         write_misc_defs()
         write_matrix_class()
