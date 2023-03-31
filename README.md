@@ -1,3 +1,29 @@
+# Current workflow for use with fortwrap_thermopack_demo :
+
+First: `pip install -e .`
+
+Navigate to the `fortwrap_thermopack_demo` directory (from now reffered to as `demo`). 
+
+The script `build.sh` does the following:
+
+ * Compile the Fortran source
+ * Build the archive `libdemo_fortran.a`
+ * Move the archive and `.mod` files to the `demo/wrappers` directory
+ * Run `python -m fortwrap -g -i ../FortWrapOptions.txt` from the `demo/src` directory
+ * Compile the resulting `FortranISOWrappers.f90` and add it to the `libdemo_fortran.a` archive
+ * Compile the `.cpp` files in the `demo/wrappers` directory
+ * Compile `demo/main.cpp`
+
+To build the python wrappings, you must additionally run `cmake ..` from the `demo/wrappers/build` directory.
+
+The `demo/wrappers/CMakeLists.txt` does the following:
+
+ * Define the `pybind_module` target
+ * Add the `demo/wrappers/.cpp` files to the target
+    * It is the binding module `pybind11_bindings.cpp` that is used, not `bindings.cpp`
+ * Link to the archive `libdemo_fortran.a`
+ * Link to `libgfortran.dylib`
+
 # FortWrap
 
 FortWrap is a python script that parses Fortran 90/95/2003 source files and

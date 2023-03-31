@@ -446,7 +446,7 @@ class Argument(object):
         Procedure pointers are handled differently since the "present" status can't be stored in the Fortran argument,
         we allow by-val conversion even for optional arguments"""
         return not self.byval and (not self.optional or self.type.proc_pointer) and (not self.type.dt) \
-                and self.intent=='in' and (not self.type.array) and (not self.type.type=='CHARACTER')#  \
+                and self.intent=='in' and (not self.type.array) and (not self.type.type=='CHARACTER') #  \
                 # and (not self.in_abstract)
 
     def fort_only(self):
@@ -503,10 +503,12 @@ class Argument(object):
         is_const = (self.intent=='in' and not self.byval and not self.pass_by_val() and not self.type.matrix)
         return is_const
 
-    def cpp_type(self, value=False):
+    def cpp_type(self, value=False, pybind=False):
         """
         Convert a Fortran type to a C++ type.
         """
+        if pybind is True:
+            return self.pybind_type()
         if self.type.dt:
             return 'ADDRESS'
         elif self.type.valid_primitive():
@@ -531,6 +533,12 @@ class Argument(object):
             return string
         else:
             raise FWTypeException(self.type.type)
+
+    def pybind_type(self):
+        if (self.intent == 'in') or (self.cpp_type(pybind=False) == 'ADDRESS'):
+            return self.cpp_type(pybind=False)
+        cpp_type = self.cpp_type(value=True, pybind=False)
+        return 'py::array_t<' + cpp_type + '>'
 
     def get_iso_c_type(self, ignore_array=False):
         if self.type.type.upper() == 'C_PTR':
@@ -576,7 +584,7 @@ class Argument(object):
                 typename = get_base_class(obj).name + '_container_'
             return '    TYPE(' + typename + '), POINTER :: {}__p\n'.format(self.name)
         elif self.type.proc_pointer:
-            return '    PROCEDURE({}), POINTER :: {}__p => NULL()\n'.format(self.type.type, self.name)
+            return '    PROCEDURE({}), POINTER :: {}__p => nullptr()\n'.format(self.type.type, self.name)
         elif self.type.type == 'CHARACTER':
             return '    CHARACTER({1}), POINTER :: {0}__p\n'.format(self.name, self.type.str_len.as_string())
         elif self.type.type == 'LOGICAL':
@@ -642,7 +650,7 @@ class Procedure(object):
                     warning("Argument exclusions only valid for optional arguments: " + name + ', ' + arg.name)
         # Make ordered argument list
         self.arglist = sorted(self.args.values(), key=lambda arg: arg.pos)
-        # Check for arguments that can have default values of NULL in C++
+        # Check for arguments that can have default values of nullptr in C++
         for arg in reversed(self.arglist):
             # (Assumes the dictionary iteration order is sorted by key)
             if arg.optional:
@@ -661,7 +669,33 @@ class Procedure(object):
                     arg.type.is_array_size = True
                 elif not opts.no_fmat and self.get_matrix_size_parent(arg.name):
                     arg.type.is_matrix_size = True
-            
+
+    def get_pybind_lambda(self, name=None):
+        if name is None:
+            name = self.name
+        leftpad = '            '
+        writestr = '[](Model& self, ' + c_arg_list(self, bind=False, call=False, definition=False, pybind=True) + '){ \\\n'
+        for arg in self.args.values():
+            if arg.pybind_type() != arg.cpp_type():
+                writestr += leftpad + 'auto ' + arg.name + '_bind = ' + arg.name + '.mutable_unchecked(); \\\n'
+        writestr += leftpad + 'self.' + name + '('
+        for arg in self.args.values():
+            if arg.cpp_type() == 'ADDRESS':
+                continue
+            if arg.pybind_type() == arg.cpp_type():
+                writestr += arg.name + ', '
+            else:
+                writestr += arg.name + '_bind.mutable_data(0), '
+        writestr = writestr[:-2] + '); \\\n'# Remove last comma
+
+        writestr += leftpad + '}'
+        for arg in self.args.values():
+            writestr += ', py::arg("' + arg.name + '")'
+            if arg.pybind_type() != arg.cpp_type():
+                writestr += '.noconvert()'
+        writestr += ' \\\n'
+        return writestr
+
     def has_args_past_pos(self, ipos, include_hidden):
         """Query whether or not the argument list continues past pos,
         accounting for c++ optional args
@@ -945,7 +979,16 @@ class DerivedType(object):
                 continue
 
             contains_methods.append(method_name)
-            write_str += '    .def("' + method_name + '", &Model::' + method_name + ') \\' + '\n'
+            leftpad = ''
+            write_str += '    .def("' + method_name + '", '
+            for arg in proc.args.values():
+                if arg.cpp_type() != arg.pybind_type():
+                    write_str += proc.get_pybind_lambda()
+                    leftpad = '        '
+                    break
+            else:
+                write_str += '&Model::' + method_name
+            write_str += leftpad + ') \\' + '\n'
 
         for tbp in self.tbps.values():
             # C++ doesn't support static virtual methods, so don't write DEFERRED, NOPASS methods into the C++ wrapper
@@ -964,7 +1007,16 @@ class DerivedType(object):
                 if tbp.name in inherited_methods:
                     continue
                 contains_methods.append(tbp.name)
-                write_str += '    .def("' + tbp.name + '", &Model::' + tbp.name + ') \\' + '\n'
+                leftpad = ''
+                write_str += '    .def("' + tbp.name + '", '
+                for arg in abstract_interfaces[tbp.interface].args.values():
+                    if arg.cpp_type() != arg.pybind_type():
+                        write_str += abstract_interfaces[tbp.interface].get_pybind_lambda(tbp.name)
+                        leftpad = '        '
+                        break
+                else:
+                    write_str += '&Model::' + tbp.name
+                write_str += leftpad + ') \\' + '\n'
 
         write_str = write_str[:-2] + '\n' # Remove the last line continuation (backslash)
         if len(contains_methods) > 0:
@@ -981,7 +1033,6 @@ class DerivedType(object):
             for fort_ctor in fort_ctors:
                 args = c_arg_list(fort_ctor, bind=False, call=False,definition=False)
                 arglist = args.split(',')
-                print('args are : ', arglist)
                 typelist = [t for t, n in [arg.strip(' ').split(' ') for arg in arglist]]
                 namelist = [n for t, n in [arg.strip(' ').split(' ') for arg in arglist]]
                 f.write('        .def(py::init<' + ', '.join(typelist) + '>(), '
@@ -1727,7 +1778,7 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
         file.write(prefix*' ' + ' */\n')
 
 
-def c_arg_list(proc,bind=False,call=False,definition=True):
+def c_arg_list(proc, bind=False, call=False, definition=True, pybind=False):
     """
     Return the C argument list as a string.  definition: defined as
     opposed to declared (prototype)
@@ -1798,7 +1849,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                             string = string + 'const '
                         string = string + 'std::vector<' + remove_const(arg.cpp_type(value=True)) + '>* '
                     else:
-                        string = string + arg.cpp_type() + ' '
+                        string = string + arg.cpp_type(pybind=pybind) + ' '
                         if not opts.array_as_ptr:
                             # Chop of the * and add [] after the argname below
                             string = string[:-2] + ' '
@@ -1808,7 +1859,8 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                     else:
                         string = string + string_object_type + ' *' # pass by ref not compat with optional
                 else:
-                    string = string + arg.cpp_type() + ' '
+                    print('\t\t(else)')
+                    string = string + arg.cpp_type(pybind=pybind) + ' '
             else:
                 raise FWTypeException(arg.type.type)
         # Change pass-by-value to reference for Fortran
@@ -1822,7 +1874,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             string = string + arg.name + '[]'
         elif (not opts.no_vector) and call and not arg.type.dt and arg.type.vec:
             if arg.optional:
-                string = string + arg.name + ' ? &(*' + arg.name + ')[0] : NULL'
+                string = string + arg.name + ' ? &(*' + arg.name + ')[0] : nullptr'
             else:
                 string = string + '&(*' + arg.name + ')[0]'
         else:
@@ -1834,22 +1886,22 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             # treatment needed here (we just pass along the character
             # array pointer)
             if not (arg.type.str_len.assumed and (arg.intent=='in' or opts.string_out=='c')):
-                # Pass NULL if optional arg not present
-                string = string + ' ? ' + arg.name + '_c__ : NULL'
+                # Pass nullptr if optional arg not present
+                string = string + ' ? ' + arg.name + '_c__ : nullptr'
         # Special handling for matrix arguments
         if call and arg.type.matrix and not opts.no_fmat:
             if arg.optional:
-                string = string + ' ? ' + arg.name + '->data : NULL'
+                string = string + ' ? ' + arg.name + '->data : nullptr'
             else:
                 string = string + '->data'
         # Special native handling of certain types:
         if call and arg.native:
             if arg.optional and arg.cpp_optional:
-                string = string + ' ? ' + arg.name + '->data_ptr : NULL'
+                string = string + ' ? ' + arg.name + '->data_ptr : nullptr'
             else:
                 string = string + '->data_ptr'
         elif not call and not bind and not definition and arg.cpp_optional:
-            string = string + '=NULL'
+            string = string + '=nullptr'
         if proc.has_args_past_pos(ipos, bind or call):
             string = string + ', '
     return string
@@ -2002,7 +2054,7 @@ def write_constructor(file,object,fort_ctor=None):
     else:
         file.write('()')
     file.write(' {\n')
-    file.write('  data_ptr = NULL;\n')
+    file.write('  data_ptr = nullptr;\n')
     # Allocate storage for Fortran derived type
     file.write('  ' + object_allocator_binding_name(object.name) + '(&data_ptr); // Allocate Fortran derived type\n')
     # If present, call Fortran ctor
@@ -2028,10 +2080,10 @@ def write_destructor(file,object):
             target = 'data_ptr'
             prefix = 'if (initialized) ' if init_func_def else ''
             file.write('  ' + prefix + proc.c_binding_name() + '(' + target)
-            # Add NULL for any optional arguments (only optional
+            # Add nullptr for any optional arguments (only optional
             # arguments are allowed in the destructor call)
             for i in range(proc.nargs-1):
-                file.write(', NULL')
+                file.write(', nullptr')
             file.write('); // Fortran Destructor\n')
     # Deallocate Fortran derived type
     file.write('  ' + object_allocator_binding_name(object.name, True) + '(data_ptr); // Deallocate Fortran derived type\n')
@@ -2041,6 +2093,7 @@ def write_pybind11_bindings(classes):
     file = open(include_output_dir + '/pybind11_bindings.cpp', 'w')
     file.write('#include <pybind11/pybind11.h>\n')
     file.write('#include <pybind11/stl.h>\n')
+    file.write('#include <pybind11/numpy.h>\n')
 
     for cls in classes:
         if cls.name.lower() in name_exclusions:
@@ -2116,7 +2169,7 @@ def write_class(object):
     if SWIG:
         # Needs to be before the include's in the case of swig -includeall
         file.write('\n#ifndef SWIG // Protect declarations from SWIG\n')
-    file.write('#include <cstdlib>\n') # Needed for NULL
+    file.write('#include <cstdlib>\n') # Needed for nullptr
     if not opts.no_vector:
         file.write('#include <vector>\n')
     if complex_used:
@@ -2348,7 +2401,7 @@ def write_matrix_class():
     
     write_cpp_dox_comments(f, ['Create a matrix with m rows and n columns','','Allocates new memory'], prefix=2)
     f.write('  ' + matrix_classname + '(int m, int n) {\n')
-    f.write('    data = NULL;\n    assert(m>0 && n>0);\n    nrows=m; ncols=n;\n')
+    f.write('    data = nullptr;\n    assert(m>0 && n>0);\n    nrows=m; ncols=n;\n')
     f.write('    data = (T*) calloc( m*n, sizeof(T) );\n    owns = true;\n  }\n\n')
 
     write_cpp_dox_comments(f, ['Set up a pointer to existing contiguous array data (in Fortran order)'], prefix=2)
@@ -2434,9 +2487,9 @@ class DLLEXPORT $CLASSNAME{
     
     f.write('#include "' + string_classname + '.h"\n\n')
     body = """\
-$CLASSNAME::$CLASSNAME() : length_(0), data_(NULL) {}
+$CLASSNAME::$CLASSNAME() : length_(0), data_(nullptr) {}
 
-$CLASSNAME::$CLASSNAME(size_t length) : length_(length), data_(NULL) {
+$CLASSNAME::$CLASSNAME(size_t length) : length_(length), data_(nullptr) {
   if (length>0) data_ = (char*) calloc(length+1, sizeof(char));
 }
 
