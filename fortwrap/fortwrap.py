@@ -394,7 +394,7 @@ class DataType(object):
         return self.__repr__()
 
 def sanitize_argument_name(name):
-    illegal_names = ['this', 'float', 'double', 'int', 'long', 'nullptr', 'struct', 'new', 'delete']
+    illegal_names = ['this', 'float', 'double', 'int', 'long', 'nullptr', 'struct', 'class', 'new', 'delete']
     if name in illegal_names:
         name = 'c_' + name
     return name
@@ -538,7 +538,17 @@ class Argument(object):
         if (self.intent == 'in') or (self.cpp_type(pybind=False) == 'ADDRESS'):
             return self.cpp_type(pybind=False)
         cpp_type = self.cpp_type(value=True, pybind=False)
-        return 'py::array_t<' + cpp_type + '>'
+        pybind_type = ''
+        if cpp_type == 'float':
+            pybind_type = 'array_f'
+
+        elif cpp_type == 'int':
+            pybind_type = 'array_i'
+
+        if self.optional is True:
+            pybind_type = 'p_' + pybind_type
+
+        return pybind_type
 
     def get_iso_c_type(self, ignore_array=False):
         if self.type.type.upper() == 'C_PTR':
@@ -677,22 +687,32 @@ class Procedure(object):
         writestr = '[](Model& self, ' + c_arg_list(self, bind=False, call=False, definition=False, pybind=True) + '){ \\\n'
         for arg in self.args.values():
             if arg.pybind_type() != arg.cpp_type():
-                writestr += leftpad + 'auto ' + arg.name + '_bind = ' + arg.name + '.mutable_unchecked(); \\\n'
+                if arg.optional is False:
+                    writestr += leftpad + f'auto {arg.name}_bind = {arg.name}.mutable_unchecked().mutable_data(0); \\\n'
+                else:
+                    writestr += leftpad + f'auto {arg.name}_bind = ({arg.name}.has_value()) ? {arg.name}.value().mutable_unchecked().mutable_data(0) : nullptr; \\\n'
         writestr += leftpad + 'self.' + name + '('
         for arg in self.args.values():
             if arg.cpp_type() == 'ADDRESS':
                 continue
             if arg.pybind_type() == arg.cpp_type():
                 writestr += arg.name + ', '
+            elif arg.optional is False:
+                writestr += f'{arg.name}_bind, '
             else:
-                writestr += arg.name + '_bind.mutable_data(0), '
+                writestr += f'&{arg.name}_bind, '
         writestr = writestr[:-2] + '); \\\n'# Remove last comma
 
         writestr += leftpad + '}'
         for arg in self.args.values():
+            if arg.cpp_type() == 'ADDRESS':
+                continue
             writestr += ', py::arg("' + arg.name + '")'
             if arg.pybind_type() != arg.cpp_type():
                 writestr += '.noconvert()'
+            if arg.optional is True:
+                writestr += ' = py::none()'
+            writestr += '\\\n' + leftpad
         writestr += ' \\\n'
         return writestr
 
@@ -1842,7 +1862,7 @@ def c_arg_list(proc, bind=False, call=False, definition=True, pybind=False):
                 elif not bind and arg.pass_by_val():
                     string = string + arg.cpp_type(value=True) + ' '
                 elif not arg.type.dt and arg.type.vec:
-                    if not bind and not opts.no_vector:
+                    if (not bind) and (not opts.no_vector) and not (arg.intent != 'in' and pybind):
                         if arg.intent=='in':
                             # const is manually removed inside <>, so
                             # add it before the type declaration
@@ -1850,7 +1870,7 @@ def c_arg_list(proc, bind=False, call=False, definition=True, pybind=False):
                         string = string + 'std::vector<' + remove_const(arg.cpp_type(value=True)) + '>* '
                     else:
                         string = string + arg.cpp_type(pybind=pybind) + ' '
-                        if not opts.array_as_ptr:
+                        if not opts.array_as_ptr and not pybind:
                             # Chop of the * and add [] after the argname below
                             string = string[:-2] + ' '
                 elif arg.type.type=='CHARACTER' and not bind and not arg.intent=='in':
@@ -1859,7 +1879,6 @@ def c_arg_list(proc, bind=False, call=False, definition=True, pybind=False):
                     else:
                         string = string + string_object_type + ' *' # pass by ref not compat with optional
                 else:
-                    print('\t\t(else)')
                     string = string + arg.cpp_type(pybind=pybind) + ' '
             else:
                 raise FWTypeException(arg.type.type)
@@ -1900,7 +1919,7 @@ def c_arg_list(proc, bind=False, call=False, definition=True, pybind=False):
                 string = string + ' ? ' + arg.name + '->data_ptr : nullptr'
             else:
                 string = string + '->data_ptr'
-        elif not call and not bind and not definition and arg.cpp_optional:
+        elif not call and not bind and not definition and not pybind and arg.cpp_optional:
             string = string + '=nullptr'
         if proc.has_args_past_pos(ipos, bind or call):
             string = string + ', '
@@ -2126,6 +2145,10 @@ def write_pybind11_bindings(classes):
             continue
         file.write('#include "' + cls.cname + '.h"\n' )
 
+    file.write('namespace py = pybind11;\n')
+    file.write('using array_f = pybind11::array_t<float, pybind11::array::c_style | pybind11::array::forcecast>;')
+    file.write('using p_array_f = std::optional<pybind11::array_t<float, pybind11::array::c_style | pybind11::array::forcecast>>;')
+
     # Write the macros used to write the pybind11 bindings
     file.write('\n\n')
     for cls in classes:
@@ -2139,7 +2162,6 @@ def write_pybind11_bindings(classes):
 
     file.write('\n')
     # Write the PYBIND11_MODULE definition
-    file.write('namespace py = pybind11;\n')
     file.write('PYBIND11_MODULE(' + PYBIND11_LIB_NAME + ', handle){\n')
     file.write('    handle.doc() = "Is this documentation? I have been told it is the best.";\n\n')
     for cls in classes:
@@ -2802,6 +2824,8 @@ class ConfigurationFile(object):
                     self.bad_decl(line_num + 1)
                 else:
                     self.opts.pybind11_lib_name = words[1]
+            elif words[0] == '--no-vector':
+                self.opts.no_vector = True
             else:
                 error("Unrecognized declaration in interface file: {}".format(words[0]))
 
