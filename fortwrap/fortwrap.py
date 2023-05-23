@@ -43,7 +43,7 @@ import warnings
 VERSION = '2.2.2'
 
 # SETTINGS ==========================================
-opts, configs, file_list = None, None, None # To be set by argv when calling wrap()
+opts, file_list = None, None # To be set by argv when calling wrap()
 
 ERROR_FILE_NAME = 'FortWrap-error.txt'
 
@@ -519,6 +519,8 @@ class Argument(object):
             string = prefix + cpp_type_map[self.type.type.upper()][self.type.kind]
             if value or self.byval:
                 return string[:-1] # Strip "*"
+            elif self.optional:
+                return string + '*'
             else:
                 return string
         elif self.type.proc_pointer and self.type.type in abstract_interfaces:
@@ -1858,7 +1860,7 @@ def c_arg_list(proc, bind=False, call=False, definition=True, pybind=False):
                         string = string + 'const '
                     string = string + matrix_classname + '<' + arg.cpp_type(value=True) + '> *'
                 elif not bind and arg.native:
-                    string = string + arg.type.type + '* '
+                    string = string + arg.type.type + '** '
                 elif not bind and arg.pass_by_val():
                     string = string + arg.cpp_type(value=True) + ' '
                 elif not arg.type.dt and arg.type.vec:
@@ -2143,11 +2145,11 @@ def write_pybind11_bindings(classes):
     for cls in classes:
         if cls.abstract:
             continue
-        file.write('#include "' + cls.cname + '.h"\n' )
+        file.write(f'#include "{cls.cname}.h"\n' )
 
     file.write('namespace py = pybind11;\n')
-    file.write('using array_f = pybind11::array_t<float, pybind11::array::c_style | pybind11::array::forcecast>;')
-    file.write('using p_array_f = std::optional<pybind11::array_t<float, pybind11::array::c_style | pybind11::array::forcecast>>;')
+    file.write('using array_f = pybind11::array_t<float, pybind11::array::c_style | pybind11::array::forcecast>;\n')
+    file.write('using p_array_f = std::optional<pybind11::array_t<float, pybind11::array::c_style | pybind11::array::forcecast>>;\n')
 
     # Write the macros used to write the pybind11 bindings
     file.write('\n\n')
@@ -2712,20 +2714,54 @@ def internal_error():
     sys.exit(1)
 
 
-# Class for parsing the configuration file
-class ConfigurationFile(object):
-    def __init__(self, opts):
-        global include_files, include_procedures, exclude_files, exclude_procedures,\
-                include_files_pattern, include_procedures_pattern, exclude_files_pattern, exclude_procedures_pattern
-        self.opts = opts
-        self.fname = opts.config_file
-        if self.fname is not None:
+# Class for parsing command line options and config file
+# Options supplied on the command line will override options supplied in the config file.
+class Options:
+    def __init__(self):
+        global include_files_pattern, include_procedures_pattern, exclude_files_pattern, exclude_procedures_pattern,\
+            include_files, include_procedures, exclude_files, exclude_procedures
+
+        self.parser = argparse.ArgumentParser(prog='fortwrap')
+        self.parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + VERSION)
+        self.parser.add_argument('-i', '--config-file', help='read interface configuration file CONFIG_FILE. Options supplied on the command line will overrule those in the config file.')
+        self.parser.add_argument('files', nargs='*', help='files to process')
+        self.parser.add_argument('-n', '--dry-run', action='store_true', help='run parser but do not generate any wrapper code (dry run)')
+        self.parser.add_argument('-g', '--glob', action='store_true', help='wrap source files found in current directory')
+        self.parser.add_argument('-d', '--directory', default='.', help='output generated wrapper code to DIRECTORY')
+        self.parser.add_argument('--file-list', help='Read list of Fortran source files to parser from file FILE_LIST.  The format is a newline-separated list of filenames with full or relative paths.')
+        self.parser.add_argument('--no-vector', action='store_true', help='wrap 1-D array arguments as C-style arrays instead of C++ std::vector containers')
+        self.parser.add_argument('--no-fmat', action='store_true', help='do not wrap 2-D array arguments with the FortranMatrix type')
+        self.parser.add_argument('--array-as-ptr', action='store_true', help="wrap 1-D arrays with '*' instead of '[]'.  Implies --no-vector")
+        self.parser.add_argument('--string-out', choices=['c++', 'c', 'wrapper'], default='c++')
+        # parser.add_argument('--no-std-string', action='store_true', help='wrap character outputs using a wrapper class instead of std::string')
+        self.parser.add_argument('--dummy-class', default='FortFuncs', help='use DUMMY_CLASS as the name of the dummy class used to wrap non-method procedures')
+        self.parser.add_argument('--global-funcs', action='store_true', help='wrap non-method procedures as global functions instead of static methods of a dummy class')
+        self.parser.add_argument('--no-orphans', action='store_true', help='do not by default wrap non-method procedures.  They can still be wrapped by using %%include directives')
+        self.parser.add_argument('--no-W-not-wrapped', action='store_true', help='do not warn about procedures that were not wrapped')
+        self.parser.add_argument('--main-header', default='FortWrap', help='Use MAIN_HEADER as name of the main header file (default=%(default)s)')
+        self.parser.add_argument('--constants-class', default='FortConstants', help='use CONSTANTS_CLASS as name of the class for wrapping enumerations (default=%(default)s)')
+        self.parser.add_argument('--single-module', action='store_true', help='write all Fortran ISO_C_BINDING wrappers to single module')
+        self.parser.add_argument('--document-all-params', action='store_true', help='write doxygen \\param comment for all arguments')
+        self.parser.add_argument('-pybind11', '--pybind11-lib-name', default='libnoname', help='Name of the library generated by Pybind11')
+        # Not documenting, as this option could be dangerous, although it is
+        # protected from -d.  help='remove all wrapper-related files from
+        # wrapper code directory before generating new code.  Requires -d.
+        # Warning: this deletes files.  Use with caution and assume it will
+        # delete everything in the wrapper directory'
+        self.parser.add_argument('--clean', action='store_true', help=argparse.SUPPRESS)
+
+        # First parse to get the config file, then parse the config file, then parse command line again
+        # to overwrite arguments that are supplied both on the command line and in the config file
+        self.parser.parse_args(namespace=self)
+        if self.config_file is not None:
             try:
-                self.f = open(self.fname)
+                config_file_handle = open(self.config_file)
+                config_file_parser_args = self.process_config_file(config_file_handle)
+                self.parser.parse_args(config_file_parser_args, namespace=self)
             except:
-                error("Error opening interface file: " + self.fname)
+                error("Error opening interface file: " + self.config_file)
                 return
-            self.process()
+
         else:
             include_files.add('.*')
             include_procedures.add('.*')
@@ -2737,12 +2773,20 @@ class ConfigurationFile(object):
         exclude_files_pattern = re.compile('|'.join(exclude_files))
         exclude_procedures_pattern = re.compile('|'.join(exclude_procedures))
 
-
-    def process(self):
+        self.parser.parse_args(namespace=self)
+        self.check_args()
+        self.assign_globals()
+    
+    def process_config_file(self, config_file_handle):
         global name_exclusions, name_inclusions, name_substitutions, ctor_def, dtor_def, init_func_def, \
                 include_files, exclude_files, include_procedures, exclude_procedures
-        for line_num,line in enumerate(self.f):
+
+        config_file_parser_args = []
+        for line_num,line in enumerate(config_file_handle):
             if not (line.startswith('%') or line.startswith('-') or line.startswith('--')):
+                continue
+            if line.startswith('-') or line.startswith('--'):
+                config_file_parser_args.extend(line.strip().split())
                 continue
             words = [w.lower() for w in line.split()]
             if words[0] == '%ignore':
@@ -2772,9 +2816,9 @@ class ConfigurationFile(object):
             elif words[0] == '%exclude_procedures':
                 if len(words) > 1:
                     for w in words[1:]:
-                        include_procedures.add(w)
+                        exclude_procedures.add(w)
                 else:
-                    include_procedures.add('')
+                    exclude_procedures.add('')
             elif words[0] == '%hide':
                 if len(words) == 3:
                     proc_arg_exclusions.add( tuple(words[1:]) )
@@ -2813,19 +2857,6 @@ class ConfigurationFile(object):
                 dtor_def = re.compile(line.strip().split('%dtor ')[1], re.IGNORECASE)
             elif words[0] == '%init':
                 init_func_def = re.compile(line.strip().split('%init ')[1], re.IGNORECASE)
-            elif words[0] in ('-d', '--directory'):
-                if len(words) != 2:
-                    self.bad_decl(line_num + 1)
-                    continue
-                elif self.opts.directory == '.':
-                    self.opts.directory = words[1]
-            elif words[0] in ('-pybind11', '--pybind11-lib-name'):
-                if len(words) != 2:
-                    self.bad_decl(line_num + 1)
-                else:
-                    self.opts.pybind11_lib_name = words[1]
-            elif words[0] == '--no-vector':
-                self.opts.no_vector = True
             else:
                 error("Unrecognized declaration in interface file: {}".format(words[0]))
 
@@ -2838,55 +2869,20 @@ class ConfigurationFile(object):
         if len(exclude_files) == 0:
             exclude_files.add('a^')
 
-                
-    def bad_decl(self,line_num):
-        error("{}, line {} <-- bad declaration".format(self.fname, line_num))
+        return config_file_parser_args
 
-
-# Class for parsing command line options
-class Options(object):
-    def __init__(self):
-        self.parse_args()
-        self.check_args()
-        self.assign_globals()
-    
-    def parse_args(self):
-        """Use argparse to parse command arguments"""
-
-        parser = argparse.ArgumentParser(prog='fortwrap')
-        parser.add_argument('-v','--version', action='version', version='%(prog)s '+VERSION)
-        parser.add_argument('files', nargs='*', help='files to process')
-        parser.add_argument('-n', '--dry-run', action='store_true', help='run parser but do not generate any wrapper code (dry run)')
-        parser.add_argument('-g','--glob', action='store_true', help='wrap source files found in current directory')
-        parser.add_argument('-d','--directory', default='.', help='output generated wrapper code to DIRECTORY')
-        parser.add_argument('--file-list', help='Read list of Fortran source files to parser from file FILE_LIST.  The format is a newline-separated list of filenames with full or relative paths.')
-        parser.add_argument('-i', '--config-file', help='read interface configuration file CONFIG_FILE')
-        parser.add_argument('--no-vector', action='store_true', help='wrap 1-D array arguments as C-style arrays instead of C++ std::vector containers')
-        parser.add_argument('--no-fmat', action='store_true', help='do not wrap 2-D array arguments with the FortranMatrix type')
-        parser.add_argument('--array-as-ptr', action='store_true', help="wrap 1-D arrays with '*' instead of '[]'.  Implies --no-vector")
-        parser.add_argument('--string-out', choices=['c++','c','wrapper'], default='c++')
-        #parser.add_argument('--no-std-string', action='store_true', help='wrap character outputs using a wrapper class instead of std::string')
-        parser.add_argument('--dummy-class', default='FortFuncs', help='use DUMMY_CLASS as the name of the dummy class used to wrap non-method procedures')
-        parser.add_argument('--global-funcs', action='store_true', help='wrap non-method procedures as global functions instead of static methods of a dummy class')
-        parser.add_argument('--no-orphans', action='store_true', help='do not by default wrap non-method procedures.  They can still be wrapped by using %%include directives')
-        parser.add_argument('--no-W-not-wrapped', action='store_true', help='do not warn about procedures that were not wrapped')
-        parser.add_argument('--main-header', default='FortWrap', help='Use MAIN_HEADER as name of the main header file (default=%(default)s)')
-        parser.add_argument('--constants-class', default='FortConstants', help='use CONSTANTS_CLASS as name of the class for wrapping enumerations (default=%(default)s)')
-        parser.add_argument('--single-module', action='store_true', help='write all Fortran ISO_C_BINDING wrappers to single module')
-        parser.add_argument('--document-all-params', action='store_true', help='write doxygen \\param comment for all arguments')
-        parser.add_argument('-pybind11', '--pybind11-lib-name', default='libnoname', help='Name of the library generated by Pybind11')
-        # Not documenting, as this option could be dangerous, although it is
-        # protected from -d.  help='remove all wrapper-related files from
-        # wrapper code directory before generating new code.  Requires -d.
-        # Warning: this deletes files.  Use with caution and assume it will
-        # delete everything in the wrapper directory'
-        parser.add_argument('--clean', action='store_true', help=argparse.SUPPRESS)
-
-        parser.parse_args(namespace=self)
+    def bad_decl(self, line_num):
+        error("{}, line {} <-- bad declaration".format(self.config_file, line_num))
 
     def check_args(self):
         """Additional validity checking an value setting not done automatically by argparse"""
-        if self.directory != '.':
+        # Ensuring absolute path, because if you 'pip install -e' the relative path will be relative to the location
+        # of the actual file, not the cwd or the symlink.
+        if self.directory == '.':
+            self.directory = os.getcwd()
+        else:
+            if self.directory[:2] == '..':
+                self.directory = os.getcwd() + '/' + self.directory
             if not os.path.isdir(self.directory):
                 error('Directory does not exist: ' + self.directory)
                 sys.exit(2)
@@ -2930,9 +2926,6 @@ try:
     file_list = []
 
     opts = Options()
-    configs = ConfigurationFile(opts)
-    opts = configs.opts
-    opts.check_args()
     opts.assign_globals()
     if opts.clean:
         clean_directories()
