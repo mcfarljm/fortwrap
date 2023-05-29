@@ -11,6 +11,26 @@ Currently, FortWrap is targetted at the gfortran compiler,
 but the generated C++ code should work with any C++ compiler,
 including g++.
 
+# Current working example
+
+FortWrap is being used to develop a Fortran <=> C++ <=> Python wrapper for [ThermoPack](https://github.com/thermotools/thermopack). To see the most up-to-date usage of FortWrap (the `iso_c_bindings` branch at the moment of writing) for this purpose, see the [prototype](https://github.com/thermotools/thermopack/tree/prototype) or [beta_v3](https://github.com/thermotools/thermopack/tree/beta_v3) branches there.
+
+# Installing
+
+Since FortWrap is pure Python, it is simply installed by running
+
+```bash
+pip install .
+```
+
+from the top level directory (where `setup.py` is found). If you are actively developing FortWrap, use
+
+```bash
+pip install -e .
+```
+
+to create a symlink to the package instead of a hard copy.
+
 ## News
 
 The wrapping approach is currently being reworked to use

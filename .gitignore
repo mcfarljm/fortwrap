@@ -3,3 +3,6 @@
 wrap/
 prog
 *.exe
+venv/
+.idea/
+fortwrap.egg-info/

@@ -12,6 +12,9 @@
 # Run fortwrap.py -h for usage information
 
 from __future__ import print_function
+
+import copy
+
 # These imports were added by futurize.  In Python 2, the builtins
 # module requires the "future" package.  These imports allow python 2
 # to use the newer versions of the functions.  However, the code will
@@ -34,18 +37,19 @@ from datetime import date
 import sys
 import os
 import traceback
+import warnings
 
 
 VERSION = '2.2.2'
 
-
 # SETTINGS ==========================================
+opts, file_list = None, None # To be set by argv when calling wrap()
 
 ERROR_FILE_NAME = 'FortWrap-error.txt'
 
-code_output_dir = '.'
-include_output_dir = '.'
-fort_output_dir = '.'
+code_output_dir = ''
+include_output_dir = ''
+fort_output_dir = ''
 
 HEADER_STRING = '/* This source file automatically generated on ' + str(date.today()) + ' using \n   FortWrap wrapper generator version ' + VERSION + ' */\n'
 
@@ -59,7 +63,7 @@ constants_classname = 'FortConstants'
 
 SWIG = True  # Whether or not to include preprocessor defs that will
              # be used by swig
-
+PYBIND11_LIB_NAME = 'libnoname'
 # Macros to define DLLEXPORT, needed with MSC compiler
 DLLEXPORT_MACRO = """#ifdef _MSC_VER
 #define DLLEXPORT __declspec(dllexport)
@@ -135,6 +139,14 @@ name_inclusions = set()
 proc_arg_exclusions = set()
 interface_defs = dict() # module -> proc name -> generic interface
 nopass_tbps = dict() # (module.lower,procname.lower) -> TypeBoundProcedure, for all TBP's with NOPASS attribute
+include_files = set()
+include_files_pattern = re.compile('')
+exclude_files = set()
+exclude_files_pattern = re.compile('')
+include_procedures = set()
+include_procedures_pattern = re.compile('')
+exclude_procedures = set()
+exclude_procedures_pattern = re.compile('')
 
 # 'INT' is for the hidden name length argument
 cpp_type_map = {'INTEGER':
@@ -375,10 +387,22 @@ class DataType(object):
         type_map = cpp_type_map.get(self.type)
         return type_map and self.kind.upper() in type_map
 
+    def __repr__(self):
+        return self.type
+
+    def __str__(self):
+        return self.__repr__()
+
+def sanitize_argument_name(name):
+    illegal_names = ['this', 'float', 'double', 'int', 'long', 'nullptr', 'struct', 'class', 'new', 'delete']
+    if name in illegal_names:
+        name = 'c_' + name
+    return name
+
 class Argument(object):
     def __init__(self,name,pos,type=None,optional=False,intent='inout',byval=False,allocatable=False,pointer=False,comment=[]):
         global string_class_used
-        self.name = name
+        self.name = sanitize_argument_name(name)
         self.pos = pos # Zero-indexed
         self.type = type
         self.comment = comment
@@ -419,8 +443,11 @@ class Argument(object):
 
         Don't count Fortran arguments having the VALUE attribute, since they are already passed by value
 
-        Procedure pointers are handled differently since the "present" status can't be stored in the Fortran argument, we allow by-val conversion even for optional arguments"""
-        return not self.byval and (not self.optional or self.type.proc_pointer) and not self.type.dt and self.intent=='in' and not self.type.array and not self.type.type=='CHARACTER' and not self.in_abstract
+        Procedure pointers are handled differently since the "present" status can't be stored in the Fortran argument,
+        we allow by-val conversion even for optional arguments"""
+        return not self.byval and (not self.optional or self.type.proc_pointer) and (not self.type.dt) \
+                and self.intent=='in' and (not self.type.array) and (not self.type.type=='CHARACTER') #  \
+                # and (not self.in_abstract)
 
     def fort_only(self):
         """Whether argument is not wrappable"""
@@ -473,12 +500,15 @@ class Argument(object):
         # FortranMatrix<const double>.  Exclude pass_by_val for
         # aesthetic reasons (to keep const from being applied to
         # non-pointer arguments in method definitions)
-        return self.intent=='in' and not self.byval and not self.pass_by_val() and not self.type.matrix
+        is_const = (self.intent=='in' and not self.byval and not self.pass_by_val() and not self.type.matrix)
+        return is_const
 
-    def cpp_type(self, value=False):
+    def cpp_type(self, value=False, pybind=False):
         """
         Convert a Fortran type to a C++ type.
         """
+        if pybind is True:
+            return self.pybind_type()
         if self.type.dt:
             return 'ADDRESS'
         elif self.type.valid_primitive():
@@ -489,6 +519,8 @@ class Argument(object):
             string = prefix + cpp_type_map[self.type.type.upper()][self.type.kind]
             if value or self.byval:
                 return string[:-1] # Strip "*"
+            elif self.optional:
+                return string + '*'
             else:
                 return string
         elif self.type.proc_pointer and self.type.type in abstract_interfaces:
@@ -503,6 +535,22 @@ class Argument(object):
             return string
         else:
             raise FWTypeException(self.type.type)
+
+    def pybind_type(self):
+        if (self.intent == 'in') or (self.cpp_type(pybind=False) == 'ADDRESS'):
+            return self.cpp_type(pybind=False)
+        cpp_type = self.cpp_type(value=True, pybind=False)
+        pybind_type = ''
+        if cpp_type == 'float':
+            pybind_type = 'array_f'
+
+        elif cpp_type == 'int':
+            pybind_type = 'array_i'
+
+        if self.optional is True:
+            pybind_type = 'p_' + pybind_type
+
+        return pybind_type
 
     def get_iso_c_type(self, ignore_array=False):
         if self.type.type.upper() == 'C_PTR':
@@ -548,7 +596,7 @@ class Argument(object):
                 typename = get_base_class(obj).name + '_container_'
             return '    TYPE(' + typename + '), POINTER :: {}__p\n'.format(self.name)
         elif self.type.proc_pointer:
-            return '    PROCEDURE({}), POINTER :: {}__p => NULL()\n'.format(self.type.type, self.name)
+            return '    PROCEDURE({}), POINTER :: {}__p => nullptr()\n'.format(self.type.type, self.name)
         elif self.type.type == 'CHARACTER':
             return '    CHARACTER({1}), POINTER :: {0}__p\n'.format(self.name, self.type.str_len.as_string())
         elif self.type.type == 'LOGICAL':
@@ -577,6 +625,12 @@ class Argument(object):
             return '    {1}{0} = C_FUNLOC({0}__p)\n'.format(self.name, present)
         return ''
 
+    def __repr__(self):
+        return '[' + str(self.type) + ', intent(' + self.intent + ') :: ' + self.name + '] => [' \
+               + self.cpp_type() + ' ' + self.name + ']'
+
+    def __str(self):
+        return self.__repr__()
 
 class Procedure(object):
     def __init__(self,name,args,method,retval=None,comment=None,nopass=False):
@@ -608,7 +662,7 @@ class Procedure(object):
                     warning("Argument exclusions only valid for optional arguments: " + name + ', ' + arg.name)
         # Make ordered argument list
         self.arglist = sorted(self.args.values(), key=lambda arg: arg.pos)
-        # Check for arguments that can have default values of NULL in C++
+        # Check for arguments that can have default values of nullptr in C++
         for arg in reversed(self.arglist):
             # (Assumes the dictionary iteration order is sorted by key)
             if arg.optional:
@@ -627,7 +681,43 @@ class Procedure(object):
                     arg.type.is_array_size = True
                 elif not opts.no_fmat and self.get_matrix_size_parent(arg.name):
                     arg.type.is_matrix_size = True
-            
+
+    def get_pybind_lambda(self, name=None):
+        if name is None:
+            name = self.name
+        leftpad = '            '
+        writestr = '[](Model& self, ' + c_arg_list(self, bind=False, call=False, definition=False, pybind=True) + '){ \\\n'
+        for arg in self.args.values():
+            if arg.pybind_type() != arg.cpp_type():
+                if arg.optional is False:
+                    writestr += leftpad + f'auto {arg.name}_bind = {arg.name}.mutable_unchecked().mutable_data(0); \\\n'
+                else:
+                    writestr += leftpad + f'auto {arg.name}_bind = ({arg.name}.has_value()) ? {arg.name}.value().mutable_unchecked().mutable_data(0) : nullptr; \\\n'
+        writestr += leftpad + 'self.' + name + '('
+        for arg in self.args.values():
+            if arg.cpp_type() == 'ADDRESS':
+                continue
+            if arg.pybind_type() == arg.cpp_type():
+                writestr += arg.name + ', '
+            elif arg.optional is False:
+                writestr += f'{arg.name}_bind, '
+            else:
+                writestr += f'&{arg.name}_bind, '
+        writestr = writestr[:-2] + '); \\\n'# Remove last comma
+
+        writestr += leftpad + '}'
+        for arg in self.args.values():
+            if arg.cpp_type() == 'ADDRESS':
+                continue
+            writestr += ', py::arg("' + arg.name + '")'
+            if arg.pybind_type() != arg.cpp_type():
+                writestr += '.noconvert()'
+            if arg.optional is True:
+                writestr += ' = py::none()'
+            writestr += '\\\n' + leftpad
+        writestr += ' \\\n'
+        return writestr
+
     def has_args_past_pos(self, ipos, include_hidden):
         """Query whether or not the argument list continues past pos,
         accounting for c++ optional args
@@ -890,7 +980,105 @@ class DerivedType(object):
         f.write('  END SUBROUTINE ' + object_allocator_binding_name(self.name, True) + '\n\n')
 
         return comment_written
-        
+
+    def write_pybind_macro(self, f, inherited_methods):
+
+        contains_methods = []
+        write_str = '#define ' + self.cname + '_bindings(Model) \\' + '\n'
+        for proc in self.procs:
+            if proc.ctor or (proc.dtor and not proc.name.lower() in name_inclusions):
+                continue
+            # Get the C++ method name
+            if proc.tbp:
+                method_name = proc.tbp.name
+            elif dfrd_tbp:
+                # proc is the abstract interface for a deferred tbp
+                method_name = dfrd_tbp.name
+            else:
+                method_name = translate_name(proc.name)
+
+            if method_name in inherited_methods:
+                continue
+
+            contains_methods.append(method_name)
+            leftpad = ''
+            write_str += '    .def("' + method_name + '", '
+            for arg in proc.args.values():
+                if arg.cpp_type() != arg.pybind_type():
+                    write_str += proc.get_pybind_lambda()
+                    leftpad = '        '
+                    break
+            else:
+                write_str += '&Model::' + method_name
+            write_str += leftpad + ') \\' + '\n'
+
+        for tbp in self.tbps.values():
+            # C++ doesn't support static virtual methods, so don't write DEFERRED, NOPASS methods into the C++ wrapper
+            if not (tbp.deferred and not tbp.nopass):
+                # Note: this lookup doesn't respect the module USE
+                # hierarchy and could potentially point to wrong
+                # abstract_interfaces if the project contains multiple
+                # abstract_interfaces with different names, in different
+                # modules
+                continue
+            if tbp.interface not in abstract_interfaces:
+                error(
+                    'abstract interface {0} for type bound procedure {1} not found (may not be interoperable)'.format(
+                        tbp.interface, tbp.name))
+            else:
+                if tbp.name in inherited_methods:
+                    continue
+                contains_methods.append(tbp.name)
+                leftpad = ''
+                write_str += '    .def("' + tbp.name + '", '
+                for arg in abstract_interfaces[tbp.interface].args.values():
+                    if arg.cpp_type() != arg.pybind_type():
+                        write_str += abstract_interfaces[tbp.interface].get_pybind_lambda(tbp.name)
+                        leftpad = '        '
+                        break
+                else:
+                    write_str += '&Model::' + tbp.name
+                write_str += leftpad + ') \\' + '\n'
+
+        write_str = write_str[:-2] + '\n' # Remove the last line continuation (backslash)
+        if len(contains_methods) > 0:
+            f.write(write_str)
+
+        return contains_methods
+
+    def write_pybind_binding(self, f, use_macros):
+        if self.abstract:
+            return
+        f.write('    py::class_<' + self.cname + '>(handle, "' + self.cname + '") \n')
+        fort_ctors = self.ctor_list()
+        if fort_ctors:
+            for fort_ctor in fort_ctors:
+                args = c_arg_list(fort_ctor, bind=False, call=False,definition=False)
+                arglist = args.split(',')
+                typelist = [t for t, n in [arg.strip(' ').split(' ') for arg in arglist]]
+                namelist = [n for t, n in [arg.strip(' ').split(' ') for arg in arglist]]
+                f.write('        .def(py::init<' + ', '.join(typelist) + '>(), '
+                        + ', '.join(['py::arg("' + n + '")' for n in namelist]) + ') \n')
+                # file.write('  ' + object.cname + '(' + c_arg_list(fort_ctor, bind=False, call=False,
+                #                                                   definition=False) + ');\n')
+
+        for parent in use_macros[:-1]:
+            f.write('        ' + parent + '_bindings(' + self.cname + ') \n')
+        f.write('        ' + use_macros[-1] + '_bindings(' + self.cname + '); \n\n') # Macro for methods defined in this
+
+    def __repr__(self):
+        return self.cname
+
+    def __str__(self):
+        return self.__repr__()
+    def __lt__(self, other):
+        if self.cname == other.extends:
+            return True
+        return False
+    def __eq__(self, other):
+        if not isinstance(other, DerivedType):
+            return False
+        return (self.name == other.name) & (self.module == other.module)
 
 class TypeBoundProcedure(object):
     def __init__(self, name, obj, procname, interface, deferred, nopass):
@@ -1158,8 +1346,7 @@ def parse_proc(file,line,abstract=False):
     """
     global dox_comments, abstract_interfaces, module_proc_num, not_wrapped
     # Store in case decide to overwrite them when parsing arg comments
-    proc_comments = dox_comments 
-
+    proc_comments = dox_comments
     # First check for line continuation:
     line = file.join_lines(line)
     proc_name = line.split('(')[0].split()[-1]
@@ -1171,7 +1358,6 @@ def parse_proc(file,line,abstract=False):
     else:
         arg_list_lower = []
     args = dict()
-    #print arg_list_lower
     retval = None
     if re.match('^\s*function', line, re.IGNORECASE):
         m = result_name_def.match(line)
@@ -1614,7 +1800,7 @@ def write_cpp_dox_comments(file, comments, arglist=None, retval=None, prefix=0):
         file.write(prefix*' ' + ' */\n')
 
 
-def c_arg_list(proc,bind=False,call=False,definition=True):
+def c_arg_list(proc, bind=False, call=False, definition=True, pybind=False):
     """
     Return the C argument list as a string.  definition: defined as
     opposed to declared (prototype)
@@ -1674,19 +1860,19 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                         string = string + 'const '
                     string = string + matrix_classname + '<' + arg.cpp_type(value=True) + '> *'
                 elif not bind and arg.native:
-                    string = string + arg.type.type + '* '
+                    string = string + arg.type.type + '** '
                 elif not bind and arg.pass_by_val():
                     string = string + arg.cpp_type(value=True) + ' '
                 elif not arg.type.dt and arg.type.vec:
-                    if not bind and not opts.no_vector:
+                    if (not bind) and (not opts.no_vector) and not (arg.intent != 'in' and pybind):
                         if arg.intent=='in':
                             # const is manually removed inside <>, so
                             # add it before the type declaration
                             string = string + 'const '
                         string = string + 'std::vector<' + remove_const(arg.cpp_type(value=True)) + '>* '
                     else:
-                        string = string + arg.cpp_type() + ' '
-                        if not opts.array_as_ptr:
+                        string = string + arg.cpp_type(pybind=pybind) + ' '
+                        if not opts.array_as_ptr and not pybind:
                             # Chop of the * and add [] after the argname below
                             string = string[:-2] + ' '
                 elif arg.type.type=='CHARACTER' and not bind and not arg.intent=='in':
@@ -1695,7 +1881,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
                     else:
                         string = string + string_object_type + ' *' # pass by ref not compat with optional
                 else:
-                    string = string + arg.cpp_type() + ' '
+                    string = string + arg.cpp_type(pybind=pybind) + ' '
             else:
                 raise FWTypeException(arg.type.type)
         # Change pass-by-value to reference for Fortran
@@ -1709,7 +1895,7 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             string = string + arg.name + '[]'
         elif (not opts.no_vector) and call and not arg.type.dt and arg.type.vec:
             if arg.optional:
-                string = string + arg.name + ' ? &(*' + arg.name + ')[0] : NULL'
+                string = string + arg.name + ' ? &(*' + arg.name + ')[0] : nullptr'
             else:
                 string = string + '&(*' + arg.name + ')[0]'
         else:
@@ -1721,22 +1907,22 @@ def c_arg_list(proc,bind=False,call=False,definition=True):
             # treatment needed here (we just pass along the character
             # array pointer)
             if not (arg.type.str_len.assumed and (arg.intent=='in' or opts.string_out=='c')):
-                # Pass NULL if optional arg not present
-                string = string + ' ? ' + arg.name + '_c__ : NULL'
+                # Pass nullptr if optional arg not present
+                string = string + ' ? ' + arg.name + '_c__ : nullptr'
         # Special handling for matrix arguments
         if call and arg.type.matrix and not opts.no_fmat:
             if arg.optional:
-                string = string + ' ? ' + arg.name + '->data : NULL'
+                string = string + ' ? ' + arg.name + '->data : nullptr'
             else:
                 string = string + '->data'
         # Special native handling of certain types:
         if call and arg.native:
             if arg.optional and arg.cpp_optional:
-                string = string + ' ? ' + arg.name + '->data_ptr : NULL'
+                string = string + ' ? ' + arg.name + '->data_ptr : nullptr'
             else:
                 string = string + '->data_ptr'
-        elif not call and not bind and not definition and arg.cpp_optional:
-            string = string + '=NULL'
+        elif not call and not bind and not definition and not pybind and arg.cpp_optional:
+            string = string + '=nullptr'
         if proc.has_args_past_pos(ipos, bind or call):
             string = string + ', '
     return string
@@ -1889,7 +2075,7 @@ def write_constructor(file,object,fort_ctor=None):
     else:
         file.write('()')
     file.write(' {\n')
-    file.write('  data_ptr = NULL;\n')
+    file.write('  data_ptr = nullptr;\n')
     # Allocate storage for Fortran derived type
     file.write('  ' + object_allocator_binding_name(object.name) + '(&data_ptr); // Allocate Fortran derived type\n')
     # If present, call Fortran ctor
@@ -1915,14 +2101,80 @@ def write_destructor(file,object):
             target = 'data_ptr'
             prefix = 'if (initialized) ' if init_func_def else ''
             file.write('  ' + prefix + proc.c_binding_name() + '(' + target)
-            # Add NULL for any optional arguments (only optional
+            # Add nullptr for any optional arguments (only optional
             # arguments are allowed in the destructor call)
             for i in range(proc.nargs-1):
-                file.write(', NULL')
+                file.write(', nullptr')
             file.write('); // Fortran Destructor\n')
     # Deallocate Fortran derived type
     file.write('  ' + object_allocator_binding_name(object.name, True) + '(data_ptr); // Deallocate Fortran derived type\n')
     file.write('}\n\n')    
+
+def write_pybind11_bindings(classes):
+    file = open(include_output_dir + '/pybind11_bindings.cpp', 'w')
+    file.write('#include <pybind11/pybind11.h>\n')
+    file.write('#include <pybind11/stl.h>\n')
+    file.write('#include <pybind11/numpy.h>\n')
+    file.write('#include <optional>\n')
+
+    for cls in classes:
+        if cls.name.lower() in name_exclusions:
+            classes.remove(cls)
+
+    # Resolve inheritance structure:
+    # classes is ordered such that children always appear after their parent
+    # class dict is a mapping from class.cname to the class object
+    # class_inheritance_chains is a mapping from class.cname to list(parent1.cname, parent2.cname, ...)
+    # inherited_methods is a mapping from class.cname to list(methods defined in parent classes)
+    classes = sort_inheritance_tree(classes)
+    class_dict = {}
+    for cls in classes:
+        class_dict[cls.cname] = cls
+    inheritance_chains = {}
+    inherited_methods = {}
+    contains_methods_dict = {}
+    for cls in classes:
+        inherited_methods[cls.name] = []
+        inheritance_chains[cls.cname] = []
+        contains_methods_dict[cls.name] = []
+        this_cls = cls
+        while this_cls.extends is not None:
+            inheritance_chains[cls.cname].append(class_dict[this_cls.extends].cname)
+            this_cls = class_dict[this_cls.extends]
+
+    # Include the neccesary headers
+    for cls in classes:
+        if cls.abstract:
+            continue
+        file.write(f'#include "{cls.cname}.h"\n' )
+
+    file.write('namespace py = pybind11;\n')
+    file.write('using array_f = pybind11::array_t<float, pybind11::array::c_style | pybind11::array::forcecast>;\n')
+    file.write('using p_array_f = std::optional<pybind11::array_t<float, pybind11::array::c_style | pybind11::array::forcecast>>;\n')
+
+    # Write the macros used to write the pybind11 bindings
+    file.write('\n\n')
+    for cls in classes:
+        contains_methods = cls.write_pybind_macro(file, inherited_methods[cls.name])
+        if len(contains_methods) > 0:
+            file.write('\n')
+        contains_methods_dict[cls.cname] = contains_methods
+        for child, parents in inheritance_chains.items():
+            if cls.cname in parents:
+                inherited_methods[child].extend(contains_methods)
+
+    file.write('\n')
+    # Write the PYBIND11_MODULE definition
+    file.write('PYBIND11_MODULE(' + PYBIND11_LIB_NAME + ', handle){\n')
+    file.write('    handle.doc() = "Is this documentation? I have been told it is the best.";\n\n')
+    for cls in classes:
+        use_macros = []
+        use_macros.extend(inheritance_chains[cls.cname])
+        if len(contains_methods_dict[cls.cname]) > 0:
+            use_macros.append(cls.cname)
+        cls.write_pybind_binding(file, use_macros)
+    file.write('}\n')
+    file.close()
 
 def write_class(object):
 
@@ -1942,7 +2194,7 @@ def write_class(object):
     if SWIG:
         # Needs to be before the include's in the case of swig -includeall
         file.write('\n#ifndef SWIG // Protect declarations from SWIG\n')
-    file.write('#include <cstdlib>\n') # Needed for NULL
+    file.write('#include <cstdlib>\n') # Needed for nullptr
     if not opts.no_vector:
         file.write('#include <vector>\n')
     if complex_used:
@@ -2118,7 +2370,17 @@ def get_required_modules(module):
                 # "method" is defined in a separate module, and that
                 # module doesn't make the derived type public
                 includes.add(objects[arg.type.type.lower()].module)
-                
+
+    for obj in objects.values():
+        if obj.module != module:
+            continue
+        if obj.extends is None:
+            continue
+        for ext in objects.values():
+            if (obj.extends == ext.name) and (ext.module != module):
+                includes.add(ext.module)
+                includes.add(ext.module + '_wrap_')
+
     return includes
 
 def write_global_header_file():
@@ -2164,7 +2426,7 @@ def write_matrix_class():
     
     write_cpp_dox_comments(f, ['Create a matrix with m rows and n columns','','Allocates new memory'], prefix=2)
     f.write('  ' + matrix_classname + '(int m, int n) {\n')
-    f.write('    data = NULL;\n    assert(m>0 && n>0);\n    nrows=m; ncols=n;\n')
+    f.write('    data = nullptr;\n    assert(m>0 && n>0);\n    nrows=m; ncols=n;\n')
     f.write('    data = (T*) calloc( m*n, sizeof(T) );\n    owns = true;\n  }\n\n')
 
     write_cpp_dox_comments(f, ['Set up a pointer to existing contiguous array data (in Fortran order)'], prefix=2)
@@ -2250,9 +2512,9 @@ class DLLEXPORT $CLASSNAME{
     
     f.write('#include "' + string_classname + '.h"\n\n')
     body = """\
-$CLASSNAME::$CLASSNAME() : length_(0), data_(NULL) {}
+$CLASSNAME::$CLASSNAME() : length_(0), data_(nullptr) {}
 
-$CLASSNAME::$CLASSNAME(size_t length) : length_(length), data_(NULL) {
+$CLASSNAME::$CLASSNAME(size_t length) : length_(length), data_(nullptr) {
   if (length>0) data_ = (char*) calloc(length+1, sizeof(char));
 }
 
@@ -2313,12 +2575,88 @@ def write_fortran_iso_wrapper_single_module():
         
         f.write('END MODULE ' + 'FortranISOWrappers' + '\n')
 
+def sort_inheritance_tree(tree):
+    """
+    Sort a list of elements with the __lt__(self, other) method defined, but where
+        (c < b) & (b < d) != (c < d)
+    This is useful when sorting a list of modules or classes with an inheritance, or USE-structure as e.g.
+            c
+           / \
+          a   b
+              |
+              d
+    Where each element only knows its own parent, and returns (self < other) = False, if 'other' is the
+    elements parent.
+
+    In the above tree, the elements of the list [a, b, c, d] will give
+        c < a : True
+        b < a : True
+        c < d : True
+        b < d : True
+    While *all other comparisons*
+        return False.
+    The corresponding list is ordered as
+        [c, a, b, d] # Order of (a, b) is arbitrary
+    """
+    # Need custom sorting algorithm to handle the fact that we can have
+    # c <= b <= a, while c > a if only a USE'es c. Tested with Pythons sorting algorithm, it didn't work.
+    sorted_tree = [t for t in tree]
+    is_sorted = False
+    while is_sorted is False:
+        is_sorted = True
+        i = 0
+        while i < len(sorted_tree):
+            for j in range(i, len(sorted_tree)):
+                if j == i:
+                    continue
+                if sorted_tree[j] < sorted_tree[i]:
+                    sorted_tree[i], sorted_tree[j] = sorted_tree[j], sorted_tree[i]
+                    is_sorted = False
+                    i = j
+                    break
+            else:
+                i += 1
+
+    return sorted_tree
+
+def sort_module_list(module_list):
+    """
+    Sort module list based on USE statement dependency
+
+    :param module_list: list[str], list of module names
+    :return: sorted module list. The first module USE'es no other modules, successive modules are guaranteed to only
+            USE modules that appear previously in the list.
+    """
+
+    class Module:
+        def __init__(self, module_str):
+            self.name = module_str
+            self.includes = list(set(get_required_modules(self.name)) - set([self.name]))
+
+        def __lt__(self, other):
+            if self.name in other.includes:
+                if other.name in self.includes:
+                    raise RecursionError('Circular USE statemetns in: {' + self.name
+                                         + '.f90, ' + other.name + '.f90}')
+                return True
+
+            return False
+
+        def __str__(self):
+            return self.name
+
+    # Need custom sorting algorithm to handle the fact that we can have
+    # c <= b <= a, while c > a if only a USE'es c. Tested with Pythons sorting algorithm, it didn't work.
+    sorted_modules = sort_inheritance_tree([Module(mstr) for mstr in module_list])
+    return [str(module) for module in sorted_modules]
+
 def write_fortran_iso_wrapper_multiple_modules():
+    global module_list
     with open(os.path.join(fort_output_dir,'FortranISOWrappers.f90'), 'w') as f:
+        module_list = sort_module_list(module_list)
         for module in module_list:
             f.write('MODULE ' + '{}_wrap_'.format(module) + '\n\n')
             f.write('  USE ISO_C_BINDING\n')
-            f.write('  USE ' + module + '\n')
             includes = get_required_modules(module)
             for include in includes:
                 f.write('  USE ' + include + '\n')
@@ -2377,22 +2715,79 @@ def internal_error():
     sys.exit(1)
 
 
-# Class for parsing the configuration file
-class ConfigurationFile(object):
-    def __init__(self,fname):
-        self.fname = fname
-        if fname:
-            try:
-                self.f = open(fname)
-            except:
-                error("Error opening interface file: " + fname)
-                return
-            self.process()
+# Class for parsing command line options and config file
+# Options supplied on the command line will override options supplied in the config file.
+class Options:
+    def __init__(self):
+        global include_files_pattern, include_procedures_pattern, exclude_files_pattern, exclude_procedures_pattern,\
+            include_files, include_procedures, exclude_files, exclude_procedures
 
-    def process(self):
-        global name_exclusions, name_inclusions, name_substitutions, ctor_def, dtor_def, init_func_def
-        for line_num,line in enumerate(self.f):
-            if not line.startswith('%'):
+        self.parser = argparse.ArgumentParser(prog='fortwrap')
+        self.parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + VERSION)
+        self.parser.add_argument('-i', '--config-file', help='read interface configuration file CONFIG_FILE. Options supplied on the command line will overrule those in the config file.')
+        self.parser.add_argument('files', nargs='*', help='files to process')
+        self.parser.add_argument('-n', '--dry-run', action='store_true', help='run parser but do not generate any wrapper code (dry run)')
+        self.parser.add_argument('-g', '--glob', action='store_true', help='wrap source files found in current directory')
+        self.parser.add_argument('-d', '--directory', default='.', help='output generated wrapper code to DIRECTORY')
+        self.parser.add_argument('--file-list', help='Read list of Fortran source files to parser from file FILE_LIST.  The format is a newline-separated list of filenames with full or relative paths.')
+        self.parser.add_argument('--no-vector', action='store_true', help='wrap 1-D array arguments as C-style arrays instead of C++ std::vector containers')
+        self.parser.add_argument('--no-fmat', action='store_true', help='do not wrap 2-D array arguments with the FortranMatrix type')
+        self.parser.add_argument('--array-as-ptr', action='store_true', help="wrap 1-D arrays with '*' instead of '[]'.  Implies --no-vector")
+        self.parser.add_argument('--string-out', choices=['c++', 'c', 'wrapper'], default='c++')
+        # parser.add_argument('--no-std-string', action='store_true', help='wrap character outputs using a wrapper class instead of std::string')
+        self.parser.add_argument('--dummy-class', default='FortFuncs', help='use DUMMY_CLASS as the name of the dummy class used to wrap non-method procedures')
+        self.parser.add_argument('--global-funcs', action='store_true', help='wrap non-method procedures as global functions instead of static methods of a dummy class')
+        self.parser.add_argument('--no-orphans', action='store_true', help='do not by default wrap non-method procedures.  They can still be wrapped by using %%include directives')
+        self.parser.add_argument('--no-W-not-wrapped', action='store_true', help='do not warn about procedures that were not wrapped')
+        self.parser.add_argument('--main-header', default='FortWrap', help='Use MAIN_HEADER as name of the main header file (default=%(default)s)')
+        self.parser.add_argument('--constants-class', default='FortConstants', help='use CONSTANTS_CLASS as name of the class for wrapping enumerations (default=%(default)s)')
+        self.parser.add_argument('--single-module', action='store_true', help='write all Fortran ISO_C_BINDING wrappers to single module')
+        self.parser.add_argument('--document-all-params', action='store_true', help='write doxygen \\param comment for all arguments')
+        self.parser.add_argument('-pybind11', '--pybind11-lib-name', default='libnoname', help='Name of the library generated by Pybind11')
+        # Not documenting, as this option could be dangerous, although it is
+        # protected from -d.  help='remove all wrapper-related files from
+        # wrapper code directory before generating new code.  Requires -d.
+        # Warning: this deletes files.  Use with caution and assume it will
+        # delete everything in the wrapper directory'
+        self.parser.add_argument('--clean', action='store_true', help=argparse.SUPPRESS)
+
+        # First parse to get the config file, then parse the config file, then parse command line again
+        # to overwrite arguments that are supplied both on the command line and in the config file
+        self.parser.parse_args(namespace=self)
+        if self.config_file is not None:
+            try:
+                config_file_handle = open(self.config_file)
+                config_file_parser_args = self.process_config_file(config_file_handle)
+                self.parser.parse_args(config_file_parser_args, namespace=self)
+            except:
+                error("Error opening interface file: " + self.config_file)
+                return
+
+        else:
+            include_files.add('.*')
+            include_procedures.add('.*')
+            exclude_files.add('a^')
+            exclude_procedures.add('a^')
+
+        include_files_pattern = re.compile('|'.join(include_files))
+        include_procedures_pattern = re.compile('|'.join(include_procedures))
+        exclude_files_pattern = re.compile('|'.join(exclude_files))
+        exclude_procedures_pattern = re.compile('|'.join(exclude_procedures))
+
+        self.parser.parse_args(namespace=self)
+        self.check_args()
+        self.assign_globals()
+    
+    def process_config_file(self, config_file_handle):
+        global name_exclusions, name_inclusions, name_substitutions, ctor_def, dtor_def, init_func_def, \
+                include_files, exclude_files, include_procedures, exclude_procedures
+
+        config_file_parser_args = []
+        for line_num,line in enumerate(config_file_handle):
+            if not (line.startswith('%') or line.startswith('-') or line.startswith('--')):
+                continue
+            if line.startswith('-') or line.startswith('--'):
+                config_file_parser_args.extend(line.strip().split())
                 continue
             words = [w.lower() for w in line.split()]
             if words[0] == '%ignore':
@@ -2401,6 +2796,30 @@ class ConfigurationFile(object):
                 else:
                     self.bad_decl(line_num+1)
                     continue
+            elif words[0] == '%include_files':
+                if len(words) > 1:
+                    for w in words[1:]:
+                        include_files.add(w)
+                else:
+                    include_files.add('')
+            elif words[0] == '%exclude_files':
+                if len(words) > 1:
+                    for w in words[1:]:
+                        exclude_files.add(w)
+                else:
+                    exclude_files.add('')
+            elif words[0] == '%include_procedures':
+                if len(words) > 1:
+                    for w in words[1:]:
+                        include_procedures.add(w)
+                else:
+                    include_procedures.add('')
+            elif words[0] == '%exclude_procedures':
+                if len(words) > 1:
+                    for w in words[1:]:
+                        exclude_procedures.add(w)
+                else:
+                    exclude_procedures.add('')
             elif words[0] == '%hide':
                 if len(words) == 3:
                     proc_arg_exclusions.add( tuple(words[1:]) )
@@ -2441,54 +2860,30 @@ class ConfigurationFile(object):
                 init_func_def = re.compile(line.strip().split('%init ')[1], re.IGNORECASE)
             else:
                 error("Unrecognized declaration in interface file: {}".format(words[0]))
-                
-    def bad_decl(self,line_num):
-        error("{}, line {} <-- bad declaration".format(self.fname, line_num))
 
+        if len(include_files) == 0:
+            include_files.add('.*')
+        if len(include_procedures) == 0:
+            include_procedures.add('.*')
+        if len(exclude_procedures) == 0:
+            exclude_procedures.add('a^')
+        if len(exclude_files) == 0:
+            exclude_files.add('a^')
 
-# Class for parsing command line options
-class Options(object):
-    def __init__(self):
-        self.parse_args()
-        self.check_args()
-        self.assign_globals()
-    
-    def parse_args(self):
-        """Use argparse to parse command arguments"""
+        return config_file_parser_args
 
-        parser = argparse.ArgumentParser(prog='fortwrap')
-        parser.add_argument('-v','--version', action='version', version='%(prog)s '+VERSION)
-        parser.add_argument('files', nargs='*', help='files to process')
-        parser.add_argument('-n', '--dry-run', action='store_true', help='run parser but do not generate any wrapper code (dry run)')
-        parser.add_argument('-g','--glob', action='store_true', help='wrap source files found in current directory')
-        parser.add_argument('-d','--directory', default='.', help='output generated wrapper code to DIRECTORY')
-        parser.add_argument('--file-list', help='Read list of Fortran source files to parser from file FILE_LIST.  The format is a newline-separated list of filenames with full or relative paths.')
-        parser.add_argument('-i', '--config-file', help='read interface configuration file CONFIG_FILE')
-        parser.add_argument('--no-vector', action='store_true', help='wrap 1-D array arguments as C-style arrays instead of C++ std::vector containers')
-        parser.add_argument('--no-fmat', action='store_true', help='do not wrap 2-D array arguments with the FortranMatrix type')
-        parser.add_argument('--array-as-ptr', action='store_true', help="wrap 1-D arrays with '*' instead of '[]'.  Implies --no-vector")
-        parser.add_argument('--string-out', choices=['c++','c','wrapper'], default='c++')
-        #parser.add_argument('--no-std-string', action='store_true', help='wrap character outputs using a wrapper class instead of std::string')
-        parser.add_argument('--dummy-class', default='FortFuncs', help='use DUMMY_CLASS as the name of the dummy class used to wrap non-method procedures')
-        parser.add_argument('--global-funcs', action='store_true', help='wrap non-method procedures as global functions instead of static methods of a dummy class')
-        parser.add_argument('--no-orphans', action='store_true', help='do not by default wrap non-method procedures.  They can still be wrapped by using %%include directives')
-        parser.add_argument('--no-W-not-wrapped', action='store_true', help='do not warn about procedures that were not wrapped')
-        parser.add_argument('--main-header', default='FortWrap', help='Use MAIN_HEADER as name of the main header file (default=%(default)s)')
-        parser.add_argument('--constants-class', default='FortConstants', help='use CONSTANTS_CLASS as name of the class for wrapping enumerations (default=%(default)s)')
-        parser.add_argument('--single-module', action='store_true', help='write all Fortran ISO_C_BINDING wrappers to single module')
-        parser.add_argument('--document-all-params', action='store_true', help='write doxygen \\param comment for all arguments')
-        # Not documenting, as this option could be dangerous, although it is
-        # protected from -d.  help='remove all wrapper-related files from
-        # wrapper code directory before generating new code.  Requires -d.
-        # Warning: this deletes files.  Use with caution and assume it will
-        # delete everything in the wrapper directory'
-        parser.add_argument('--clean', action='store_true', help=argparse.SUPPRESS)
-
-        parser.parse_args(namespace=self)
+    def bad_decl(self, line_num):
+        error("{}, line {} <-- bad declaration".format(self.config_file, line_num))
 
     def check_args(self):
         """Additional validity checking an value setting not done automatically by argparse"""
-        if self.directory != '.':
+        # Ensuring absolute path, because if you 'pip install -e' the relative path will be relative to the location
+        # of the actual file, not the cwd or the symlink.
+        if self.directory == '.':
+            self.directory = os.getcwd()
+        else:
+            if self.directory[:2] == '..':
+                self.directory = os.getcwd() + '/' + self.directory
             if not os.path.isdir(self.directory):
                 error('Directory does not exist: ' + self.directory)
                 sys.exit(2)
@@ -2508,7 +2903,8 @@ class Options(object):
 
     def assign_globals(self):
         """Assign certain options to global variables"""
-        global code_output_dir, include_output_dir, fort_output_dir, string_object_type, constants_classname, orphan_classname, file_list
+        global code_output_dir, include_output_dir, fort_output_dir, string_object_type, constants_classname, \
+            orphan_classname, file_list, PYBIND11_LIB_NAME
 
         file_list = self.files
         orphan_classname = self.dummy_class
@@ -2521,56 +2917,78 @@ class Options(object):
         if self.string_out == 'wrapper':
             string_object_type = string_classname
 
+        PYBIND11_LIB_NAME = self.pybind11_lib_name
         constants_classname = self.constants_class
 
 
 
+# Setting global options
+try:
+    file_list = []
+
+    opts = Options()
+    opts.assign_globals()
+    if opts.clean:
+        clean_directories()
+
+    if opts.file_list:
+        try:
+            f = open(opts.file_list)
+        except IOError:
+            error('Unable to open file list: ' + opts.file_list)
+            sys.exit(3)
+        for line in f:
+            if not line.strip().startswith('#') and re.search('\w', line):
+                file_list.append(line.strip())
+        f.close()
+        print("LOADED", len(file_list), 'FILES FROM LIST')
+
+    if opts.glob:
+        file_list += glob.glob('*.[fF]90')
+
+    # If any patterns are given to the %include_files option of the configuration file, only files that match
+    # at least one of the patters will be parsed.
+    # If any patterns are given to the %exclude_files option, files that match any of the patterns will be excluded.
+    # By default, include_files_pattern = '[\s\S]*' (matches everything), and exclude_files_pattern = ''.
+    i = 0
+    while i < len(file_list):
+        if include_files_pattern.search(file_list[i]) and not exclude_files_pattern.search(file_list[i]):
+            i += 1
+            continue
+        file_list.pop(i)
+
+    if not file_list:
+        error("No source files")
+        sys.exit(3)
+
+    opts.file_list = file_list
+
+    fcount = 0  # Counts valid files
+    for f in file_list:
+        fcount += parse_file(f)
+    if fcount == 0:
+        error("No source files")
+        sys.exit(3)
+
+    # Prevent writing any files if there is nothing to wrap
+    if len(procedures) == 0:
+        error("No procedures to wrap")
+        sys.exit(4)
+
+except SystemExit:
+    # Raised by sys.exit
+    raise
+
+except NotImplementedError:
+    # NotImplementedError used to bypass error handling
+    internal_error()
+
+
 # COMMANDS ==========================================
 
-if __name__ == "__main__":
-
+def wrap():
+    global opts, configs, file_list, objects
     try:
-
-        file_list = []
-
-        opts = Options()
-
-        configs = ConfigurationFile(opts.config_file)
-
-        if opts.clean:
-            clean_directories()
-
-        if opts.file_list:
-            try:
-                f = open(opts.file_list)
-            except IOError:
-                error('Unable to open file list: ' + opts.file_list)
-                sys.exit(3)
-            for line in f:
-                if not line.strip().startswith('#') and re.search('\w', line):
-                    file_list.append( line.strip() )
-            f.close()
-            print("LOADED", len(file_list), 'FILES FROM LIST')
-
-        if opts.glob:
-            file_list += glob.glob('*.[fF]90')
-
-        if not file_list:
-            error("No source files")
-            sys.exit(3)
-
-        fcount = 0  # Counts valid files
-        for f in file_list:
-            fcount += parse_file(f)
-        if fcount==0:
-            error("No source files")
-            sys.exit(3)
-
-        # Prevent writing any files if there is nothing to wrap
-        if len(procedures)==0:
-            error("No procedures to wrap")
-            sys.exit(4)
-
         associate_procedures()
 
         if opts.warn_not_wrapped and len(not_wrapped) > 0:
@@ -2581,6 +2999,7 @@ if __name__ == "__main__":
         for obj in objects.values():
             write_class(obj)
 
+        write_pybind11_bindings(objects.values())
         write_global_header_file()
         write_misc_defs()
         write_matrix_class()
@@ -2603,3 +3022,7 @@ if __name__ == "__main__":
     except NotImplementedError:
         # NotImplementedError used to bypass error handling
         internal_error()
+
+
+if __name__ == "__main__":
+    wrap()
