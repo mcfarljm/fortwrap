@@ -2115,6 +2115,7 @@ def write_pybind11_bindings(classes):
     file.write('#include <pybind11/pybind11.h>\n')
     file.write('#include <pybind11/stl.h>\n')
     file.write('#include <pybind11/numpy.h>\n')
+    file.write('#include <optional>\n')
 
     for cls in classes:
         if cls.name.lower() in name_exclusions:

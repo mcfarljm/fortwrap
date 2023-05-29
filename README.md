@@ -1,29 +1,3 @@
-# Current workflow for use with fortwrap_thermopack_demo :
-
-First: `pip install -e .`
-
-Navigate to the `fortwrap_thermopack_demo` directory (from now reffered to as `demo`). 
-
-The script `build.sh` does the following:
-
- * Compile the Fortran source
- * Build the archive `libdemo_fortran.a`
- * Move the archive and `.mod` files to the `demo/wrappers` directory
- * Run `python -m fortwrap -g -i ../FortWrapOptions.txt` from the `demo/src` directory
- * Compile the resulting `FortranISOWrappers.f90` and add it to the `libdemo_fortran.a` archive
- * Compile the `.cpp` files in the `demo/wrappers` directory
- * Compile `demo/main.cpp`
-
-To build the python wrappings, you must additionally run `cmake ..` from the `demo/wrappers/build` directory.
-
-The `demo/wrappers/CMakeLists.txt` does the following:
-
- * Define the `pybind_module` target
- * Add the `demo/wrappers/.cpp` files to the target
-    * It is the binding module `pybind11_bindings.cpp` that is used, not `bindings.cpp`
- * Link to the archive `libdemo_fortran.a`
- * Link to `libgfortran.dylib`
-
 # FortWrap
 
 FortWrap is a python script that parses Fortran 90/95/2003 source files and
@@ -36,6 +10,26 @@ the Fortran derived types with C++ "proxy classes".
 Currently, FortWrap is targetted at the gfortran compiler,
 but the generated C++ code should work with any C++ compiler,
 including g++.
+
+# Current working example
+
+FortWrap is being used to develop a Fortran <=> C++ <=> Python wrapper for [ThermoPack](https://github.com/thermotools/thermopack). To see the most up-to-date usage of FortWrap (the `iso_c_bindings` branch at the moment of writing) for this purpose, see the [prototype](https://github.com/thermotools/thermopack/tree/prototype) or [beta_v3](https://github.com/thermotools/thermopack/tree/beta_v3) branches there.
+
+# Installing
+
+Since FortWrap is pure Python, it is simply installed by running
+
+```bash
+pip install .
+```
+
+from the top level directory (where `setup.py` is found). If you are actively developing FortWrap, use
+
+```bash
+pip install -e .
+```
+
+to create a symlink to the package instead of a hard copy.
 
 ## News
 
